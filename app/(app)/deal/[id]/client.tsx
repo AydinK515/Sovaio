@@ -1,12 +1,100 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
+
+function renderMarkdown(text: string) {
+  const lines = text.split('\n')
+  const elements: React.ReactNode[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Blank line
+    if (line.trim() === '') {
+      i++
+      continue
+    }
+
+    // Unordered list block
+    if (/^[-*]\s/.test(line.trim())) {
+      const items: string[] = []
+      while (i < lines.length && /^[-*]\s/.test(lines[i].trim())) {
+        items.push(lines[i].trim().replace(/^[-*]\s/, ''))
+        i++
+      }
+      elements.push(
+        <ul key={i} className="list-disc list-inside space-y-0.5 my-1">
+          {items.map((item, j) => (
+            <li key={j} className="text-sm leading-relaxed">{inlineFormat(item)}</li>
+          ))}
+        </ul>
+      )
+      continue
+    }
+
+    // Ordered list block
+    if (/^\d+\.\s/.test(line.trim())) {
+      const items: string[] = []
+      while (i < lines.length && /^\d+\.\s/.test(lines[i].trim())) {
+        items.push(lines[i].trim().replace(/^\d+\.\s/, ''))
+        i++
+      }
+      elements.push(
+        <ol key={i} className="list-decimal list-inside space-y-0.5 my-1">
+          {items.map((item, j) => (
+            <li key={j} className="text-sm leading-relaxed">{inlineFormat(item)}</li>
+          ))}
+        </ol>
+      )
+      continue
+    }
+
+    // Heading
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      const content = headingMatch[2]
+      elements.push(
+        <p key={i} className={`font-semibold leading-relaxed ${level === 1 ? 'text-base' : 'text-sm'} mt-2 mb-0.5`}>
+          {inlineFormat(content)}
+        </p>
+      )
+      i++
+      continue
+    }
+
+    // Normal paragraph
+    elements.push(
+      <p key={i} className="text-sm leading-relaxed">
+        {inlineFormat(line)}
+      </p>
+    )
+    i++
+  }
+
+  return elements.length > 0 ? <div className="space-y-1">{elements}</div> : null
+}
+
+function inlineFormat(text: string): React.ReactNode[] {
+  // Handle **bold** and *italic*
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={i}>{part.slice(1, -1)}</em>
+    }
+    return part
+  })
+}
 
 const THINKING_LABELS = ['Thinking...', 'Analyzing...', 'Reviewing offer...', 'Crafting response...', 'Strategizing...']
 
@@ -561,8 +649,10 @@ export default function DealClient({
       return
     }
 
-    await supabase.from('deals').update({ status, updated_at: new Date().toISOString() }).eq('id', deal.id)
-    setDeal(prev => ({ ...prev, status }))
+    const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+    if (status === 'negotiating') update.final_price = null
+    await supabase.from('deals').update(update).eq('id', deal.id)
+    setDeal(prev => ({ ...prev, status, ...(status === 'negotiating' ? { final_price: null } : {}) }))
   }
 
   async function closeDealWon() {
@@ -811,7 +901,7 @@ export default function DealClient({
                   <p className="text-xs font-medium mb-1 opacity-60">
                     {msg.role === 'ai' ? 'RateProof AI' : 'You'}
                   </p>
-                  <p className="text-sm leading-relaxed">{msg.content}</p>
+                  {msg.role === 'ai' ? renderMarkdown(msg.content) : <p className="text-sm leading-relaxed">{msg.content}</p>}
 
                   {msg.suggested_script && (
                     <div className="mt-3 bg-white/10 rounded-xl p-4 border border-primary/20">
@@ -840,11 +930,9 @@ export default function DealClient({
               <div className="flex justify-start">
                 <div className="max-w-[80%] bg-muted-light rounded-2xl rounded-bl-sm px-5 py-3">
                   <p className="text-xs font-medium mb-1 opacity-60">RateProof AI</p>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {aiText || (
-                      <ThinkingLabel />
-                    )}
-                  </p>
+                  <div className="text-sm leading-relaxed">
+                    {aiText ? renderMarkdown(aiText) : <ThinkingLabel />}
+                  </div>
                   {aiReasoningText && (
                     <div className="mt-3 rounded-xl border border-border bg-white/50 p-4">
                       <span className="text-xs font-semibold uppercase tracking-wider text-muted">Thinking</span>
@@ -889,13 +977,27 @@ export default function DealClient({
                   <p className="mt-0.5 text-sm text-red-700">Come back tomorrow and your limit will reset.</p>
                 </div>
               ) : (
-                <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-center gap-3">
-                  <input
+                <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-3">
+                  <textarea
                     value={input}
                     onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendMessage()
+                      }
+                    }}
                     placeholder="Tell me what happened in the negotiation..."
                     disabled={sending}
-                    className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
+                    rows={1}
+                    className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 resize-none overflow-hidden"
+                    style={{ minHeight: '44px', maxHeight: '160px' }}
+                    ref={el => {
+                      if (el) {
+                        el.style.height = 'auto'
+                        el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+                      }
+                    }}
                   />
                   {aiTyping ? (
                     <button
@@ -923,9 +1025,7 @@ export default function DealClient({
             <div className="shrink-0 border-t border-border p-4 text-center">
               <p className="text-sm text-muted">
                 This deal is {deal.status === 'closed_won' ? 'closed (won)' : deal.status === 'closed_lost' ? 'closed (lost)' : 'stalled'}.
-                {deal.status === 'stalled' && (
-                  <button onClick={() => updateStatus('negotiating')} className="ml-2 text-primary font-medium hover:underline">Resume</button>
-                )}
+                <button onClick={() => updateStatus('negotiating')} className="ml-2 text-primary font-medium hover:underline">Resume</button>
               </p>
             </div>
           )}

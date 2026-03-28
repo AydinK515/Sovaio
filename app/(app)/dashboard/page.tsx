@@ -4,22 +4,26 @@ import Link from 'next/link'
 import { Plus, ArrowRight, Upload, BookOpen, TrendingUp, DollarSign, BarChart3, FileStack } from 'lucide-react'
 import type { RateCard, Deal } from '@/lib/types'
 
-function StatusBadge({ status }: { status: Deal['status'] }) {
+function StatusBadge({ status, finalPrice }: { status: Deal['status'], finalPrice?: number | null }) {
   const styles = {
     negotiating: 'bg-blue-50 text-blue-700 border-blue-200',
     closed_won: 'bg-green-50 text-green-700 border-green-200',
     closed_lost: 'bg-red-50 text-red-700 border-red-200',
     stalled: 'bg-amber-50 text-amber-700 border-amber-200',
   }
-  const labels = {
-    negotiating: 'Negotiating',
-    closed_won: 'Closed Won',
-    closed_lost: 'Closed Lost',
-    stalled: 'Stalled',
+  let label: string
+  if (status === 'closed_won') {
+    label = finalPrice ? `Closed for ${formatCurrency(finalPrice)}` : 'Closed Won'
+  } else if (status === 'closed_lost') {
+    label = 'Closed Lost'
+  } else if (status === 'negotiating') {
+    label = 'Negotiating'
+  } else {
+    label = 'Stalled'
   }
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>
-      {labels[status]}
+      {label}
     </span>
   )
 }
@@ -223,7 +227,7 @@ export default async function DashboardPage() {
                 {deals!.map((deal: Deal) => (
                   <tr key={deal.id} className="border-b border-border last:border-0 hover:bg-muted-light/50 transition-colors">
                     <td className="px-6 py-4 font-medium">{deal.brand_name}</td>
-                    <td className="px-6 py-4"><StatusBadge status={deal.status} /></td>
+                    <td className="px-6 py-4"><StatusBadge status={deal.status} finalPrice={deal.final_price} /></td>
                     <td className="px-6 py-4 text-muted">{formatDate(deal.updated_at)}</td>
                     <td className="px-6 py-4 font-medium">{formatCurrency(deal.creator_ask)}</td>
                     <td className="px-6 py-4">
@@ -231,7 +235,7 @@ export default async function DashboardPage() {
                         href={`/deal/${deal.id}`}
                         className="inline-flex items-center gap-1 text-primary text-sm font-medium hover:underline"
                       >
-                        {deal.status === 'negotiating' ? 'Continue Negotiating' : deal.status === 'closed_won' ? 'View Contract' : 'Archived'}
+                        {deal.status === 'negotiating' ? 'Continue Negotiating' : 'Archived'}
                         <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </td>
