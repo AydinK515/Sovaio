@@ -1,12 +1,17 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { streamText, createTextStreamResponse } from 'ai'
+import { createTextStreamResponse, streamText } from 'ai'
 
 export const runtime = 'edge'
 
 export async function POST(req: Request) {
   const { brandMessage, deal, messageHistory } = await req.json()
+  const apiKey = process.env.OPENAI_API_KEY
 
-  const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  if (!apiKey) {
+    return new Response('Missing OPENAI_API_KEY', { status: 500 })
+  }
+
+  const openai = createOpenAI({ apiKey })
 
   const systemPrompt = `You are RateProof AI, an expert negotiation advisor for YouTube creators dealing with brand sponsorship negotiations.
 
@@ -18,14 +23,21 @@ ${deal.brand_last_offer ? `- Brand's last known offer: $${deal.brand_last_offer.
 ${deal.timeline ? `- Timeline: ${deal.timeline}` : ''}
 ${deal.notes ? `- Additional notes: ${deal.notes}` : ''}
 
-Your job is to analyze what the brand just said and give the creator tactical negotiation advice. Be direct, confident, and specific.
+Your job is to analyze what the brand just said and give the creator tactical negotiation advice. Be direct, specific, and commercially realistic.
 
-Format your response in EXACTLY this structure — no other format is acceptable:
+Rules:
+- Protect the creator's leverage without sounding hostile.
+- If the brand offer is weak, explain why and suggest a credible counter.
+- If the brand message lacks key details, tell the creator what to clarify next.
+- Never invent campaign details that were not provided.
+- Keep the advice concise and the reply usable in a real email or DM thread.
 
-[Your tactical analysis and advice in 2-4 sentences. Be specific about leverage, psychology, and what the creator should do next.]
+Format your response in EXACTLY this structure:
+
+[Your tactical analysis and advice in 2-4 sentences.]
 
 ---SCRIPT---
-[A ready-to-send reply the creator can use verbatim or adapt. Write it in first person as the creator. Keep it professional but assertive.]
+[A ready-to-send reply the creator can use verbatim or adapt. Write it in first person as the creator.]
 
 The ---SCRIPT--- separator must appear exactly as written. Do not add anything after the script.`
 
@@ -37,7 +49,7 @@ The ---SCRIPT--- separator must appear exactly as written. Do not add anything a
     })) as Array<{ role: 'user' | 'assistant'; content: string }>
 
   const result = streamText({
-    model: openai('gpt-4o-mini'),
+    model: openai('gpt-5-mini'),
     system: systemPrompt,
     messages: [
       ...history,

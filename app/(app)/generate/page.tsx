@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Papa from 'papaparse'
+import { strFromU8, unzipSync } from 'fflate'
 import { createClient } from '@/lib/supabase-browser'
 import { CSV_TYPES, NICHES } from '@/lib/types'
 import { Upload, CheckCircle2, Circle, ExternalLink, Sparkles, Info, X, FileText, BarChart3 } from 'lucide-react'
@@ -13,6 +13,7 @@ interface ParsedFile {
   data: Record<string, unknown>[]
   rowCount: number
   fileName: string
+  quality: number
 }
 
 const LOADING_MESSAGES = [
@@ -55,49 +56,149 @@ export default function GeneratePage() {
   const confidenceColor = confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
   const barColor = confidence < 40 ? 'bg-primary' : confidence < 70 ? 'bg-warning' : 'bg-success'
 
-  function detectCsvType(headers: string[]): string {
+  function detectCsvType(headers: string[], fileName: string): string | null {
     const h = headers.map(s => s.toLowerCase().trim())
-    if (h.some(x => x.includes('video title') || x.includes('views') || x.includes('watch time'))) return 'content'
+    const lowerFileName = fileName.toLowerCase()
+    const hasVideoTitle = h.some(x => x.includes('video title'))
+    const hasContentId = h.includes('content')
+    const hasViews = h.some(x => x === 'views' || x.includes('views'))
+    const hasWatchTime = h.some(x => x.includes('watch time'))
+    const hasSubscribers = h.some(x => x.includes('subscribers'))
+    const hasDate = h.includes('date')
+    const hasCountry = h.some(x => x.includes('country') || x.includes('geography'))
+    const hasAge = h.some(x => x.includes('age'))
+    const hasGender = h.some(x => x.includes('gender'))
+    const hasTrafficSource = h.some(x => x.includes('traffic source') || x.includes('source type'))
+    const hasRetention = h.some(x => x.includes('retention') || x.includes('average percentage viewed') || x.includes('average view duration'))
+
+    if ((lowerFileName.includes('totals') || lowerFileName.includes('chart data')) && hasDate && hasViews && !hasVideoTitle) {
+      return null
+    }
+
+    if (hasAge || hasGender) return 'demographics'
+    if (hasCountry) return 'geography'
+    if (hasTrafficSource) return 'traffic_sources'
+    if (hasRetention) return 'retention'
+
+    if ((hasVideoTitle || hasContentId) && (hasViews || hasWatchTime || hasSubscribers)) return 'content'
     if (h.some(x => x.includes('age') || x.includes('gender'))) return 'demographics'
     if (h.some(x => x.includes('country') || x.includes('geography'))) return 'geography'
     if (h.some(x => x.includes('traffic source') || x.includes('source type'))) return 'traffic_sources'
     if (h.some(x => x.includes('retention') || x.includes('average percentage viewed') || x.includes('average view duration'))) return 'retention'
-    return 'content' // default
+
+    return null
   }
 
-  const handleFiles = useCallback((files: FileList | File[]) => {
+  function getQualityScore(headers: string[], fileName: string, rowCount: number): number {
+    const h = headers.map(s => s.toLowerCase().trim())
+    const lowerFileName = fileName.toLowerCase()
+    let score = rowCount + h.length * 5
+
+    if (lowerFileName.includes('table data')) score += 500
+    if (lowerFileName.includes('chart data')) score -= 250
+    if (lowerFileName.includes('totals')) score -= 500
+    if (h.some(x => x.includes('video title'))) score += 100
+    if (h.some(x => x.includes('watch time'))) score += 50
+    if (h.some(x => x.includes('country') || x.includes('geography'))) score += 50
+
+    return score
+  }
+
+  function normalizeRows(rows: Record<string, unknown>[]) {
+    return rows.filter((row) => {
+      const values = Object.values(row).filter(value => value !== null && value !== undefined && String(value).trim() !== '')
+      if (values.length === 0) return false
+
+      const content = String(row['Content'] ?? '').trim().toLowerCase()
+      const title = String(row['Video title'] ?? '').trim().toLowerCase()
+      return content !== 'total' && title !== 'total'
+    })
+  }
+
+  function parseCsvText(fileName: string, text: string): ParsedFile | null {
+    const results = Papa.parse<Record<string, unknown>>(text, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: header => header.trim(),
+    })
+
+    const headers = results.meta.fields || []
+    const type = detectCsvType(headers, fileName)
+    if (!type) return null
+
+    const normalizedData = normalizeRows(results.data)
+    if (normalizedData.length === 0) return null
+
+    return {
+      type,
+      data: normalizedData,
+      rowCount: normalizedData.length,
+      fileName,
+      quality: getQualityScore(headers, fileName, normalizedData.length),
+    }
+  }
+
+  async function extractZipCandidates(file: File) {
+    const archive = unzipSync(new Uint8Array(await file.arrayBuffer()))
+    const parsed: ParsedFile[] = []
+
+    for (const [entryName, bytes] of Object.entries(archive)) {
+      if (!entryName.toLowerCase().endsWith('.csv')) continue
+
+      const text = strFromU8(bytes)
+      const candidate = parseCsvText(`${file.name} > ${entryName}`, text)
+      if (candidate) parsed.push(candidate)
+    }
+
+    return parsed
+  }
+
+  async function handleFiles(files: FileList | File[]) {
     setError('')
-    const fileArray = Array.from(files).filter(f => f.name.endsWith('.csv'))
+    const fileArray = Array.from(files).filter(f => {
+      const lower = f.name.toLowerCase()
+      return lower.endsWith('.csv') || lower.endsWith('.zip')
+    })
+
     if (fileArray.length === 0) {
-      setError('Please upload CSV files only.')
+      setError('Please upload YouTube CSV files or exported .zip bundles.')
       return
     }
 
-    fileArray.forEach(file => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete(results) {
-          if (results.data.length === 0) return
-          const headers = results.meta.fields || []
-          const type = detectCsvType(headers)
-
-          setParsedFiles(prev => {
-            const filtered = prev.filter(f => f.type !== type)
-            return [...filtered, {
-              type,
-              data: results.data as Record<string, unknown>[],
-              rowCount: results.data.length,
-              fileName: file.name,
-            }]
-          })
-        },
-        error() {
-          setError(`Failed to parse ${file.name}`)
+    try {
+      const extracted = await Promise.all(fileArray.map(async (file) => {
+        const lower = file.name.toLowerCase()
+        if (lower.endsWith('.zip')) {
+          return extractZipCandidates(file)
         }
+
+        const text = await file.text()
+        const candidate = parseCsvText(file.name, text)
+        return candidate ? [candidate] : []
+      }))
+
+      const candidates = extracted.flat()
+      if (candidates.length === 0) {
+        setError('No supported YouTube report tables were found in those files.')
+        return
+      }
+
+      setParsedFiles(prev => {
+        const bestByType = new Map(prev.map(file => [file.type, file]))
+
+        for (const candidate of candidates) {
+          const existing = bestByType.get(candidate.type)
+          if (!existing || candidate.quality >= existing.quality) {
+            bestByType.set(candidate.type, candidate)
+          }
+        }
+
+        return Array.from(bestByType.values())
       })
-    })
-  }, [])
+    } catch {
+      setError('One of the uploaded files could not be unpacked or parsed.')
+    }
+  }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -253,7 +354,7 @@ export default function GeneratePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.zip"
               multiple
               onChange={e => e.target.files && handleFiles(e.target.files)}
               className="hidden"
@@ -261,8 +362,8 @@ export default function GeneratePage() {
             <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Upload className="w-7 h-7 text-primary" />
             </div>
-            <p className="font-semibold text-lg">Drop your YouTube Studio CSVs here</p>
-            <p className="mt-2 text-sm text-muted">Upload the specific reports from your dashboard to unlock high-precision rate estimates.</p>
+            <p className="font-semibold text-lg">Drop your YouTube Studio exports here</p>
+            <p className="mt-2 text-sm text-muted">Upload raw CSVs or the zipped exports YouTube gives you. We&apos;ll unpack the right table automatically.</p>
             <button className="mt-4 px-6 py-2.5 bg-secondary text-white text-sm font-medium rounded-xl hover:bg-secondary-hover transition-colors">
               Click to browse files
             </button>
@@ -414,4 +515,3 @@ export default function GeneratePage() {
     </div>
   )
 }
-
