@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealMessage } from '@/lib/types'
@@ -18,10 +17,7 @@ const DEAL_TYPE_LABELS = {
   integration_30s: 'Integrated (30s)',
 }
 
-const SCRIPT_SEPARATOR = '---SCRIPT---'
-
 export default function DealClient({ deal: initialDeal, initialMessages }: { deal: Deal; initialMessages: DealMessage[] }) {
-  const router = useRouter()
   const [deal, setDeal] = useState(initialDeal)
   const [messages, setMessages] = useState(initialMessages)
   const [input, setInput] = useState('')
@@ -83,7 +79,7 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
     // Build message history for context (exclude the message we just saved so it goes as the final user turn)
     const historyForContext = messages.map(m => ({ role: m.role, content: m.content }))
 
-    // Stream AI response
+    // Request AI response
     const controller = new AbortController()
     abortRef.current = controller
 
@@ -107,40 +103,35 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
       })
 
       if (!response.ok) throw new Error(`API error: ${response.status}`)
+      const payload = await response.json()
+      const advice = typeof payload?.advice === 'string' ? payload.advice.trim() : ''
+      const script = typeof payload?.script === 'string' ? payload.script.trim() : null
+      const rawText = typeof payload?.rawText === 'string' ? payload.rawText : ''
+      const messageContent = advice || rawText.trim() || 'I generated a response, but it came back empty.'
 
-      const reader = response.body!.getReader()
-      const decoder = new TextDecoder()
-      let fullText = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        fullText += chunk
-        setAiText(fullText)
-      }
-
-      // Parse advice and script from response
-      const scriptIndex = fullText.indexOf(SCRIPT_SEPARATOR)
-      let advice = fullText
-      let script: string | null = null
-
-      if (scriptIndex !== -1) {
-        advice = fullText.slice(0, scriptIndex).trim()
-        script = fullText.slice(scriptIndex + SCRIPT_SEPARATOR.length).trim()
-      }
+      setAiText(messageContent)
 
       // Save AI message to Supabase
       const { data: aiMsg } = await supabase.from('deal_messages').insert({
         deal_id: deal.id,
         user_id: user.id,
         role: 'ai',
-        content: advice,
+        content: messageContent,
         suggested_script: script,
       }).select('*').single()
 
       if (aiMsg) {
         setMessages(prev => [...prev, aiMsg as DealMessage])
+      } else if (messageContent) {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          deal_id: deal.id,
+          user_id: user.id,
+          role: 'ai',
+          content: messageContent,
+          suggested_script: script,
+          created_at: new Date().toISOString(),
+        } as DealMessage])
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {

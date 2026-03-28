@@ -70,7 +70,6 @@ For pitch_email:
     schema: RateCardSchema,
     system,
     prompt,
-    temperature: 0.3,
   })
 
   return Response.json(object)

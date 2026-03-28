@@ -1,19 +1,20 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { createTextStreamResponse, streamText } from 'ai'
+import { generateText } from 'ai'
 
-export const runtime = 'edge'
+const SCRIPT_SEPARATOR = '---SCRIPT---'
 
 export async function POST(req: Request) {
-  const { brandMessage, deal, messageHistory } = await req.json()
-  const apiKey = process.env.OPENAI_API_KEY
+  try {
+    const { brandMessage, deal, messageHistory } = await req.json()
+    const apiKey = process.env.OPENAI_API_KEY
 
-  if (!apiKey) {
-    return new Response('Missing OPENAI_API_KEY', { status: 500 })
-  }
+    if (!apiKey) {
+      return new Response('Missing OPENAI_API_KEY', { status: 500 })
+    }
 
-  const openai = createOpenAI({ apiKey })
+    const openai = createOpenAI({ apiKey })
 
-  const systemPrompt = `You are RateProof AI, an expert negotiation advisor for YouTube creators dealing with brand sponsorship negotiations.
+    const systemPrompt = `You are RateProof AI, an expert negotiation advisor for YouTube creators dealing with brand sponsorship negotiations.
 
 The creator's deal context:
 - Brand: ${deal.brand_name}
@@ -41,23 +42,40 @@ Format your response in EXACTLY this structure:
 
 The ---SCRIPT--- separator must appear exactly as written. Do not add anything after the script.`
 
-  const history = (messageHistory as Array<{ role: string; content: string }>)
-    .filter(m => m.role === 'brand' || m.role === 'ai')
-    .map(m => ({
-      role: m.role === 'ai' ? 'assistant' : 'user',
-      content: m.content,
-    })) as Array<{ role: 'user' | 'assistant'; content: string }>
+    const history = (messageHistory as Array<{ role: string; content: string }>)
+      .filter(m => m.role === 'brand' || m.role === 'ai')
+      .map(m => ({
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: m.content,
+      })) as Array<{ role: 'user' | 'assistant'; content: string }>
 
-  const result = streamText({
-    model: openai('gpt-5-mini'),
-    system: systemPrompt,
-    messages: [
-      ...history,
-      { role: 'user', content: brandMessage },
-    ],
-    maxOutputTokens: 400,
-    temperature: 0.7,
-  })
+    const { text } = await generateText({
+      model: openai('gpt-5-mini'),
+      system: systemPrompt,
+      messages: [
+        ...history,
+        { role: 'user', content: brandMessage },
+      ],
+      maxOutputTokens: 400,
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'minimal',
+          textVerbosity: 'low',
+        },
+      },
+    })
 
-  return createTextStreamResponse({ textStream: result.textStream })
+    const scriptIndex = text.indexOf(SCRIPT_SEPARATOR)
+    const advice = (scriptIndex === -1 ? text : text.slice(0, scriptIndex)).trim()
+    const script = (scriptIndex === -1 ? '' : text.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
+
+    return Response.json({
+      advice,
+      script: script || null,
+      rawText: text,
+    })
+  } catch (error) {
+    console.error('Negotiation AI failed', error)
+    return Response.json({ error: 'Failed to generate negotiation advice.' }, { status: 500 })
+  }
 }
