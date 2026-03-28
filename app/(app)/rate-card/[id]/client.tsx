@@ -2,10 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { RateCard } from '@/lib/types'
-import { Copy, Check, Download, ArrowRight, TrendingUp, Sparkles, FileText } from 'lucide-react'
+import { Copy, Check, Download, TrendingUp, Sparkles, FileText } from 'lucide-react'
 
 function formatCurrency(n: number) {
   return `$${n.toLocaleString()}`
@@ -49,7 +48,10 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
     setCreatingDeal(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setCreatingDeal(false)
+      return
+    }
 
     const askAmount = creatorAsk ? parseInt(creatorAsk.replace(/,/g, '')) : (() => {
       switch (dealType) {
@@ -73,15 +75,27 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
       return
     }
 
+    const { data: chat, error: chatError } = await supabase.from('deal_chats').insert({
+      deal_id: deal.id,
+      user_id: user.id,
+      title: 'Chat 1',
+    }).select('id').single()
+
+    if (chatError || !chat) {
+      setCreatingDeal(false)
+      return
+    }
+
     // Create initial AI message
     await supabase.from('deal_messages').insert({
       deal_id: deal.id,
+      chat_id: chat.id,
       user_id: user.id,
       role: 'ai',
       content: `I've reviewed your rate card. You're asking ${formatCurrency(askAmount!)} from ${brandName} for a ${dealType === 'dedicated_video' ? 'dedicated video' : dealType === 'integration_60s' ? '60s integration' : '30s integration'}. What did they come back with?`,
     })
 
-    router.push(`/deal/${deal.id}`)
+    router.push(`/deal/${deal.id}?chat=${chat.id}`)
   }
 
   const tips = rateCard.improvement_tips as { title: string; description: string }[] | null

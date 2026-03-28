@@ -1,10 +1,17 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
-import type { Deal, DealMessage } from '@/lib/types'
+import type { Deal, DealChat, DealMessage } from '@/lib/types'
 import DealClient from './client'
 
-export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DealPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ chat?: string }>
+}) {
   const { id } = await params
+  const { chat: requestedChatId } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
@@ -19,10 +26,30 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   if (!deal) notFound()
 
   const { data: messages } = await supabase
-    .from('deal_messages')
+    .from('deal_chats')
     .select('*')
     .eq('deal_id', id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: true })
 
-  return <DealClient deal={deal as Deal} initialMessages={(messages || []) as DealMessage[]} />
+  const chats = (messages || []) as DealChat[]
+  const selectedChat = chats.find(chat => chat.id === requestedChatId) ?? chats[0] ?? null
+
+  const { data: threadMessages } = selectedChat
+    ? await supabase
+      .from('deal_messages')
+      .select('*')
+      .eq('deal_id', id)
+      .eq('chat_id', selectedChat.id)
+      .order('created_at', { ascending: true })
+    : { data: [] }
+
+  return (
+    <DealClient
+      deal={deal as Deal}
+      initialChats={chats}
+      initialChat={selectedChat}
+      initialMessages={(threadMessages || []) as DealMessage[]}
+    />
+  )
 }

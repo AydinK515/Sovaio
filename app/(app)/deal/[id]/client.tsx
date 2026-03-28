@@ -1,14 +1,28 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-import type { Deal, DealMessage } from '@/lib/types'
-import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft } from 'lucide-react'
+import type { Deal, DealChat, DealMessage } from '@/lib/types'
+import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus } from 'lucide-react'
 
 function formatCurrency(n: number | null) {
-  if (n == null) return '—'
+  if (n == null) return '--'
   return `$${n.toLocaleString()}`
+}
+
+const SCRIPT_SEPARATOR = '---SCRIPT---'
+
+function parseNegotiationText(text: string) {
+  const scriptIndex = text.indexOf(SCRIPT_SEPARATOR)
+  const advice = (scriptIndex === -1 ? text : text.slice(0, scriptIndex)).trim()
+  const script = (scriptIndex === -1 ? '' : text.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
+
+  return {
+    advice,
+    script: script || null,
+  }
 }
 
 const DEAL_TYPE_LABELS = {
@@ -17,8 +31,25 @@ const DEAL_TYPE_LABELS = {
   integration_30s: 'Integrated (30s)',
 }
 
-export default function DealClient({ deal: initialDeal, initialMessages }: { deal: Deal; initialMessages: DealMessage[] }) {
+function getOpeningMessage(deal: Deal) {
+  return `This is a fresh negotiation thread for ${deal.brand_name}. You're targeting ${formatCurrency(deal.creator_ask)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Paste the latest brand reply here and I'll help you work this angle.`
+}
+
+export default function DealClient({
+  deal: initialDeal,
+  initialChats,
+  initialChat,
+  initialMessages,
+}: {
+  deal: Deal
+  initialChats: DealChat[]
+  initialChat: DealChat | null
+  initialMessages: DealMessage[]
+}) {
+  const router = useRouter()
   const [deal, setDeal] = useState(initialDeal)
+  const [chats, setChats] = useState(initialChats)
+  const [currentChat, setCurrentChat] = useState(initialChat)
   const [messages, setMessages] = useState(initialMessages)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -27,14 +58,41 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
+  const [creatingChat, setCreatingChat] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const supabase = createClient()
 
   useEffect(() => {
+    setDeal(initialDeal)
+  }, [initialDeal])
+
+  useEffect(() => {
+    setChats(initialChats)
+  }, [initialChats])
+
+  useEffect(() => {
+    setCurrentChat(initialChat)
+  }, [initialChat])
+
+  useEffect(() => {
+    setMessages(initialMessages)
+  }, [initialMessages])
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, aiText])
+
+  function markChatUpdated(chatId: string, updatedAt: string) {
+    setChats(prev =>
+      prev.map(chat =>
+        chat.id === chatId
+          ? { ...chat, updated_at: updatedAt }
+          : chat
+      )
+    )
+  }
 
   async function copyScript(text: string, id: string) {
     await navigator.clipboard.writeText(text)
@@ -43,17 +101,21 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
   }
 
   async function sendMessage() {
-    if (!input.trim() || sending) return
+    if (!input.trim() || sending || !currentChat) return
     setSending(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setSending(false)
+      return
+    }
 
     const brandText = input.trim()
 
     // Save brand message to Supabase
     const { data: brandMsg } = await supabase.from('deal_messages').insert({
       deal_id: deal.id,
+      chat_id: currentChat.id,
       user_id: user.id,
       role: 'brand',
       content: brandText,
@@ -62,6 +124,11 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
     if (brandMsg) {
       setMessages(prev => [...prev, brandMsg as DealMessage])
     }
+
+    const messageTimestamp = new Date().toISOString()
+    await supabase.from('deal_chats').update({ updated_at: messageTimestamp }).eq('id', currentChat.id)
+    await supabase.from('deals').update({ updated_at: messageTimestamp }).eq('id', deal.id)
+    markChatUpdated(currentChat.id, messageTimestamp)
 
     // Extract dollar amount from brand message for offer tracking
     const numberMatch = brandText.match(/\$?([\d,]+)/)
@@ -103,17 +170,32 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
       })
 
       if (!response.ok) throw new Error(`API error: ${response.status}`)
-      const payload = await response.json()
-      const advice = typeof payload?.advice === 'string' ? payload.advice.trim() : ''
-      const script = typeof payload?.script === 'string' ? payload.script.trim() : null
-      const rawText = typeof payload?.rawText === 'string' ? payload.rawText : ''
-      const messageContent = advice || rawText.trim() || 'I generated a response, but it came back empty.'
+      if (!response.body) throw new Error('API returned no response body')
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let fullText = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+
+        fullText += decoder.decode(value, { stream: true })
+        const partial = parseNegotiationText(fullText)
+        setAiText(partial.advice || fullText.trim())
+      }
+
+      fullText += decoder.decode()
+
+      const { advice, script } = parseNegotiationText(fullText)
+      const messageContent = advice || fullText.trim() || 'I generated a response, but it came back empty.'
 
       setAiText(messageContent)
 
       // Save AI message to Supabase
       const { data: aiMsg } = await supabase.from('deal_messages').insert({
         deal_id: deal.id,
+        chat_id: currentChat.id,
         user_id: user.id,
         role: 'ai',
         content: messageContent,
@@ -126,6 +208,7 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           deal_id: deal.id,
+          chat_id: currentChat.id,
           user_id: user.id,
           role: 'ai',
           content: messageContent,
@@ -139,6 +222,7 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           deal_id: deal.id,
+          chat_id: currentChat.id,
           user_id: user?.id ?? '',
           role: 'ai',
           content: 'Sorry, I ran into an error. Please check that your OpenAI API key is configured.',
@@ -151,6 +235,48 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
       setAiText('')
       abortRef.current = null
     }
+  }
+
+  async function createChat() {
+    if (creatingChat) return
+    setCreatingChat(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setCreatingChat(false)
+      return
+    }
+
+    const title = `Chat ${chats.length + 1}`
+    const { data: newChat, error } = await supabase.from('deal_chats').insert({
+      deal_id: deal.id,
+      user_id: user.id,
+      title,
+    }).select('*').single()
+
+    if (error || !newChat) {
+      setCreatingChat(false)
+      return
+    }
+
+    await supabase.from('deal_messages').insert({
+      deal_id: deal.id,
+      chat_id: newChat.id,
+      user_id: user.id,
+      role: 'ai',
+      content: getOpeningMessage(deal),
+    })
+
+    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', deal.id)
+
+    setCreatingChat(false)
+    router.push(`/deal/${deal.id}?chat=${newChat.id}`)
+    router.refresh()
+  }
+
+  function openChat(chatId: string) {
+    if (chatId === currentChat?.id) return
+    router.push(`/deal/${deal.id}?chat=${chatId}`)
   }
 
   async function updateStatus(status: Deal['status']) {
@@ -260,6 +386,38 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
               </div>
             </div>
           </div>
+
+          <div className="bg-white rounded-2xl border border-border p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold">Deal Chats</h3>
+              <button
+                onClick={createChat}
+                disabled={creatingChat}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted-light transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {creatingChat ? 'Creating...' : 'New Chat'}
+              </button>
+            </div>
+            <div className="space-y-2">
+              {chats.map(chat => (
+                <button
+                  key={chat.id}
+                  onClick={() => openChat(chat.id)}
+                  className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                    chat.id === currentChat?.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted-light'
+                  }`}
+                >
+                  <p className="text-sm font-medium">{chat.title}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {new Date(chat.updated_at).toLocaleDateString()}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Chat Area */}
@@ -271,6 +429,7 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
               </div>
               <div>
                 <h3 className="font-semibold text-sm">Negotiation Assistant</h3>
+                <p className="text-xs text-muted">{currentChat?.title || 'No chat selected'}</p>
               </div>
             </div>
             <span className="text-xs text-muted">AI-powered advice</span>
@@ -278,6 +437,14 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {!currentChat && (
+              <div className="flex h-full min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-border bg-muted-light/30 p-8 text-center">
+                <div>
+                  <p className="text-sm font-medium">No chat selected yet.</p>
+                  <p className="mt-1 text-sm text-muted">Create a new chat for this deal to start a separate negotiation thread.</p>
+                </div>
+              </div>
+            )}
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'brand' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] ${
@@ -338,13 +505,13 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder="Paste what the brand said..."
-                  disabled={sending || aiTyping}
+                  placeholder={currentChat ? 'Paste what the brand said...' : 'Create a chat to begin'}
+                  disabled={sending || aiTyping || !currentChat}
                   className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  disabled={!input.trim() || sending || aiTyping}
+                  disabled={!input.trim() || sending || aiTyping || !currentChat}
                   className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />

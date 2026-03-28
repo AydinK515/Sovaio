@@ -1,7 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { generateText } from 'ai'
-
-const SCRIPT_SEPARATOR = '---SCRIPT---'
+import { streamText } from 'ai'
 
 export async function POST(req: Request) {
   try {
@@ -49,7 +47,7 @@ The ---SCRIPT--- separator must appear exactly as written. Do not add anything a
         content: m.content,
       })) as Array<{ role: 'user' | 'assistant'; content: string }>
 
-    const { text } = await generateText({
+    const result = streamText({
       model: openai('gpt-5-mini'),
       system: systemPrompt,
       messages: [
@@ -64,18 +62,14 @@ The ---SCRIPT--- separator must appear exactly as written. Do not add anything a
         },
       },
     })
-
-    const scriptIndex = text.indexOf(SCRIPT_SEPARATOR)
-    const advice = (scriptIndex === -1 ? text : text.slice(0, scriptIndex)).trim()
-    const script = (scriptIndex === -1 ? '' : text.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
-
-    return Response.json({
-      advice,
-      script: script || null,
-      rawText: text,
+    
+    return result.toTextStreamResponse({
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
     })
   } catch (error) {
     console.error('Negotiation AI failed', error)
-    return Response.json({ error: 'Failed to generate negotiation advice.' }, { status: 500 })
+    return new Response('Failed to generate negotiation advice.', { status: 500 })
   }
 }

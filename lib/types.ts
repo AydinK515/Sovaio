@@ -61,11 +61,21 @@ export interface Deal {
 export interface DealMessage {
   id: string
   deal_id: string
+  chat_id: string
   user_id: string
   role: 'creator' | 'brand' | 'ai'
   content: string
   suggested_script: string | null
   created_at: string
+}
+
+export interface DealChat {
+  id: string
+  deal_id: string
+  user_id: string
+  title: string
+  created_at: string
+  updated_at: string
 }
 
 export const NICHES = [
