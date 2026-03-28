@@ -51,6 +51,7 @@ export default function DealClient({
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const [chatFullscreen, setChatFullscreen] = useState(false)
+  const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -74,6 +75,7 @@ export default function DealClient({
 
   useEffect(() => {
     setMessages(initialMessages)
+    setRateLimitType(null)
   }, [initialMessages])
 
   useEffect(() => {
@@ -164,6 +166,14 @@ export default function DealClient({
 
   async function sendMessage() {
     if (!input.trim() || sending) return
+
+    // Frontend guard: check per-chat creator message count before hitting the server.
+    const creatorCount = messages.filter(m => m.role === 'creator').length
+    if (creatorCount >= 30) {
+      setRateLimitType('chat')
+      return
+    }
+
     setSending(true)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -260,6 +270,17 @@ export default function DealClient({
       })
 
       if (!response.ok) {
+        if (response.status === 429) {
+          const body = await response.text().catch(() => '')
+          if (body === 'CHAT_LIMIT_REACHED') {
+            setRateLimitType('chat')
+          } else {
+            setRateLimitType('daily')
+          }
+          setAiTyping(false)
+          setSending(false)
+          return
+        }
         const errorText = await response.text().catch(() => '')
         throw new Error(errorText || `API error: ${response.status}`)
       }
@@ -808,32 +829,54 @@ export default function DealClient({
           {/* Input */}
           {deal.status === 'negotiating' && (
             <div className="shrink-0 border-t border-border p-4">
-              <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-center gap-3">
-                <input
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  placeholder="Tell me what happened in the negotiation..."
-                  disabled={sending}
-                  className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
-                />
-                {aiTyping ? (
-                  <button
-                    type="button"
-                    onClick={stopGeneration}
-                    className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors"
-                  >
-                    <Square className="w-4 h-4 fill-white" />
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={!input.trim() || sending}
-                    className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                )}
-              </form>
+              {rateLimitType === 'chat' ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+                  <p className="text-sm font-medium text-amber-800">This chat has reached the 30-message limit.</p>
+                  <p className="mt-0.5 text-sm text-amber-700">
+                    Start a new chat to keep going.{' '}
+                    <button
+                      type="button"
+                      onClick={createChat}
+                      disabled={creatingChat}
+                      className="font-semibold underline underline-offset-2 hover:no-underline disabled:opacity-50"
+                    >
+                      {creatingChat ? 'Starting...' : 'New chat'}
+                    </button>
+                  </p>
+                </div>
+              ) : rateLimitType === 'daily' ? (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-center">
+                  <p className="text-sm font-medium text-red-800">You&apos;ve reached your 100-message daily limit.</p>
+                  <p className="mt-0.5 text-sm text-red-700">Come back tomorrow and your limit will reset.</p>
+                </div>
+              ) : (
+                <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-center gap-3">
+                  <input
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="Tell me what happened in the negotiation..."
+                    disabled={sending}
+                    className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
+                  />
+                  {aiTyping ? (
+                    <button
+                      type="button"
+                      onClick={stopGeneration}
+                      className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors"
+                    >
+                      <Square className="w-4 h-4 fill-white" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || sending}
+                      className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  )}
+                </form>
+              )}
             </div>
           )}
 

@@ -331,6 +331,28 @@ export async function POST(req: Request) {
       .eq('chat_id', chat.id)
       .order('created_at', { ascending: true })
 
+    // Per-chat limit: count creator messages already in this chat.
+    // The frontend inserts the user's message before calling this route,
+    // so existingMessages already includes the message just sent.
+    const creatorMessageCount = (existingMessages ?? []).filter(m => m.role === 'creator').length
+    if (creatorMessageCount > 30) {
+      return new Response('CHAT_LIMIT_REACHED', { status: 429 })
+    }
+
+    // Daily limit: atomically check and increment via a SECURITY DEFINER
+    // function so the counter cannot be tampered with via the client.
+    const { data: allowed, error: usageError } = await supabase
+      .rpc('increment_ai_daily_usage', { p_daily_limit: 100 })
+
+    if (usageError) {
+      console.error('Failed to check AI daily usage', usageError)
+      return new Response('Failed to check usage limits.', { status: 500 })
+    }
+
+    if (!allowed) {
+      return new Response('DAILY_LIMIT_REACHED', { status: 429 })
+    }
+
     const conversationId = await ensureConversationState({
       apiKey,
       chat: chat as DealChat,
