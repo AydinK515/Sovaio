@@ -46,6 +46,27 @@ body {
   50% { opacity: 1; }
 }
 
+@keyframes thinking-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.thinking-text {
+  background: linear-gradient(
+    90deg,
+    #94a3b8 0%,
+    #94a3b8 30%,
+    #6366f1 50%,
+    #94a3b8 70%,
+    #94a3b8 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-shimmer 2.5s linear infinite;
+}
+
 @keyframes typewriter {
   from { width: 0; }
   to { width: 100%; }

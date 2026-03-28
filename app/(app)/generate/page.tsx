@@ -46,13 +46,16 @@ export default function GeneratePage() {
   const confidence = (() => {
     let score = 0
     const types = parsedFiles.map(f => f.type)
-    if (types.includes('content')) score += 40
+    if (types.includes('content')) score += 35
+    if (types.includes('audience_growth')) score += 25
     if (types.includes('demographics')) score += 20
-    if (types.includes('geography')) score += 15
-    if (types.includes('traffic_sources')) score += 15
-    if (types.includes('retention')) score += 10
+    if (types.includes('geography')) score += 10
+    if (types.includes('traffic_sources')) score += 10
     return score
   })()
+
+  const hasRequiredTypes = ['content', 'audience_growth'].every(t => parsedFiles.some(f => f.type === t))
+  const missingRequired = (['content', 'audience_growth'] as const).filter(t => !parsedFiles.some(f => f.type === t))
 
   const confidenceLabel = confidence < 40 ? 'Low' : confidence < 70 ? 'Medium' : 'High'
   const confidenceColor = confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
@@ -72,6 +75,14 @@ export default function GeneratePage() {
     const hasGender = h.some(x => x.includes('gender'))
     const hasTrafficSource = h.some(x => x.includes('traffic source') || x.includes('source type'))
     const hasRetention = h.some(x => x.includes('retention') || x.includes('average percentage viewed') || x.includes('average view duration'))
+
+    // Audience size & growth report types
+    const hasMonthlyAudience = h.some(x => x.includes('monthly audience'))
+    const has28DayViewers = h.some(x => x.includes('28-day') && (x.includes('viewer') || x.includes('new') || x.includes('casual') || x.includes('regular')))
+    // Subscribers.csv: exactly 2 columns (Date + Subscribers), no video-level data
+    const isSubscriberTimeline = hasDate && hasSubscribers && !hasVideoTitle && !hasContentId && !hasViews && !hasWatchTime && h.length <= 2
+
+    if (hasMonthlyAudience || has28DayViewers || isSubscriberTimeline) return 'audience_growth'
 
     if ((lowerFileName.includes('totals') || lowerFileName.includes('chart data')) && hasDate && hasViews && !hasVideoTitle) {
       return null
@@ -102,6 +113,10 @@ export default function GeneratePage() {
     if (h.some(x => x.includes('video title'))) score += 100
     if (h.some(x => x.includes('watch time'))) score += 50
     if (h.some(x => x.includes('country') || x.includes('geography'))) score += 50
+    // Viewer loyalty data (new/casual/regular split) is the richest audience_growth signal
+    if (h.some(x => x.includes('28-day') && x.includes('new'))) score += 200
+    // Subscriber timeline is useful for growth rate
+    if (h.some(x => x === 'subscribers') && h.includes('date')) score += 100
 
     return score
   }
@@ -185,6 +200,22 @@ export default function GeneratePage() {
         return
       }
 
+      // Auto-fill subscriber count from any candidate that has a Subscribers column
+      // (picks up Subscribers.csv from the Audience size & growth zip)
+      setSubscriberCount(prev => {
+        if (prev) return prev
+        for (const candidate of candidates) {
+          if (candidate.data.length === 0) continue
+          const lastRow = candidate.data[candidate.data.length - 1]
+          const subs = lastRow['Subscribers']
+          if (subs !== undefined && subs !== null && subs !== '') {
+            const count = parseInt(String(subs).replace(/[, ]/g, ''))
+            if (!isNaN(count) && count > 100) return count.toLocaleString()
+          }
+        }
+        return prev
+      })
+
       setParsedFiles(prev => {
         const bestByType = new Map(prev.map(file => [file.type, file]))
 
@@ -223,6 +254,11 @@ export default function GeneratePage() {
     }
     if (parsedFiles.length === 0) {
       setError('Please upload at least one CSV file.')
+      return
+    }
+    if (missingRequired.length > 0) {
+      const labels = missingRequired.map(t => CSV_TYPES.find(c => c.key === t)?.label).join(' and ')
+      setError(`"${labels}" ${missingRequired.length === 1 ? 'is' : 'are'} required to generate a rate card. Download ${missingRequired.length === 1 ? 'it' : 'them'} from YouTube Studio and upload the zip.`)
       return
     }
 
@@ -483,14 +519,18 @@ export default function GeneratePage() {
           {/* Generate button */}
           <button
             onClick={handleGenerate}
-            disabled={parsedFiles.length === 0}
+            disabled={!hasRequiredTypes}
             className="w-full py-4 rounded-xl bg-primary text-white font-semibold text-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             Generate My Rate Card
             <Sparkles className="w-5 h-5" />
           </button>
-          {parsedFiles.length === 0 && (
-            <p className="text-center text-xs text-muted -mt-4">Upload files to enable generation</p>
+          {!hasRequiredTypes && (
+            <p className="text-center text-xs text-muted -mt-4">
+              {parsedFiles.length === 0
+                ? 'Upload files to enable generation'
+                : `Still need: ${missingRequired.map(t => CSV_TYPES.find(c => c.key === t)?.label).join(' and ')}`}
+            </p>
           )}
         </div>
 
@@ -513,30 +553,41 @@ export default function GeneratePage() {
 
           {/* Required Data */}
           <div className="bg-white rounded-2xl border border-border p-6">
-            <h3 className="font-semibold mb-4">Required Data</h3>
+            <h3 className="font-semibold mb-1">Data Sources</h3>
+            <p className="text-xs text-muted mb-4">Required reports must be uploaded to generate</p>
             <div className="space-y-3">
               {CSV_TYPES.map(csvType => {
                 const uploaded = parsedFiles.some(f => f.type === csvType.key)
                 return (
-                  <div key={csvType.key} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div key={csvType.key} className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
                       {uploaded ? (
-                        <CheckCircle2 className="w-4 h-4 text-success" />
+                        <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
                       ) : (
-                        <Circle className="w-4 h-4 text-border-dark" />
+                        <Circle className="w-4 h-4 text-border-dark shrink-0 mt-0.5" />
                       )}
-                      <span className={`text-sm ${uploaded ? 'text-foreground' : 'text-muted'}`}>
-                        {csvType.label}
-                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-sm ${uploaded ? 'text-foreground font-medium' : 'text-muted'}`}>
+                            {csvType.label}
+                          </span>
+                          {csvType.required ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">Required</span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-muted bg-muted-light px-1.5 py-0.5 rounded">+{csvType.confidence}%</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted mt-0.5 leading-snug">{csvType.description}</p>
+                      </div>
                     </div>
                     {!uploaded && (
                       <a
-                        href={`https://studio.youtube.com`}
+                        href="https://studio.youtube.com"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+                        className="text-xs text-primary font-medium hover:underline flex items-center gap-1 shrink-0"
                       >
-                        Get CSV
+                        Get
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}

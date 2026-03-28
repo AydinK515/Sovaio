@@ -170,7 +170,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
     const { data: chat, error: chatError } = await supabase.from('deal_chats').insert({
       deal_id: deal.id,
       user_id: user.id,
-      title: 'Chat 1',
+      title: 'New Chat',
     }).select('id').single()
 
     if (chatError || !chat) {

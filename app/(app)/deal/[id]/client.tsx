@@ -8,6 +8,34 @@ import type { Deal, DealChat, DealMessage } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
 
+const THINKING_LABELS = ['Thinking...', 'Analyzing...', 'Reviewing offer...', 'Crafting response...', 'Strategizing...']
+
+function ThinkingLabel() {
+  const [index, setIndex] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const cycle = () => {
+      setVisible(false)
+      setTimeout(() => {
+        setIndex(i => (i + 1) % THINKING_LABELS.length)
+        setVisible(true)
+      }, 300)
+    }
+    const id = setInterval(cycle, 2800)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <span
+      className="thinking-text text-sm font-medium"
+      style={{ transition: 'opacity 0.3s ease', opacity: visible ? 1 : 0 }}
+    >
+      {THINKING_LABELS[index]}
+    </span>
+  )
+}
+
 function getDraftChat(deal: Deal): DealChat {
   return {
     id: '__draft__',
@@ -81,7 +109,7 @@ export default function DealClient({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, aiText, aiReasoningText, aiScriptText, aiScriptSubject])
+  }, [messages, aiTyping, aiText, aiReasoningText, aiScriptText, aiScriptSubject])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -814,11 +842,7 @@ export default function DealClient({
                   <p className="text-xs font-medium mb-1 opacity-60">RateProof AI</p>
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">
                     {aiText || (
-                      <span className="flex items-center gap-1 text-muted">
-                        <span className="w-2 h-2 bg-muted rounded-full" style={{ animation: 'pulse-dot 1.4s infinite 0s' }} />
-                        <span className="w-2 h-2 bg-muted rounded-full" style={{ animation: 'pulse-dot 1.4s infinite 0.2s' }} />
-                        <span className="w-2 h-2 bg-muted rounded-full" style={{ animation: 'pulse-dot 1.4s infinite 0.4s' }} />
-                      </span>
+                      <ThinkingLabel />
                     )}
                   </p>
                   {aiReasoningText && (
@@ -853,10 +877,9 @@ export default function DealClient({
                     <button
                       type="button"
                       onClick={createChat}
-                      disabled={creatingChat}
-                      className="font-semibold underline underline-offset-2 hover:no-underline disabled:opacity-50"
+                      className="font-semibold underline underline-offset-2 hover:no-underline"
                     >
-                      {creatingChat ? 'Starting...' : 'New chat'}
+                      New chat
                     </button>
                   </p>
                 </div>

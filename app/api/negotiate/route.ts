@@ -1,7 +1,8 @@
 import { parsePartialJson } from 'ai'
 import { getOpeningMessage } from '@/lib/deal-chat'
 import { createClient } from '@/lib/supabase-server'
-import type { Deal, DealChat, DealMessage } from '@/lib/types'
+import { buildCsvSummary } from '@/lib/csv-summary'
+import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 
 const OPENAI_API_BASE_URL = 'https://api.openai.com/v1'
 
@@ -57,7 +58,7 @@ function formatSseEvent(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`
 }
 
-function buildSystemPrompt(deal: Deal, generateTitle: boolean) {
+function buildSystemPrompt(deal: Deal, generateTitle: boolean, channelContext: string | null) {
   return `You are RateProof AI, a smart negotiation copilot for YouTube creators.
 
 The creator's deal context:
@@ -67,6 +68,7 @@ The creator's deal context:
 ${deal.brand_last_offer ? `- Brand's last known offer: $${deal.brand_last_offer.toLocaleString()}` : ''}
 ${deal.timeline ? `- Timeline: ${deal.timeline}` : ''}
 ${deal.notes ? `- Additional notes: ${deal.notes}` : ''}
+${channelContext ? `\n${channelContext}` : ''}
 
 You are speaking to the creator, not the brand.
 Treat every user message as the creator talking to you unless they clearly signal they are quoting or paraphrasing the brand with phrasing like "they said", "the brand replied", quotes, pasted email text, or similar context.
@@ -85,9 +87,14 @@ Behavior rules:
 - For brand_update and strategy_request: give clear, commercially realistic negotiation help.
 - Never invent campaign details, exact brand wording, deadlines, usage rights, payment terms, or internal facts that were not provided.
 - Do not aggressively ask for missing details unless the user is actually trying to analyze a negotiation step.
-- Only provide a recommended script when it would genuinely help.
-- If the user is just chatting, asking a meta question, or thinking out loud, return script as an empty string.
-- If the user asks for a draft, asks what to send, or has clearly provided enough brand context for a concrete reply, return a useful script.
+Script rules — follow these exactly based on the detected intent:
+- small_talk → script MUST be "" (empty string). No exceptions. Do not write a script even if it feels helpful.
+- meta_question → script MUST be "" (empty string). No exceptions.
+- creator_context → script MUST be "" unless the creator explicitly asks for a draft or says "what should I send/say".
+- brand_update → script MAY be provided if there is enough context to write a useful reply to the brand. Otherwise "".
+- strategy_request → script SHOULD be provided if the creator is asking what to send or how to respond.
+
+Additional script formatting rules:
 - If script is email-style and needs a subject line, return it ONLY in the subject field — never inside the script body.
 - If no subject is needed, return subject as an empty string.
 - The script field must ONLY contain the body of the message — no "Subject:" line, no metadata, no labels of any kind. Start directly with the salutation or first sentence.
@@ -325,6 +332,52 @@ export async function POST(req: Request) {
       return new Response('Deal not found.', { status: 404 })
     }
 
+    // Fetch channel context from rate card + CSV uploads (if deal was created from a rate card)
+    let channelContext: string | null = null
+    if (deal.rate_card_id) {
+      const { data: rateCard } = await supabase
+        .from('rate_cards')
+        .select('*')
+        .eq('id', deal.rate_card_id)
+        .single()
+
+      if (rateCard) {
+        const rc = rateCard as RateCard
+        const rateCardLines = [
+          `Creator's channel profile (from rate card):`,
+          `- Niche: ${rc.niche ?? 'unknown'}`,
+          `- Subscribers: ${rc.subscriber_count?.toLocaleString() ?? 'unknown'}`,
+          `- Market rate for dedicated video: $${rc.dedicated_video_low.toLocaleString()}–$${rc.dedicated_video_high.toLocaleString()}`,
+          `- Market rate for 60-second integration: $${rc.integration_60s_low.toLocaleString()}–$${rc.integration_60s_high.toLocaleString()}`,
+          `- Market rate for 30-second integration: $${rc.integration_30s_low.toLocaleString()}–$${rc.integration_30s_high.toLocaleString()}`,
+          rc.explanation ? `- Rate card rationale: ${rc.explanation}` : null,
+        ].filter(Boolean).join('\n')
+
+        const csvUploadIds: string[] = Array.isArray(rc.csv_upload_ids) ? rc.csv_upload_ids : []
+        let analyticsSummary = ''
+
+        if (csvUploadIds.length > 0) {
+          const { data: csvUploads } = await supabase
+            .from('csv_uploads')
+            .select('upload_type, parsed_data')
+            .in('id', csvUploadIds)
+
+          if (csvUploads && csvUploads.length > 0) {
+            const csvData: Record<string, Record<string, unknown>[]> = {}
+            for (const upload of csvUploads) {
+              const rows = Array.isArray(upload.parsed_data) ? upload.parsed_data as Record<string, unknown>[] : []
+              if (rows.length > 0) {
+                csvData[upload.upload_type] = rows
+              }
+            }
+            analyticsSummary = buildCsvSummary(csvData)
+          }
+        }
+
+        channelContext = [rateCardLines, analyticsSummary].filter(Boolean).join('\n\n')
+      }
+    }
+
     const { data: existingMessages } = await supabase
       .from('deal_messages')
       .select('*')
@@ -362,10 +415,12 @@ export async function POST(req: Request) {
       supabase,
     })
 
+    console.log('\n=== negotiate SYSTEM PROMPT ===\n', buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext), '\n=== USER MESSAGE ===\n', latestUserMessage, '\n==============================\n')
+
     const openaiRequestBody = JSON.stringify({
       model: 'gpt-5',
       conversation: conversationId,
-      instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle)),
+      instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext),
       input: [
         {
           role: 'user',
@@ -553,6 +608,8 @@ export async function POST(req: Request) {
                 lastSent,
                 lastValidPayload,
               })
+
+          console.log('\n=== negotiate RESPONSE ===\n', JSON.stringify(finalPayload, null, 2), '\n==========================\n')
 
           let savedMessage: DealMessage | null = null
           const messageContent = finalPayload.advice.trim() || 'I generated a response, but it came back empty.'

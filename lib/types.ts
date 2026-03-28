@@ -16,7 +16,7 @@ export interface Profile {
 export interface CsvUpload {
   id: string
   user_id: string
-  upload_type: 'content' | 'demographics' | 'geography' | 'traffic_sources' | 'retention'
+  upload_type: 'content' | 'audience_growth' | 'demographics' | 'geography' | 'traffic_sources' | 'retention'
   parsed_data: Record<string, unknown>
   row_count: number
   created_at: string
@@ -103,9 +103,9 @@ export const NICHES = [
 ] as const
 
 export const CSV_TYPES = [
-  { key: 'content' as const, label: 'Top Content', required: true, description: 'Shows your reach and top performing videos', studioPath: 'Analytics > Content' },
-  { key: 'demographics' as const, label: 'Audience Demographics', required: false, description: 'Age and gender breakdown of your audience', studioPath: 'Analytics > Audience > Demographics' },
-  { key: 'geography' as const, label: 'Geography', required: false, description: 'Where your viewers are located', studioPath: 'Analytics > Audience > Geography' },
-  { key: 'traffic_sources' as const, label: 'Traffic Sources', required: false, description: 'How viewers find your content', studioPath: 'Analytics > Reach > Traffic source' },
-  { key: 'retention' as const, label: 'Retention', required: false, description: 'How long viewers watch your videos', studioPath: 'Analytics > Engagement > Audience retention' },
+  { key: 'content' as const, label: 'Top Content', required: true, confidence: 35, description: 'Views, watch time, CTR, and subscribers gained per video', studioPath: 'Analytics > Content' },
+  { key: 'audience_growth' as const, label: 'Audience Size & Growth', required: true, confidence: 25, description: 'Monthly audience, subscriber trajectory, and viewer loyalty (new vs regular)', studioPath: 'Analytics > Audience > Audience size and growth' },
+  { key: 'demographics' as const, label: 'Audience Demographics', required: false, confidence: 20, description: 'Age and gender breakdown — signals audience purchasing power', studioPath: 'Analytics > Audience > Age and gender' },
+  { key: 'geography' as const, label: 'Top Geographies', required: false, confidence: 10, description: 'Where your viewers are located — US/UK/CA = premium CPMs', studioPath: 'Analytics > Audience > Geography' },
+  { key: 'traffic_sources' as const, label: 'Traffic Sources', required: false, confidence: 10, description: 'How viewers find your content — organic search signals intent', studioPath: 'Analytics > Reach > Traffic source' },
 ] as const
