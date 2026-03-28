@@ -5,21 +5,40 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
-import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus } from 'lucide-react'
+import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown } from 'lucide-react'
 
 function formatCurrency(n: number | null) {
   if (n == null) return '--'
   return `$${n.toLocaleString()}`
 }
 
+const TITLE_SEPARATOR = '---TITLE---'
+const ADVICE_SEPARATOR = '---ADVICE---'
 const SCRIPT_SEPARATOR = '---SCRIPT---'
 
 function parseNegotiationText(text: string) {
+  if (text.includes(TITLE_SEPARATOR) && text.includes(ADVICE_SEPARATOR)) {
+    const afterTitle = text.slice(text.indexOf(TITLE_SEPARATOR) + TITLE_SEPARATOR.length)
+    const adviceIndex = afterTitle.indexOf(ADVICE_SEPARATOR)
+    const title = (adviceIndex === -1 ? '' : afterTitle.slice(0, adviceIndex)).trim()
+    const afterAdvice = adviceIndex === -1 ? '' : afterTitle.slice(adviceIndex + ADVICE_SEPARATOR.length)
+    const scriptIndex = afterAdvice.indexOf(SCRIPT_SEPARATOR)
+    const advice = (scriptIndex === -1 ? afterAdvice : afterAdvice.slice(0, scriptIndex)).trim()
+    const script = (scriptIndex === -1 ? '' : afterAdvice.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
+
+    return {
+      title: title || null,
+      advice,
+      script: script || null,
+    }
+  }
+
   const scriptIndex = text.indexOf(SCRIPT_SEPARATOR)
   const advice = (scriptIndex === -1 ? text : text.slice(0, scriptIndex)).trim()
   const script = (scriptIndex === -1 ? '' : text.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
 
   return {
+    title: null,
     advice,
     script: script || null,
   }
@@ -32,7 +51,7 @@ const DEAL_TYPE_LABELS = {
 }
 
 function getOpeningMessage(deal: Deal) {
-  return `This is a fresh negotiation thread for ${deal.brand_name}. You're targeting ${formatCurrency(deal.creator_ask)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Paste the latest brand reply here and I'll help you work this angle.`
+  return `This is a fresh negotiation thread for ${deal.brand_name}. You're targeting ${formatCurrency(deal.creator_ask)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
 }
 
 export default function DealClient({
@@ -59,8 +78,10 @@ export default function DealClient({
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
   const [creatingChat, setCreatingChat] = useState(false)
+  const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const chatMenuRef = useRef<HTMLDivElement>(null)
 
   const supabase = createClient()
 
@@ -84,6 +105,17 @@ export default function DealClient({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, aiText])
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!chatMenuRef.current?.contains(event.target as Node)) {
+        setChatMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   function markChatUpdated(chatId: string, updatedAt: string) {
     setChats(prev =>
       prev.map(chat =>
@@ -92,6 +124,45 @@ export default function DealClient({
           : chat
       )
     )
+  }
+
+  function renameChat(chatId: string, title: string) {
+    setChats(prev =>
+      prev.map(chat =>
+        chat.id === chatId
+          ? { ...chat, title }
+          : chat
+      )
+    )
+
+    setCurrentChat(prev => (
+      prev && prev.id === chatId
+        ? { ...prev, title }
+        : prev
+    ))
+  }
+
+  function getVisibleMessages() {
+    const openingMessage = getOpeningMessage(deal)
+    const hasOpeningMessage = messages.some(msg => msg.role === 'ai' && msg.content === openingMessage)
+
+    if (hasOpeningMessage || !currentChat) {
+      return messages
+    }
+
+    return [
+      {
+        id: `opening-${currentChat.id}`,
+        deal_id: deal.id,
+        chat_id: currentChat.id,
+        user_id: deal.user_id,
+        role: 'ai',
+        content: openingMessage,
+        suggested_script: null,
+        created_at: currentChat.created_at,
+      } as DealMessage,
+      ...messages,
+    ]
   }
 
   async function copyScript(text: string, id: string) {
@@ -110,19 +181,19 @@ export default function DealClient({
       return
     }
 
-    const brandText = input.trim()
+    const userText = input.trim()
+    const shouldGenerateTitle = messages.filter(msg => msg.role !== 'ai').length === 0
 
-    // Save brand message to Supabase
-    const { data: brandMsg } = await supabase.from('deal_messages').insert({
+    const { data: userMsg } = await supabase.from('deal_messages').insert({
       deal_id: deal.id,
       chat_id: currentChat.id,
       user_id: user.id,
-      role: 'brand',
-      content: brandText,
+      role: 'creator',
+      content: userText,
     }).select('*').single()
 
-    if (brandMsg) {
-      setMessages(prev => [...prev, brandMsg as DealMessage])
+    if (userMsg) {
+      setMessages(prev => [...prev, userMsg as DealMessage])
     }
 
     const messageTimestamp = new Date().toISOString()
@@ -131,7 +202,7 @@ export default function DealClient({
     markChatUpdated(currentChat.id, messageTimestamp)
 
     // Extract dollar amount from brand message for offer tracking
-    const numberMatch = brandText.match(/\$?([\d,]+)/)
+    const numberMatch = userText.match(/\$?([\d,]+)/)
     if (numberMatch) {
       const offer = parseInt(numberMatch[1].replace(/,/g, ''))
       await supabase.from('deals').update({ brand_last_offer: offer, updated_at: new Date().toISOString() }).eq('id', deal.id)
@@ -156,7 +227,7 @@ export default function DealClient({
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          brandMessage: brandText,
+          userMessage: userText,
           deal: {
             brand_name: deal.brand_name,
             deal_type: deal.deal_type,
@@ -166,6 +237,7 @@ export default function DealClient({
             notes: deal.notes,
           },
           messageHistory: historyForContext,
+          generateTitle: shouldGenerateTitle,
         }),
       })
 
@@ -182,15 +254,24 @@ export default function DealClient({
 
         fullText += decoder.decode(value, { stream: true })
         const partial = parseNegotiationText(fullText)
-        setAiText(partial.advice || fullText.trim())
+        setAiText(
+          fullText.includes(TITLE_SEPARATOR) || fullText.includes(ADVICE_SEPARATOR)
+            ? partial.advice
+            : fullText.trim()
+        )
       }
 
       fullText += decoder.decode()
 
-      const { advice, script } = parseNegotiationText(fullText)
+      const { title, advice, script } = parseNegotiationText(fullText)
       const messageContent = advice || fullText.trim() || 'I generated a response, but it came back empty.'
 
       setAiText(messageContent)
+
+      if (title && shouldGenerateTitle) {
+        await supabase.from('deal_chats').update({ title }).eq('id', currentChat.id)
+        renameChat(currentChat.id, title)
+      }
 
       // Save AI message to Supabase
       const { data: aiMsg } = await supabase.from('deal_messages').insert({
@@ -247,7 +328,7 @@ export default function DealClient({
       return
     }
 
-    const title = `Chat ${chats.length + 1}`
+    const title = 'New Chat'
     const { data: newChat, error } = await supabase.from('deal_chats').insert({
       deal_id: deal.id,
       user_id: user.id,
@@ -270,12 +351,14 @@ export default function DealClient({
     await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', deal.id)
 
     setCreatingChat(false)
+    setChatMenuOpen(false)
     router.push(`/deal/${deal.id}?chat=${newChat.id}`)
     router.refresh()
   }
 
   function openChat(chatId: string) {
     if (chatId === currentChat?.id) return
+    setChatMenuOpen(false)
     router.push(`/deal/${deal.id}?chat=${chatId}`)
   }
 
@@ -299,6 +382,8 @@ export default function DealClient({
     setDeal(prev => ({ ...prev, status: 'closed_won', final_price: price }))
     setShowCloseModal(false)
   }
+
+  const visibleMessages = getVisibleMessages()
 
   return (
     <div className="py-8">
@@ -387,37 +472,6 @@ export default function DealClient({
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-border p-6">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="text-sm font-semibold">Deal Chats</h3>
-              <button
-                onClick={createChat}
-                disabled={creatingChat}
-                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted-light transition-colors disabled:opacity-50"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {creatingChat ? 'Creating...' : 'New Chat'}
-              </button>
-            </div>
-            <div className="space-y-2">
-              {chats.map(chat => (
-                <button
-                  key={chat.id}
-                  onClick={() => openChat(chat.id)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
-                    chat.id === currentChat?.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:bg-muted-light'
-                  }`}
-                >
-                  <p className="text-sm font-medium">{chat.title}</p>
-                  <p className="mt-1 text-xs text-muted">
-                    {new Date(chat.updated_at).toLocaleDateString()}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Chat Area */}
@@ -427,9 +481,50 @@ export default function DealClient({
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-4 h-4 text-white" />
               </div>
-              <div>
+              <div className="relative" ref={chatMenuRef}>
                 <h3 className="font-semibold text-sm">Negotiation Assistant</h3>
-                <p className="text-xs text-muted">{currentChat?.title || 'No chat selected'}</p>
+                <button
+                  type="button"
+                  onClick={() => setChatMenuOpen(prev => !prev)}
+                  className="mt-1 inline-flex items-center gap-2 rounded-xl border border-border bg-muted-light px-3 py-2 text-sm font-medium transition-colors hover:bg-muted-light/80"
+                >
+                  <span className="max-w-[180px] truncate">{currentChat?.title || 'Select chat'}</span>
+                  <ChevronDown className={`w-4 h-4 text-muted transition-transform ${chatMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {chatMenuOpen && (
+                  <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-border bg-white p-2 shadow-xl">
+                    <div className="max-h-72 overflow-y-auto">
+                      {chats.map(chat => (
+                        <button
+                          key={chat.id}
+                          type="button"
+                          onClick={() => openChat(chat.id)}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm transition-colors ${
+                            chat.id === currentChat?.id
+                              ? 'bg-primary/8 text-foreground'
+                              : 'hover:bg-muted-light'
+                          }`}
+                        >
+                          <span className="truncate font-medium">{chat.title}</span>
+                          {chat.id === currentChat?.id && <Check className="w-4 h-4 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-2 border-t border-border pt-2">
+                      <button
+                        type="button"
+                        onClick={createChat}
+                        disabled={creatingChat}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-sm font-medium text-muted transition-colors hover:bg-muted-light disabled:opacity-50"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {creatingChat ? 'Starting...' : 'Start a new chat'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <span className="text-xs text-muted">AI-powered advice</span>
@@ -445,17 +540,17 @@ export default function DealClient({
                 </div>
               </div>
             )}
-            {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === 'brand' ? 'justify-end' : 'justify-start'}`}>
+            {visibleMessages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === 'brand' || msg.role === 'creator' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] ${
-                  msg.role === 'brand'
+                  msg.role === 'brand' || msg.role === 'creator'
                     ? 'bg-secondary text-white rounded-2xl rounded-br-sm px-5 py-3'
                     : msg.role === 'ai'
                     ? 'bg-muted-light rounded-2xl rounded-bl-sm px-5 py-3'
                     : 'bg-blue-50 rounded-2xl px-5 py-3'
                 }`}>
                   <p className="text-xs font-medium mb-1 opacity-60">
-                    {msg.role === 'ai' ? 'RateProof AI' : msg.role === 'brand' ? 'You' : 'Creator'}
+                    {msg.role === 'ai' ? 'RateProof AI' : 'You'}
                   </p>
                   <p className="text-sm leading-relaxed">{msg.content}</p>
 
@@ -505,7 +600,7 @@ export default function DealClient({
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder={currentChat ? 'Paste what the brand said...' : 'Create a chat to begin'}
+                  placeholder={currentChat ? 'Tell me what happened in the negotiation...' : 'Create a chat to begin'}
                   disabled={sending || aiTyping || !currentChat}
                   className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
                 />

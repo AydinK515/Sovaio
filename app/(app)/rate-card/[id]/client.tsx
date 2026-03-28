@@ -92,7 +92,7 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
       chat_id: chat.id,
       user_id: user.id,
       role: 'ai',
-      content: `I've reviewed your rate card. You're asking ${formatCurrency(askAmount!)} from ${brandName} for a ${dealType === 'dedicated_video' ? 'dedicated video' : dealType === 'integration_60s' ? '60s integration' : '30s integration'}. What did they come back with?`,
+      content: `This is a fresh negotiation thread for ${brandName}. You're targeting ${formatCurrency(askAmount!)} for a ${dealType === 'dedicated_video' ? 'dedicated video' : dealType === 'integration_60s' ? 'integrated (60s)' : 'integrated (30s)'}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`,
     })
 
     router.push(`/deal/${deal.id}?chat=${chat.id}`)
