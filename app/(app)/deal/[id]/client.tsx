@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
-import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2 } from 'lucide-react'
+import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
 
 function getDraftChat(deal: Deal): DealChat {
   return {
@@ -47,8 +47,9 @@ export default function DealClient({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
-  const [creatingChat, setCreatingChat] = useState(false)
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const [chatFullscreen, setChatFullscreen] = useState(false)
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
@@ -128,6 +129,16 @@ export default function DealClient({
         ? { ...prev, title }
         : prev
     ))
+  }
+
+  async function submitRename(chatId: string) {
+    const trimmed = renameValue.trim()
+    setRenamingChatId(null)
+    if (!trimmed) return
+    const original = chats.find(c => c.id === chatId)?.title
+    if (trimmed === original) return
+    renameChat(chatId, trimmed)
+    await supabase.from('deal_chats').update({ title: trimmed }).eq('id', chatId)
   }
 
   function getVisibleMessages() {
@@ -468,42 +479,11 @@ export default function DealClient({
     }
   }
 
-  async function createChat() {
-    if (creatingChat) return
-    setCreatingChat(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setCreatingChat(false)
-      return
-    }
-
-    const title = 'New Chat'
-    const { data: newChat, error } = await supabase.from('deal_chats').insert({
-      deal_id: deal.id,
-      user_id: user.id,
-      title,
-    }).select('*').single()
-
-    if (error || !newChat) {
-      setCreatingChat(false)
-      return
-    }
-
-    await supabase.from('deal_messages').insert({
-      deal_id: deal.id,
-      chat_id: newChat.id,
-      user_id: user.id,
-      role: 'ai',
-      content: getOpeningMessage(deal),
-    })
-
-    await supabase.from('deals').update({ updated_at: new Date().toISOString() }).eq('id', deal.id)
-
-    setCreatingChat(false)
+  function createChat() {
+    if (currentChat === null) return
+    setCurrentChat(null)
+    setMessages([])
     setChatMenuOpen(false)
-    router.push(`/deal/${deal.id}?chat=${newChat.id}`)
-    router.refresh()
   }
 
   function openChat(chatId: string) {
@@ -692,22 +672,58 @@ export default function DealClient({
                 {chatMenuOpen && (
                   <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-border bg-white p-2 shadow-xl">
                     <div className="max-h-72 overflow-y-auto">
+                      {currentChat === null && (
+                        <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm bg-primary/8 text-foreground">
+                          <span className="flex min-w-0 flex-1 items-center justify-between">
+                            <span className="truncate font-medium">New Chat</span>
+                            <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />
+                          </span>
+                        </div>
+                      )}
                       {chats.map(chat => (
                         <div
                           key={chat.id}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors ${
+                          className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
                             chat.id === currentChat?.id
                               ? 'bg-primary/8 text-foreground'
                               : 'hover:bg-muted-light'
                           }`}
                         >
+                          {renamingChatId === chat.id ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={renameValue}
+                              onChange={e => setRenameValue(e.target.value)}
+                              onBlur={() => submitRename(chat.id)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') { e.preventDefault(); submitRename(chat.id) }
+                                if (e.key === 'Escape') { e.preventDefault(); setRenamingChatId(null) }
+                              }}
+                              onClick={e => e.stopPropagation()}
+                              className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openChat(chat.id)}
+                              className="flex min-w-0 flex-1 items-center justify-between text-left"
+                            >
+                              <span className="truncate font-medium">{chat.title}</span>
+                              {chat.id === currentChat?.id && <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />}
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => openChat(chat.id)}
-                            className="flex min-w-0 flex-1 items-center justify-between text-left"
+                            onClick={e => {
+                              e.stopPropagation()
+                              setRenameValue(chat.title)
+                              setRenamingChatId(chat.id)
+                            }}
+                            aria-label={`Rename ${chat.title}`}
+                            className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
                           >
-                            <span className="truncate font-medium">{chat.title}</span>
-                            {chat.id === currentChat?.id && <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />}
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
@@ -729,11 +745,11 @@ export default function DealClient({
                       <button
                         type="button"
                         onClick={createChat}
-                        disabled={creatingChat}
+                        disabled={currentChat === null}
                         className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-sm font-medium text-muted transition-colors hover:bg-muted-light disabled:opacity-50"
                       >
                         <Plus className="w-4 h-4" />
-                        {creatingChat ? 'Starting...' : 'Start a new chat'}
+                        Start a new chat
                       </button>
                     </div>
                   </div>
