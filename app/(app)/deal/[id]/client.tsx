@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
-import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2 } from 'lucide-react'
+import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 
 function getDraftChat(deal: Deal): DealChat {
   return {
@@ -50,6 +50,7 @@ export default function DealClient({
   const [creatingChat, setCreatingChat] = useState(false)
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
+  const [chatFullscreen, setChatFullscreen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -86,6 +87,17 @@ export default function DealClient({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!chatFullscreen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [chatFullscreen])
 
   function markChatUpdated(chatId: string, updatedAt: string) {
     setChats(prev =>
@@ -503,12 +515,19 @@ export default function DealClient({
   const displayChat = currentChat ?? getDraftChat(deal)
 
   return (
-    <div className="py-8">
-      <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6">
+    <div className="flex flex-col py-8 lg:h-[calc(100vh-14rem)] lg:overflow-hidden">
+      {chatFullscreen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-950/20 backdrop-blur-[2px]"
+          onClick={() => setChatFullscreen(false)}
+        />
+      )}
+
+      <Link href="/dashboard" className="mb-6 inline-flex shrink-0 items-center gap-1 text-sm text-muted hover:text-foreground">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
 
-      <div className="grid lg:grid-cols-[280px_1fr] gap-8">
+      <div className="grid flex-1 gap-8 lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)]">
         {/* Sidebar */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-border p-6">
@@ -592,8 +611,12 @@ export default function DealClient({
         </div>
 
         {/* Chat Area */}
-        <div className="bg-white rounded-2xl border border-border flex flex-col" style={{ minHeight: '600px' }}>
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+        <div className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-white ${
+          chatFullscreen
+            ? 'fixed inset-x-6 bottom-6 top-24 z-40 shadow-2xl lg:inset-x-10 lg:top-20'
+            : 'lg:min-h-0 lg:h-full'
+        }`}>
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-4 h-4 text-white" />
@@ -660,11 +683,21 @@ export default function DealClient({
                 )}
               </div>
             </div>
-            <span className="text-xs text-muted">AI-powered advice</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted">AI-powered advice</span>
+              <button
+                type="button"
+                onClick={() => setChatFullscreen(prev => !prev)}
+                aria-label={chatFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-white text-muted transition-colors hover:bg-muted-light hover:text-foreground"
+              >
+                {chatFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
             {visibleMessages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'brand' || msg.role === 'creator' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] ${
@@ -738,7 +771,7 @@ export default function DealClient({
 
           {/* Input */}
           {deal.status === 'negotiating' && (
-            <div className="p-4 border-t border-border">
+            <div className="shrink-0 border-t border-border p-4">
               <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-center gap-3">
                 <input
                   value={input}
@@ -759,7 +792,7 @@ export default function DealClient({
           )}
 
           {deal.status !== 'negotiating' && (
-            <div className="p-4 border-t border-border text-center">
+            <div className="shrink-0 border-t border-border p-4 text-center">
               <p className="text-sm text-muted">
                 This deal is {deal.status === 'closed_won' ? 'closed (won)' : deal.status === 'closed_lost' ? 'closed (lost)' : 'stalled'}.
                 {deal.status === 'stalled' && (
