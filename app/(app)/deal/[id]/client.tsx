@@ -173,8 +173,8 @@ export default function DealClient({
     }
 
     const userText = input.trim()
-    const shouldGenerateTitle = messages.filter(msg => msg.role !== 'ai').length === 0
     let activeChat = currentChat
+    const shouldGenerateTitle = !activeChat || activeChat.title === 'New Chat'
 
     if (!activeChat) {
       const { data: newChat, error: newChatError } = await supabase.from('deal_chats').insert({

@@ -23,7 +23,7 @@ const negotiationResponseSchema = {
     },
     script: {
       type: 'string',
-      description: 'A ready-to-send reply. Return an empty string when no script is needed.',
+      description: 'A ready-to-send reply. Body only — no subject line, no "Subject:" prefix, no metadata. Start directly with the salutation or first sentence. Return an empty string when no script is needed.',
     },
     subject: {
       type: 'string',
@@ -88,9 +88,9 @@ Behavior rules:
 - Only provide a recommended script when it would genuinely help.
 - If the user is just chatting, asking a meta question, or thinking out loud, return script as an empty string.
 - If the user asks for a draft, asks what to send, or has clearly provided enough brand context for a concrete reply, return a useful script.
-- If script is email-style and needs a subject line, return subject as just the subject text.
+- If script is email-style and needs a subject line, return it ONLY in the subject field — never inside the script body.
 - If no subject is needed, return subject as an empty string.
-- Never include "Subject:" inside the script body.
+- The script field must ONLY contain the body of the message — no "Subject:" line, no metadata, no labels of any kind. Start directly with the salutation or first sentence.
 - Preserve paragraph breaks and list formatting inside the script body when useful.
 - The advice should fit the detected intent instead of forcing everything into negotiation triage.
 - The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.
