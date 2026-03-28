@@ -372,7 +372,7 @@ export default function DealClient({
           chat_id: activeChat.id,
           user_id: user?.id ?? '',
           role: 'ai',
-          content: 'Sorry, I ran into an error. Please check that your OpenAI API key is configured.',
+          content: `Sorry, I ran into an error${err.message ? `: ${err.message}` : '.'}`,
           suggested_script: null,
           created_at: new Date().toISOString(),
         } as DealMessage])

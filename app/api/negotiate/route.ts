@@ -29,6 +29,31 @@ function formatSseEvent(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`
 }
 
+function buildFallbackPayload(input: {
+  latestUserMessage: string
+  lastSent: { intent: string; title: string; advice: string; script: string }
+  lastValidPayload: { intent: string; title: string; advice: string; script: string } | null
+}) {
+  if (input.lastValidPayload) return input.lastValidPayload
+
+  const trimmedMessage = input.latestUserMessage.trim()
+  const fallbackTitle =
+    input.lastSent.title ||
+    trimmedMessage.split(/\s+/).slice(0, 5).join(' ') ||
+    'New Chat'
+
+  const fallbackAdvice =
+    input.lastSent.advice ||
+    "I couldn't finish my full response, but I did get partway through it. Please send that again and I'll answer cleanly."
+
+  return {
+    intent: input.lastSent.intent || 'creator_context',
+    title: fallbackTitle,
+    advice: fallbackAdvice,
+    script: input.lastSent.script || '',
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { brandMessage, userMessage, deal, messageHistory, generateTitle } = await req.json()
@@ -210,7 +235,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
           const finalParsed = await parsePartialJson(jsonBuffer)
           const finalObject = finalParsed.value
 
-          if (
+          const finalPayload =
             finalObject &&
             typeof finalObject === 'object' &&
             !Array.isArray(finalObject) &&
@@ -218,39 +243,26 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
             typeof finalObject.title === 'string' &&
             typeof finalObject.advice === 'string' &&
             typeof finalObject.script === 'string'
-          ) {
-            controller.enqueue(
-              encoder.encode(
-                formatSseEvent({
-                  type: 'final',
-                  payload: {
-                    intent: finalObject.intent,
-                    title: finalObject.title,
-                    advice: finalObject.advice,
-                    script: finalObject.script,
-                  },
+              ? {
+                  intent: finalObject.intent,
+                  title: finalObject.title,
+                  advice: finalObject.advice,
+                  script: finalObject.script,
+                }
+              : buildFallbackPayload({
+                  latestUserMessage,
+                  lastSent,
+                  lastValidPayload,
                 })
-              )
+
+          controller.enqueue(
+            encoder.encode(
+              formatSseEvent({
+                type: 'final',
+                payload: finalPayload,
+              })
             )
-          } else if (lastValidPayload) {
-            controller.enqueue(
-              encoder.encode(
-                formatSseEvent({
-                  type: 'final',
-                  payload: lastValidPayload,
-                })
-              )
-            )
-          } else {
-            controller.enqueue(
-              encoder.encode(
-                formatSseEvent({
-                  type: 'error',
-                  message: 'The model returned an incomplete structured response.',
-                })
-              )
-            )
-          }
+          )
         } catch (error) {
           console.error('Negotiation AI streaming failed', error)
           controller.enqueue(
