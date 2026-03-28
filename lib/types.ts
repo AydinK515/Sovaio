@@ -65,6 +65,7 @@ export interface DealMessage {
   user_id: string
   role: 'creator' | 'brand' | 'ai'
   content: string
+  subject: string | null
   suggested_script: string | null
   created_at: string
 }

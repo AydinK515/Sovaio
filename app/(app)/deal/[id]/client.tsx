@@ -53,7 +53,9 @@ export default function DealClient({
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
   const [aiText, setAiText] = useState('')
+  const [aiReasoningText, setAiReasoningText] = useState('')
   const [aiScriptText, setAiScriptText] = useState('')
+  const [aiScriptSubject, setAiScriptSubject] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
@@ -84,7 +86,7 @@ export default function DealClient({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, aiText, aiScriptText])
+  }, [messages, aiText, aiReasoningText, aiScriptText, aiScriptSubject])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -235,7 +237,9 @@ export default function DealClient({
     setSending(false)
     setAiTyping(true)
     setAiText('')
+    setAiReasoningText('')
     setAiScriptText('')
+    setAiScriptSubject('')
 
     // Build message history for context (exclude the message we just saved so it goes as the final user turn)
     const historyForContext = messages.map(m => ({ role: m.role, content: m.content }))
@@ -272,8 +276,10 @@ export default function DealClient({
       let eventBuffer = ''
       let streamedTitle = ''
       let streamedAdvice = ''
+      let streamedReasoning = ''
       let streamedScript = ''
-      let finalPayload: { title?: string; advice?: string; script?: string } | null = null
+      let streamedSubject = ''
+      let finalPayload: { title?: string; advice?: string; reasoning?: string; script?: string; subject?: string } | null = null
 
       while (true) {
         const { value, done } = await reader.read()
@@ -297,12 +303,21 @@ export default function DealClient({
           if (!data) continue
 
           const event = JSON.parse(data) as
-            | { type: 'partial'; payload: { title?: string; advice?: string; script?: string } }
-            | { type: 'final'; payload: { title?: string; advice?: string; script?: string } }
+            | { type: 'partial'; payload: { title?: string; advice?: string; script?: string; subject?: string } }
+            | { type: 'reasoning'; payload: { reasoning?: string } }
+            | { type: 'final'; payload: { title?: string; advice?: string; reasoning?: string; script?: string; subject?: string } }
             | { type: 'error'; message?: string }
 
           if (event.type === 'error') {
             throw new Error(event.message || 'Streaming failed')
+          }
+
+          if (event.type === 'reasoning') {
+            if (typeof event.payload.reasoning === 'string') {
+              streamedReasoning = event.payload.reasoning
+              setAiReasoningText(streamedReasoning)
+            }
+            continue
           }
 
           if (event.type === 'partial' || event.type === 'final') {
@@ -319,6 +334,16 @@ export default function DealClient({
               streamedScript = event.payload.script
               setAiScriptText(streamedScript)
             }
+
+            if (typeof event.payload.subject === 'string') {
+              streamedSubject = event.payload.subject
+              setAiScriptSubject(streamedSubject)
+            }
+
+            if (typeof event.payload.reasoning === 'string') {
+              streamedReasoning = event.payload.reasoning
+              setAiReasoningText(streamedReasoning)
+            }
           }
 
           if (event.type === 'final') {
@@ -329,10 +354,13 @@ export default function DealClient({
 
       const messageContent = (finalPayload?.advice ?? streamedAdvice).trim() || 'I generated a response, but it came back empty.'
       const finalScript = (finalPayload?.script ?? streamedScript).trim() || null
+      const finalSubject = (finalPayload?.subject ?? streamedSubject).trim() || null
       const finalTitle = (finalPayload?.title ?? streamedTitle).trim()
 
       setAiText(messageContent)
+      setAiReasoningText(streamedReasoning)
       setAiScriptText(finalScript || '')
+      setAiScriptSubject(finalSubject || '')
 
       if (finalTitle && shouldGenerateTitle) {
         await supabase.from('deal_chats').update({ title: finalTitle }).eq('id', activeChat.id)
@@ -346,6 +374,7 @@ export default function DealClient({
         user_id: user.id,
         role: 'ai',
         content: messageContent,
+        subject: finalSubject,
         suggested_script: finalScript,
       }).select('*').single()
 
@@ -359,6 +388,7 @@ export default function DealClient({
           user_id: user.id,
           role: 'ai',
           content: messageContent,
+          subject: finalSubject,
           suggested_script: finalScript,
           created_at: new Date().toISOString(),
         } as DealMessage])
@@ -373,6 +403,7 @@ export default function DealClient({
           user_id: user?.id ?? '',
           role: 'ai',
           content: `Sorry, I ran into an error${err.message ? `: ${err.message}` : '.'}`,
+          subject: null,
           suggested_script: null,
           created_at: new Date().toISOString(),
         } as DealMessage])
@@ -380,7 +411,9 @@ export default function DealClient({
     } finally {
       setAiTyping(false)
       setAiText('')
+      setAiReasoningText('')
       setAiScriptText('')
+      setAiScriptSubject('')
       abortRef.current = null
     }
   }
@@ -677,7 +710,10 @@ export default function DealClient({
                           {copiedId === msg.id ? 'Copied' : 'Copy'}
                         </button>
                       </div>
-                      <p className="text-sm italic text-muted leading-relaxed">{msg.suggested_script}</p>
+                      {msg.subject && (
+                        <p className="mb-2 text-sm font-semibold text-foreground whitespace-pre-wrap">{msg.subject}</p>
+                      )}
+                      <p className="text-sm italic text-muted leading-relaxed whitespace-pre-wrap">{msg.suggested_script}</p>
                     </div>
                   )}
                 </div>
@@ -698,9 +734,18 @@ export default function DealClient({
                       </span>
                     )}
                   </p>
+                  {aiReasoningText && (
+                    <div className="mt-3 rounded-xl border border-border bg-white/50 p-4">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted">Thinking</span>
+                      <p className="mt-2 text-sm leading-relaxed text-muted whitespace-pre-wrap">{aiReasoningText}</p>
+                    </div>
+                  )}
                   {aiScriptText && (
                     <div className="mt-3 rounded-xl border border-primary/20 bg-white/10 p-4">
                       <span className="text-xs font-semibold uppercase tracking-wider text-primary">Recommended Script</span>
+                      {aiScriptSubject && (
+                        <p className="mt-2 text-sm font-semibold text-foreground whitespace-pre-wrap">{aiScriptSubject}</p>
+                      )}
                       <p className="mt-2 text-sm italic leading-relaxed text-muted whitespace-pre-wrap">{aiScriptText}</p>
                     </div>
                   )}

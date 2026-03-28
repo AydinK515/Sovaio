@@ -20,8 +20,12 @@ const negotiationResponseSchema = {
       type: 'string',
       description: 'A ready-to-send reply. Return an empty string when no script is needed.',
     },
+    subject: {
+      type: 'string',
+      description: 'Email subject line when the recommended script is an email. Return an empty string when no subject is needed.',
+    },
   },
-  required: ['intent', 'title', 'advice', 'script'],
+  required: ['intent', 'title', 'advice', 'script', 'subject'],
   additionalProperties: false,
 } as const
 
@@ -31,8 +35,8 @@ function formatSseEvent(data: unknown) {
 
 function buildFallbackPayload(input: {
   latestUserMessage: string
-  lastSent: { intent: string; title: string; advice: string; script: string }
-  lastValidPayload: { intent: string; title: string; advice: string; script: string } | null
+  lastSent: { intent: string; title: string; advice: string; script: string; subject: string }
+  lastValidPayload: { intent: string; title: string; advice: string; script: string; subject: string } | null
 }) {
   if (input.lastValidPayload) return input.lastValidPayload
 
@@ -51,6 +55,7 @@ function buildFallbackPayload(input: {
     title: fallbackTitle,
     advice: fallbackAdvice,
     script: input.lastSent.script || '',
+    subject: input.lastSent.subject || '',
   }
 }
 
@@ -95,6 +100,10 @@ Behavior rules:
 - Only provide a recommended script when it would genuinely help.
 - If the user is just chatting, asking a meta question, or thinking out loud, return script as an empty string.
 - If the user asks for a draft, asks what to send, or has clearly provided enough brand context for a concrete reply, return a useful script.
+- If script is email-style and needs a subject line, return subject as just the subject text.
+- If no subject is needed, return subject as an empty string.
+- Never include "Subject:" inside the script body.
+- Preserve paragraph breaks and list formatting inside the script body when useful.
 - The advice should fit the detected intent instead of forcing everything into negotiation triage.
 - The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.
 ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is already good.'}`
@@ -107,7 +116,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
       })) as Array<{ role: 'user' | 'assistant'; content: string }>
 
     const upstreamResponse = await fetch(
-      `${useGateway ? 'https://ai-gateway.vercel.sh/v1' : 'https://api.openai.com/v1'}/chat/completions`,
+      `${useGateway ? 'https://ai-gateway.vercel.sh/v1' : 'https://api.openai.com/v1'}/responses`,
       {
         method: 'POST',
         headers: {
@@ -116,23 +125,27 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
         },
         body: JSON.stringify({
           model: useGateway ? 'openai/gpt-5' : 'gpt-5',
-          messages: [
-            { role: 'system', content: systemPrompt },
+          instructions: systemPrompt,
+          input: [
             ...history,
             { role: 'user', content: latestUserMessage },
           ],
           stream: true,
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
+          text: {
+            format: {
+              type: 'json_schema',
               name: 'negotiation_response',
-              description: 'Structured negotiation guidance for a creator-brand discussion',
               schema: negotiationResponseSchema,
+              description: 'Structured negotiation guidance for a creator-brand discussion',
+              strict: true,
             },
+            verbosity: 'low',
           },
-          max_completion_tokens: 2000,
-          reasoning_effort: 'low',
-          verbosity: 'low',
+          max_output_tokens: 2000,
+          reasoning: {
+            effort: 'low',
+            summary: 'concise',
+          },
         }),
       }
     )
@@ -151,17 +164,20 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
         const reader = upstreamResponse.body!.getReader()
         let eventBuffer = ''
         let jsonBuffer = ''
+        let reasoningBuffer = ''
         let lastValidPayload: {
           intent: string
           title: string
           advice: string
           script: string
+          subject: string
         } | null = null
         let lastSent = {
           intent: '',
           title: '',
           advice: '',
           script: '',
+          subject: '',
         }
 
         try {
@@ -187,13 +203,35 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
               if (!data) continue
               if (data === '[DONE]') continue
 
-              const chunk = JSON.parse(data) as {
-                choices?: Array<{ delta?: { content?: string | null } }>
-              }
-              const content = chunk.choices?.[0]?.delta?.content
-              if (!content) continue
+              const event = JSON.parse(data) as
+                | { type?: string; delta?: string }
+                | { type?: string; error?: { message?: string } }
 
-              jsonBuffer += content
+              if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+                jsonBuffer += event.delta
+              }
+
+              if (event.type === 'response.reasoning_summary_text.delta' && typeof event.delta === 'string') {
+                reasoningBuffer += event.delta
+                controller.enqueue(
+                  encoder.encode(
+                    formatSseEvent({
+                      type: 'reasoning',
+                      payload: {
+                        reasoning: reasoningBuffer,
+                      },
+                    })
+                  )
+                )
+              }
+
+              if (event.type === 'error' || event.type === 'response.error') {
+                throw new Error(event.error?.message || 'The model stream returned an error.')
+              }
+
+              if (event.type !== 'response.output_text.delta') {
+                continue
+              }
 
               const parsed = await parsePartialJson(jsonBuffer)
               const partial = parsed.value
@@ -207,6 +245,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
                 title: typeof partial.title === 'string' ? partial.title : '',
                 advice: typeof partial.advice === 'string' ? partial.advice : '',
                 script: typeof partial.script === 'string' ? partial.script : '',
+                subject: typeof partial.subject === 'string' ? partial.subject : '',
               }
 
               if (next.intent && next.title && next.advice) {
@@ -217,7 +256,8 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
                 next.intent !== lastSent.intent ||
                 next.title !== lastSent.title ||
                 next.advice !== lastSent.advice ||
-                next.script !== lastSent.script
+                next.script !== lastSent.script ||
+                next.subject !== lastSent.subject
               ) {
                 lastSent = next
                 controller.enqueue(
@@ -242,12 +282,14 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
             typeof finalObject.intent === 'string' &&
             typeof finalObject.title === 'string' &&
             typeof finalObject.advice === 'string' &&
-            typeof finalObject.script === 'string'
+            typeof finalObject.script === 'string' &&
+            typeof finalObject.subject === 'string'
               ? {
                   intent: finalObject.intent,
                   title: finalObject.title,
                   advice: finalObject.advice,
                   script: finalObject.script,
+                  subject: finalObject.subject,
                 }
               : buildFallbackPayload({
                   latestUserMessage,
@@ -259,7 +301,10 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
             encoder.encode(
               formatSseEvent({
                 type: 'final',
-                payload: finalPayload,
+                payload: {
+                  ...finalPayload,
+                  reasoning: reasoningBuffer,
+                },
               })
             )
           )
