@@ -4,11 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import type { RateCard } from '@/lib/types'
+import { formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText } from 'lucide-react'
-
-function formatCurrency(n: number) {
-  return `$${n.toLocaleString()}`
-}
 
 export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
   const router = useRouter()
@@ -92,7 +89,11 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
       chat_id: chat.id,
       user_id: user.id,
       role: 'ai',
-      content: `This is a fresh negotiation thread for ${brandName}. You're targeting ${formatCurrency(askAmount!)} for a ${dealType === 'dedicated_video' ? 'dedicated video' : dealType === 'integration_60s' ? 'integrated (60s)' : 'integrated (30s)'}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`,
+      content: getOpeningMessage({
+        brand_name: brandName.trim(),
+        creator_ask: askAmount!,
+        deal_type: dealType,
+      }),
     })
 
     router.push(`/deal/${deal.id}?chat=${chat.id}`)

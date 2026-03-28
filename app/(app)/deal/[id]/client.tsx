@@ -5,22 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
+import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2 } from 'lucide-react'
-
-function formatCurrency(n: number | null) {
-  if (n == null) return '--'
-  return `$${n.toLocaleString()}`
-}
-
-const DEAL_TYPE_LABELS = {
-  dedicated_video: 'Dedicated Video',
-  integration_60s: 'Integrated (60s)',
-  integration_30s: 'Integrated (30s)',
-}
-
-function getOpeningMessage(deal: Deal) {
-  return `This is a fresh negotiation thread for ${deal.brand_name}. You're targeting ${formatCurrency(deal.creator_ask)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
-}
 
 function getDraftChat(deal: Deal): DealChat {
   return {
@@ -28,6 +14,8 @@ function getDraftChat(deal: Deal): DealChat {
     deal_id: deal.id,
     user_id: deal.user_id,
     title: 'New Chat',
+    openai_conversation_id: null,
+    openai_last_response_id: null,
     created_at: deal.created_at,
     updated_at: deal.updated_at,
   }
@@ -241,9 +229,6 @@ export default function DealClient({
     setAiScriptText('')
     setAiScriptSubject('')
 
-    // Build message history for context (exclude the message we just saved so it goes as the final user turn)
-    const historyForContext = messages.map(m => ({ role: m.role, content: m.content }))
-
     // Request AI response
     const controller = new AbortController()
     abortRef.current = controller
@@ -254,21 +239,16 @@ export default function DealClient({
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
+          chatId: activeChat.id,
           userMessage: userText,
-          deal: {
-            brand_name: deal.brand_name,
-            deal_type: deal.deal_type,
-            creator_ask: deal.creator_ask,
-            brand_last_offer: deal.brand_last_offer,
-            timeline: deal.timeline,
-            notes: deal.notes,
-          },
-          messageHistory: historyForContext,
           generateTitle: shouldGenerateTitle,
         }),
       })
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`)
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '')
+        throw new Error(errorText || `API error: ${response.status}`)
+      }
       if (!response.body) throw new Error('API returned no response body')
 
       const reader = response.body.getReader()
@@ -279,13 +259,22 @@ export default function DealClient({
       let streamedReasoning = ''
       let streamedScript = ''
       let streamedSubject = ''
-      let finalPayload: { title?: string; advice?: string; reasoning?: string; script?: string; subject?: string } | null = null
+      type StreamPayload = {
+        title?: string
+        advice?: string
+        reasoning?: string
+        script?: string
+        subject?: string
+        updatedAt?: string
+        message?: DealMessage | null
+      }
+      let finalPayload: StreamPayload | null = null
 
       while (true) {
         const { value, done } = await reader.read()
         if (done) break
 
-        eventBuffer += decoder.decode(value, { stream: true })
+        eventBuffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
 
         while (true) {
           const boundaryIndex = eventBuffer.indexOf('\n\n')
@@ -303,9 +292,9 @@ export default function DealClient({
           if (!data) continue
 
           const event = JSON.parse(data) as
-            | { type: 'partial'; payload: { title?: string; advice?: string; script?: string; subject?: string } }
-            | { type: 'reasoning'; payload: { reasoning?: string } }
-            | { type: 'final'; payload: { title?: string; advice?: string; reasoning?: string; script?: string; subject?: string } }
+            | { type: 'partial'; payload: StreamPayload }
+            | { type: 'reasoning'; payload: StreamPayload }
+            | { type: 'final'; payload: StreamPayload }
             | { type: 'error'; message?: string }
 
           if (event.type === 'error') {
@@ -363,23 +352,15 @@ export default function DealClient({
       setAiScriptSubject(finalSubject || '')
 
       if (finalTitle && shouldGenerateTitle) {
-        await supabase.from('deal_chats').update({ title: finalTitle }).eq('id', activeChat.id)
         renameChat(activeChat.id, finalTitle)
       }
 
-      // Save AI message to Supabase
-      const { data: aiMsg } = await supabase.from('deal_messages').insert({
-        deal_id: deal.id,
-        chat_id: activeChat.id,
-        user_id: user.id,
-        role: 'ai',
-        content: messageContent,
-        subject: finalSubject,
-        suggested_script: finalScript,
-      }).select('*').single()
+      if (finalPayload?.updatedAt) {
+        markChatUpdated(activeChat.id, finalPayload.updatedAt)
+      }
 
-      if (aiMsg) {
-        setMessages(prev => [...prev, aiMsg as DealMessage])
+      if (finalPayload?.message) {
+        setMessages(prev => [...prev, finalPayload.message!])
       } else if (messageContent) {
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),

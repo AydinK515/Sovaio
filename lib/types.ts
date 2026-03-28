@@ -75,6 +75,8 @@ export interface DealChat {
   deal_id: string
   user_id: string
   title: string
+  openai_conversation_id: string | null
+  openai_last_response_id: string | null
   created_at: string
   updated_at: string
 }

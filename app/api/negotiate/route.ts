@@ -1,4 +1,9 @@
 import { parsePartialJson } from 'ai'
+import { getOpeningMessage } from '@/lib/deal-chat'
+import { createClient } from '@/lib/supabase-server'
+import type { Deal, DealChat, DealMessage } from '@/lib/types'
+
+const OPENAI_API_BASE_URL = 'https://api.openai.com/v1'
 
 const negotiationResponseSchema = {
   type: 'object',
@@ -29,48 +34,26 @@ const negotiationResponseSchema = {
   additionalProperties: false,
 } as const
 
+type NegotiationPayload = {
+  intent: string
+  title: string
+  advice: string
+  script: string
+  subject: string
+}
+
+type ConversationInputItem = {
+  type: 'message'
+  role: 'user' | 'assistant'
+  content: string
+}
+
 function formatSseEvent(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`
 }
 
-function buildFallbackPayload(input: {
-  latestUserMessage: string
-  lastSent: { intent: string; title: string; advice: string; script: string; subject: string }
-  lastValidPayload: { intent: string; title: string; advice: string; script: string; subject: string } | null
-}) {
-  if (input.lastValidPayload) return input.lastValidPayload
-
-  const trimmedMessage = input.latestUserMessage.trim()
-  const fallbackTitle =
-    input.lastSent.title ||
-    trimmedMessage.split(/\s+/).slice(0, 5).join(' ') ||
-    'New Chat'
-
-  const fallbackAdvice =
-    input.lastSent.advice ||
-    "I couldn't finish my full response, but I did get partway through it. Please send that again and I'll answer cleanly."
-
-  return {
-    intent: input.lastSent.intent || 'creator_context',
-    title: fallbackTitle,
-    advice: fallbackAdvice,
-    script: input.lastSent.script || '',
-    subject: input.lastSent.subject || '',
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { brandMessage, userMessage, deal, messageHistory, generateTitle } = await req.json()
-    const latestUserMessage = (userMessage ?? brandMessage ?? '').trim()
-    const apiKey = process.env.AI_GATEWAY_API_KEY ?? process.env.OPENAI_API_KEY
-    const useGateway = Boolean(process.env.AI_GATEWAY_API_KEY)
-
-    if (!apiKey) {
-      return new Response('Missing AI_GATEWAY_API_KEY or OPENAI_API_KEY', { status: 500 })
-    }
-
-    const systemPrompt = `You are RateProof AI, a smart negotiation copilot for YouTube creators.
+function buildSystemPrompt(deal: Deal, generateTitle: boolean) {
+  return `You are RateProof AI, a smart negotiation copilot for YouTube creators.
 
 The creator's deal context:
 - Brand: ${deal.brand_name}
@@ -107,48 +90,283 @@ Behavior rules:
 - The advice should fit the detected intent instead of forcing everything into negotiation triage.
 - The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.
 ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is already good.'}`
+}
 
-    const history = (messageHistory as Array<{ role: string; content: string }>)
-      .filter(m => m.role === 'brand' || m.role === 'creator' || m.role === 'ai')
-      .map(m => ({
-        role: m.role === 'ai' ? 'assistant' : 'user',
-        content: m.content,
-      })) as Array<{ role: 'user' | 'assistant'; content: string }>
+function isNegotiationPayload(value: unknown): value is NegotiationPayload {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      typeof (value as NegotiationPayload).intent === 'string' &&
+      typeof (value as NegotiationPayload).title === 'string' &&
+      typeof (value as NegotiationPayload).advice === 'string' &&
+      typeof (value as NegotiationPayload).script === 'string' &&
+      typeof (value as NegotiationPayload).subject === 'string'
+  )
+}
 
-    const upstreamResponse = await fetch(
-      `${useGateway ? 'https://ai-gateway.vercel.sh/v1' : 'https://api.openai.com/v1'}/responses`,
+function buildFallbackPayload(input: {
+  latestUserMessage: string
+  lastSent: NegotiationPayload
+  lastValidPayload: NegotiationPayload | null
+}) {
+  if (input.lastValidPayload) return input.lastValidPayload
+
+  const trimmedMessage = input.latestUserMessage.trim()
+  const fallbackTitle =
+    input.lastSent.title ||
+    trimmedMessage.split(/\s+/).slice(0, 5).join(' ') ||
+    'New Chat'
+
+  const fallbackAdvice =
+    input.lastSent.advice ||
+    "I couldn't finish my full response, but I did get partway through it. Please send that again and I'll answer cleanly."
+
+  return {
+    intent: input.lastSent.intent || 'creator_context',
+    title: fallbackTitle,
+    advice: fallbackAdvice,
+    script: input.lastSent.script || '',
+    subject: input.lastSent.subject || '',
+  }
+}
+
+async function openAiJson<T>(path: string, apiKey: string, body: unknown) {
+  const response = await fetch(`${OPENAI_API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    throw new Error(errorText || `OpenAI request failed with status ${response.status}.`)
+  }
+
+  return response.json() as Promise<T>
+}
+
+function serializeAssistantMessage(message: DealMessage) {
+  const sections = [message.content.trim()]
+
+  if (message.subject?.trim() || message.suggested_script?.trim()) {
+    const scriptSection = ['Recommended script:']
+
+    if (message.subject?.trim()) {
+      scriptSection.push(`Subject: ${message.subject.trim()}`)
+    }
+
+    if (message.suggested_script?.trim()) {
+      scriptSection.push(message.suggested_script.trim())
+    }
+
+    sections.push(scriptSection.join('\n'))
+  }
+
+  return sections.filter(Boolean).join('\n\n')
+}
+
+function buildConversationSeedItems(messages: DealMessage[], deal: Deal, latestUserMessage: string) {
+  const openingMessage = getOpeningMessage(deal)
+  const trimmedLatestMessage = latestUserMessage.trim()
+  const messagesToSeed = [...messages]
+  const newestMessage = messagesToSeed.at(-1)
+
+  if (
+    newestMessage?.role === 'creator' &&
+    newestMessage.content.trim() === trimmedLatestMessage
+  ) {
+    messagesToSeed.pop()
+  }
+
+  return messagesToSeed
+    .filter(message => {
+      if (
+        message.role === 'ai' &&
+        message.content === openingMessage &&
+        !message.subject &&
+        !message.suggested_script
+      ) {
+        return false
+      }
+
+      return true
+    })
+    .map<ConversationInputItem | null>(message => {
+      if (message.role === 'ai') {
+        const content = serializeAssistantMessage(message)
+        return content
+          ? {
+              type: 'message',
+              role: 'assistant',
+              content,
+            }
+          : null
+      }
+
+      const content =
+        message.role === 'brand'
+          ? `Quoted brand message:\n${message.content.trim()}`
+          : message.content.trim()
+
+      return content
+        ? {
+            type: 'message',
+            role: 'user',
+            content,
+          }
+        : null
+    })
+    .filter((item): item is ConversationInputItem => Boolean(item))
+}
+
+async function ensureConversationState(input: {
+  apiKey: string
+  chat: DealChat
+  deal: Deal
+  latestUserMessage: string
+  messages: DealMessage[]
+  supabase: Awaited<ReturnType<typeof createClient>>
+}) {
+  if (input.chat.openai_conversation_id) {
+    return input.chat.openai_conversation_id
+  }
+
+  const seedItems = buildConversationSeedItems(input.messages, input.deal, input.latestUserMessage)
+  const initialItems = seedItems.slice(0, 20)
+  const remainingItems = seedItems.slice(20)
+
+  const createdConversation = await openAiJson<{ id: string }>(
+    '/conversations',
+    input.apiKey,
+    {
+      metadata: {
+        deal_chat_id: input.chat.id,
+        deal_id: input.chat.deal_id,
+        brand_name: input.deal.brand_name.slice(0, 512),
+      },
+      ...(initialItems.length > 0 ? { items: initialItems } : {}),
+    }
+  )
+
+  for (let i = 0; i < remainingItems.length; i += 20) {
+    await openAiJson(
+      `/conversations/${createdConversation.id}/items`,
+      input.apiKey,
       {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: useGateway ? 'openai/gpt-5' : 'gpt-5',
-          instructions: systemPrompt,
-          input: [
-            ...history,
-            { role: 'user', content: latestUserMessage },
-          ],
-          stream: true,
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'negotiation_response',
-              schema: negotiationResponseSchema,
-              description: 'Structured negotiation guidance for a creator-brand discussion',
-              strict: true,
-            },
-            verbosity: 'low',
-          },
-          max_output_tokens: 2000,
-          reasoning: {
-            effort: 'low',
-            summary: 'concise',
-          },
-        }),
+        items: remainingItems.slice(i, i + 20),
       }
     )
+  }
+
+  const { error: updateError } = await input.supabase
+    .from('deal_chats')
+    .update({ openai_conversation_id: createdConversation.id })
+    .eq('id', input.chat.id)
+    .eq('user_id', input.chat.user_id)
+
+  if (updateError) {
+    throw new Error(`Failed to store OpenAI conversation state: ${updateError.message}`)
+  }
+
+  return createdConversation.id
+}
+
+export async function POST(req: Request) {
+  try {
+    const { chatId, userMessage, generateTitle } = await req.json()
+    const latestUserMessage = typeof userMessage === 'string' ? userMessage.trim() : ''
+    const apiKey = process.env.OPENAI_API_KEY
+
+    if (!apiKey) {
+      return new Response('Missing OPENAI_API_KEY.', { status: 500 })
+    }
+
+    if (!chatId || !latestUserMessage) {
+      return new Response('Missing chatId or userMessage.', { status: 400 })
+    }
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return new Response('Unauthorized.', { status: 401 })
+    }
+
+    const { data: chat } = await supabase
+      .from('deal_chats')
+      .select('*')
+      .eq('id', chatId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!chat) {
+      return new Response('Chat not found.', { status: 404 })
+    }
+
+    const { data: deal } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('id', chat.deal_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!deal) {
+      return new Response('Deal not found.', { status: 404 })
+    }
+
+    const { data: existingMessages } = await supabase
+      .from('deal_messages')
+      .select('*')
+      .eq('chat_id', chat.id)
+      .order('created_at', { ascending: true })
+
+    const conversationId = await ensureConversationState({
+      apiKey,
+      chat: chat as DealChat,
+      deal: deal as Deal,
+      latestUserMessage,
+      messages: (existingMessages || []) as DealMessage[],
+      supabase,
+    })
+
+    const upstreamResponse = await fetch(`${OPENAI_API_BASE_URL}/responses`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5',
+        conversation: conversationId,
+        instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle)),
+        input: [
+          {
+            role: 'user',
+            content: latestUserMessage,
+          },
+        ],
+        stream: true,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'negotiation_response',
+            schema: negotiationResponseSchema,
+            description: 'Structured negotiation guidance for a creator-brand discussion',
+            strict: true,
+          },
+          verbosity: 'low',
+        },
+        max_output_tokens: 2000,
+        reasoning: {
+          effort: 'low',
+          summary: 'concise',
+        },
+      }),
+    })
 
     if (!upstreamResponse.ok || !upstreamResponse.body) {
       const errorText = await upstreamResponse.text().catch(() => '')
@@ -165,27 +383,22 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
         let eventBuffer = ''
         let jsonBuffer = ''
         let reasoningBuffer = ''
-        let lastValidPayload: {
-          intent: string
-          title: string
-          advice: string
-          script: string
-          subject: string
-        } | null = null
-        let lastSent = {
+        let lastValidPayload: NegotiationPayload | null = null
+        let lastSent: NegotiationPayload = {
           intent: '',
           title: '',
           advice: '',
           script: '',
           subject: '',
         }
+        let latestResponseId: string | null = null
 
         try {
           while (true) {
             const { value, done } = await reader.read()
             if (done) break
 
-            eventBuffer += decoder.decode(value, { stream: true })
+            eventBuffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
 
             while (true) {
               const boundaryIndex = eventBuffer.indexOf('\n\n')
@@ -200,12 +413,21 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
                 .map(line => line.slice(5).trim())
                 .join('\n')
 
-              if (!data) continue
-              if (data === '[DONE]') continue
+              if (!data || data === '[DONE]') continue
 
-              const event = JSON.parse(data) as
-                | { type?: string; delta?: string }
-                | { type?: string; error?: { message?: string } }
+              const event = JSON.parse(data) as {
+                type?: string
+                delta?: string
+                response?: { id?: string }
+                error?: { message?: string }
+              }
+
+              if (
+                (event.type === 'response.created' || event.type === 'response.completed') &&
+                typeof event.response?.id === 'string'
+              ) {
+                latestResponseId = event.response.id
+              }
 
               if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
                 jsonBuffer += event.delta
@@ -240,7 +462,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
                 continue
               }
 
-              const next = {
+              const next: NegotiationPayload = {
                 intent: typeof partial.intent === 'string' ? partial.intent : '',
                 title: typeof partial.title === 'string' ? partial.title : '',
                 advice: typeof partial.advice === 'string' ? partial.advice : '',
@@ -273,29 +495,68 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
           }
 
           const finalParsed = await parsePartialJson(jsonBuffer)
-          const finalObject = finalParsed.value
+          const finalPayload = isNegotiationPayload(finalParsed.value)
+            ? finalParsed.value
+            : buildFallbackPayload({
+                latestUserMessage,
+                lastSent,
+                lastValidPayload,
+              })
 
-          const finalPayload =
-            finalObject &&
-            typeof finalObject === 'object' &&
-            !Array.isArray(finalObject) &&
-            typeof finalObject.intent === 'string' &&
-            typeof finalObject.title === 'string' &&
-            typeof finalObject.advice === 'string' &&
-            typeof finalObject.script === 'string' &&
-            typeof finalObject.subject === 'string'
-              ? {
-                  intent: finalObject.intent,
-                  title: finalObject.title,
-                  advice: finalObject.advice,
-                  script: finalObject.script,
-                  subject: finalObject.subject,
-                }
-              : buildFallbackPayload({
-                  latestUserMessage,
-                  lastSent,
-                  lastValidPayload,
-                })
+          let savedMessage: DealMessage | null = null
+          const messageContent = finalPayload.advice.trim() || 'I generated a response, but it came back empty.'
+          const finalScript = finalPayload.script.trim() || null
+          const finalSubject = finalPayload.subject.trim() || null
+          const nextTitle = Boolean(generateTitle) && finalPayload.title.trim()
+            ? finalPayload.title.trim()
+            : null
+
+          const { data: insertedAiMessage, error: aiMessageError } = await supabase
+            .from('deal_messages')
+            .insert({
+              deal_id: chat.deal_id,
+              chat_id: chat.id,
+              user_id: user.id,
+              role: 'ai',
+              content: messageContent,
+              subject: finalSubject,
+              suggested_script: finalScript,
+            })
+            .select('*')
+            .single()
+
+          if (aiMessageError) {
+            console.error('Failed to persist negotiation AI message', aiMessageError)
+          } else if (insertedAiMessage) {
+            savedMessage = insertedAiMessage as DealMessage
+          }
+
+          const chatUpdatedAt = savedMessage?.created_at ?? new Date().toISOString()
+          const chatUpdate: {
+            updated_at: string
+            openai_last_response_id?: string
+            title?: string
+          } = {
+            updated_at: chatUpdatedAt,
+          }
+
+          if (latestResponseId) {
+            chatUpdate.openai_last_response_id = latestResponseId
+          }
+
+          if (nextTitle) {
+            chatUpdate.title = nextTitle
+          }
+
+          const { error: chatUpdateError } = await supabase
+            .from('deal_chats')
+            .update(chatUpdate)
+            .eq('id', chat.id)
+            .eq('user_id', user.id)
+
+          if (chatUpdateError) {
+            console.error('Failed to persist negotiation chat state', chatUpdateError)
+          }
 
           controller.enqueue(
             encoder.encode(
@@ -304,6 +565,8 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
                 payload: {
                   ...finalPayload,
                   reasoning: reasoningBuffer,
+                  message: savedMessage,
+                  updatedAt: chatUpdatedAt,
                 },
               })
             )
