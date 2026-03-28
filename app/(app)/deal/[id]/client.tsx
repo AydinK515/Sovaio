@@ -18,21 +18,7 @@ const DEAL_TYPE_LABELS = {
   integration_30s: 'Integrated (30s)',
 }
 
-// Mock AI responses for the negotiation advisor
-const MOCK_AI_RESPONSES = [
-  {
-    content: "That's a significant gap. They're likely testing your flexibility since your historical CTR in the niche is nearly 2.4x the industry average. Don't drop your price yet. Instead, pivot the conversation to ROI.",
-    script: "\"I appreciate the context on budget. However, given my 68% audience retention on similar product reviews and the historical performance of my tech integrations, I'm confident in the valuation. Would you be open to a performance-based bonus to bridge the gap?\"",
-  },
-  {
-    content: "They're coming up, which is a good sign. The fact that they increased their offer means they have more room. I'd suggest a small concession — come down 10% but add a usage rights limitation to protect your value.",
-    script: "\"Thanks for moving on this. I can come down to [slightly lower price] if we limit usage rights to 90 days and one platform. For extended rights, we'd need to revisit the rate. Does that work for your team?\"",
-  },
-  {
-    content: "This is a strong offer — it's within your rate card range and above the niche average for this type of integration. I'd recommend accepting but negotiating on payment terms to protect your cash flow.",
-    script: "\"That works for me. I'd like to confirm: 50% upfront before production begins, net-30 on the remainder after publish. I'll send over a simple agreement for us to sign. Looking forward to this!\"",
-  },
-]
+const SCRIPT_SEPARATOR = '---SCRIPT---'
 
 export default function DealClient({ deal: initialDeal, initialMessages }: { deal: Deal; initialMessages: DealMessage[] }) {
   const router = useRouter()
@@ -46,7 +32,7 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const mockResponseIndex = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
 
   const supabase = createClient()
 
@@ -67,20 +53,22 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Save brand message
+    const brandText = input.trim()
+
+    // Save brand message to Supabase
     const { data: brandMsg } = await supabase.from('deal_messages').insert({
       deal_id: deal.id,
       user_id: user.id,
       role: 'brand',
-      content: input.trim(),
+      content: brandText,
     }).select('*').single()
 
     if (brandMsg) {
       setMessages(prev => [...prev, brandMsg as DealMessage])
     }
 
-    // Extract number from brand message for offer tracking
-    const numberMatch = input.match(/\$?([\d,]+)/);
+    // Extract dollar amount from brand message for offer tracking
+    const numberMatch = brandText.match(/\$?([\d,]+)/)
     if (numberMatch) {
       const offer = parseInt(numberMatch[1].replace(/,/g, ''))
       await supabase.from('deals').update({ brand_last_offer: offer, updated_at: new Date().toISOString() }).eq('id', deal.id)
@@ -89,44 +77,89 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
 
     setInput('')
     setSending(false)
-
-    // Simulate AI streaming response
     setAiTyping(true)
-    const mockResponse = MOCK_AI_RESPONSES[mockResponseIndex.current % MOCK_AI_RESPONSES.length]
-    mockResponseIndex.current++
-
-    // Typewriter effect
-    const fullText = mockResponse.content
-    let charIndex = 0
     setAiText('')
 
-    await new Promise(r => setTimeout(r, 800)) // Thinking delay
+    // Build message history for context (exclude the message we just saved so it goes as the final user turn)
+    const historyForContext = messages.map(m => ({ role: m.role, content: m.content }))
 
-    await new Promise<void>(resolve => {
-      const interval = setInterval(() => {
-        charIndex++
-        setAiText(fullText.slice(0, charIndex))
-        if (charIndex >= fullText.length) {
-          clearInterval(interval)
-          resolve()
-        }
-      }, 20)
-    })
+    // Stream AI response
+    const controller = new AbortController()
+    abortRef.current = controller
 
-    // Save AI message
-    const { data: aiMsg } = await supabase.from('deal_messages').insert({
-      deal_id: deal.id,
-      user_id: user.id,
-      role: 'ai',
-      content: mockResponse.content,
-      suggested_script: mockResponse.script,
-    }).select('*').single()
+    try {
+      const response = await fetch('/api/negotiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          brandMessage: brandText,
+          deal: {
+            brand_name: deal.brand_name,
+            deal_type: deal.deal_type,
+            creator_ask: deal.creator_ask,
+            brand_last_offer: deal.brand_last_offer,
+            timeline: deal.timeline,
+            notes: deal.notes,
+          },
+          messageHistory: historyForContext,
+        }),
+      })
 
-    if (aiMsg) {
-      setMessages(prev => [...prev, aiMsg as DealMessage])
+      if (!response.ok) throw new Error(`API error: ${response.status}`)
+
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let fullText = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        fullText += chunk
+        setAiText(fullText)
+      }
+
+      // Parse advice and script from response
+      const scriptIndex = fullText.indexOf(SCRIPT_SEPARATOR)
+      let advice = fullText
+      let script: string | null = null
+
+      if (scriptIndex !== -1) {
+        advice = fullText.slice(0, scriptIndex).trim()
+        script = fullText.slice(scriptIndex + SCRIPT_SEPARATOR.length).trim()
+      }
+
+      // Save AI message to Supabase
+      const { data: aiMsg } = await supabase.from('deal_messages').insert({
+        deal_id: deal.id,
+        user_id: user.id,
+        role: 'ai',
+        content: advice,
+        suggested_script: script,
+      }).select('*').single()
+
+      if (aiMsg) {
+        setMessages(prev => [...prev, aiMsg as DealMessage])
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        // Save error message so conversation isn't broken
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          deal_id: deal.id,
+          user_id: user?.id ?? '',
+          role: 'ai',
+          content: 'Sorry, I ran into an error. Please check that your OpenAI API key is configured.',
+          suggested_script: null,
+          created_at: new Date().toISOString(),
+        } as DealMessage])
+      }
+    } finally {
+      setAiTyping(false)
+      setAiText('')
+      abortRef.current = null
     }
-    setAiTyping(false)
-    setAiText('')
   }
 
   async function updateStatus(status: Deal['status']) {
@@ -287,12 +320,12 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
               </div>
             ))}
 
-            {/* AI typing indicator */}
+            {/* AI streaming indicator */}
             {aiTyping && (
               <div className="flex justify-start">
                 <div className="max-w-[80%] bg-muted-light rounded-2xl rounded-bl-sm px-5 py-3">
                   <p className="text-xs font-medium mb-1 opacity-60">RateProof AI</p>
-                  <p className="text-sm leading-relaxed">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
                     {aiText || (
                       <span className="flex items-center gap-1 text-muted">
                         <span className="w-2 h-2 bg-muted rounded-full" style={{ animation: 'pulse-dot 1.4s infinite 0s' }} />
@@ -314,7 +347,7 @@ export default function DealClient({ deal: initialDeal, initialMessages }: { dea
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder="Tell me what they said..."
+                  placeholder="Paste what the brand said..."
                   disabled={sending || aiTyping}
                   className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
                 />

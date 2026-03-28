@@ -147,29 +147,48 @@ export default function GeneratePage() {
         uploadIds.push(data.id)
       }
 
-      // Mock rate card generation (AI stub)
-      await new Promise(r => setTimeout(r, 6000))
-
       const subCount = parseInt(subscriberCount.replace(/,/g, ''))
-      const baseRate = Math.max(500, Math.round(subCount / 1000 * 25))
+
+      // Build a keyed map of CSV data for the AI
+      const csvData: Record<string, Record<string, unknown>[]> = {}
+      for (const pf of parsedFiles) {
+        csvData[pf.type] = pf.data
+      }
+
+      // Call AI to generate rate card
+      const aiResponse = await fetch('/api/generate-rate-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          niche,
+          subscriberCount: subCount,
+          hasSponsorships,
+          csvData,
+          confidence,
+        }),
+      })
+
+      if (!aiResponse.ok) {
+        const err = await aiResponse.text()
+        throw new Error(`AI generation failed: ${err}`)
+      }
+
+      const aiRates = await aiResponse.json()
 
       const { data: rateCard, error: rcError } = await supabase.from('rate_cards').insert({
         user_id: user.id,
         niche,
         subscriber_count: subCount,
         has_sponsorships: hasSponsorships,
-        dedicated_video_low: Math.round(baseRate * 2),
-        dedicated_video_high: Math.round(baseRate * 3.1),
-        integration_60s_low: Math.round(baseRate * 1.0),
-        integration_60s_high: Math.round(baseRate * 1.6),
-        integration_30s_low: Math.round(baseRate * 0.6),
-        integration_30s_high: Math.round(baseRate * 0.95),
-        explanation: `"Your high retention (65%) and strong US audience (42%) put you in the top 10% of ${niche} creators. Brands value the direct conversion potential of your dedicated subscriber base."`,
-        improvement_tips: [
-          { title: 'Increase Click-Through Rate', description: 'Improve your CTR from 4% to 6% to unlock a 15% increase in your base rate.' },
-          { title: 'Duration Focus', description: 'Focus on longer watch-time content to prove engagement depth to premium advertisers.' },
-        ],
-        pitch_email: `Subject: Partnership Proposal: [Your Channel Name] x [Brand Name]\n\nHi [Contact Name],\n\nI've been following [Brand Name] and love your recent focus on ${niche.toLowerCase()} products.\n\nMy channel recently reached a 65% average retention rate with a 42% US-based audience. I believe a 60-second integration in my upcoming video on "[Video Topic]" would be a perfect fit for your Q4 goals.\n\nWould you be open to discussing a partnership?\n\nBest,\n[Your Name]`,
+        dedicated_video_low: aiRates.dedicated_video_low,
+        dedicated_video_high: aiRates.dedicated_video_high,
+        integration_60s_low: aiRates.integration_60s_low,
+        integration_60s_high: aiRates.integration_60s_high,
+        integration_30s_low: aiRates.integration_30s_low,
+        integration_30s_high: aiRates.integration_30s_high,
+        explanation: aiRates.explanation,
+        improvement_tips: aiRates.improvement_tips,
+        pitch_email: aiRates.pitch_email,
         report_confidence: confidence,
         csv_upload_ids: uploadIds,
       }).select('id').single()
