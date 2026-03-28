@@ -33,6 +33,8 @@ export default function GeneratePage() {
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([])
   const [niche, setNiche] = useState('')
   const [hasSponsorships, setHasSponsorships] = useState<boolean | null>(null)
+  const [sponsorshipCount, setSponsorshipCount] = useState('')
+  const [avgDealAmount, setAvgDealAmount] = useState('')
   const [subscriberCount, setSubscriberCount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
@@ -215,6 +217,10 @@ export default function GeneratePage() {
       setError('Please fill in all required fields.')
       return
     }
+    if (hasSponsorships && (!sponsorshipCount || !avgDealAmount)) {
+      setError('Please fill in your sponsorship history details.')
+      return
+    }
     if (parsedFiles.length === 0) {
       setError('Please upload at least one CSV file.')
       return
@@ -264,6 +270,8 @@ export default function GeneratePage() {
           niche,
           subscriberCount: subCount,
           hasSponsorships,
+          sponsorshipCount: sponsorshipCount ? parseInt(sponsorshipCount.replace(/,/g, '')) : null,
+          avgDealAmount: avgDealAmount ? parseInt(avgDealAmount.replace(/[$,]/g, '')) : null,
           csvData,
           confidence,
         }),
@@ -281,6 +289,8 @@ export default function GeneratePage() {
         niche,
         subscriber_count: subCount,
         has_sponsorships: hasSponsorships,
+        sponsorship_count: hasSponsorships && sponsorshipCount ? parseInt(sponsorshipCount.replace(/,/g, '')) : null,
+        avg_deal_amount: hasSponsorships && avgDealAmount ? parseInt(avgDealAmount.replace(/[$,]/g, '')) : null,
         dedicated_video_low: aiRates.dedicated_video_low,
         dedicated_video_high: aiRates.dedicated_video_high,
         integration_60s_low: aiRates.integration_60s_low,
@@ -434,6 +444,31 @@ export default function GeneratePage() {
               />
             </div>
           </div>
+
+          {hasSponsorships === true && (
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-2">How Many Sponsorships?</label>
+                <input
+                  type="text"
+                  value={sponsorshipCount}
+                  onChange={e => setSponsorshipCount(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-2">Average Deal Amount (USD)</label>
+                <input
+                  type="text"
+                  value={avgDealAmount}
+                  onChange={e => setAvgDealAmount(e.target.value)}
+                  placeholder="e.g. $2,000"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+          )}
 
           {error && <p className="text-sm text-primary bg-primary-light rounded-lg px-4 py-2">{error}</p>}
 

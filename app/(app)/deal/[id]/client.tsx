@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
-import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2 } from 'lucide-react'
+import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 
 function getDraftChat(deal: Deal): DealChat {
   return {
@@ -54,6 +54,9 @@ export default function DealClient({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
+  const aiTextRef = useRef('')
+  const aiScriptTextRef = useRef('')
+  const aiScriptSubjectRef = useRef('')
 
   const supabase = createClient()
 
@@ -155,6 +158,10 @@ export default function DealClient({
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  function stopGeneration() {
+    abortRef.current?.abort()
+  }
+
   async function sendMessage() {
     if (!input.trim() || sending) return
     setSending(true)
@@ -225,14 +232,6 @@ export default function DealClient({
     await supabase.from('deals').update({ updated_at: messageTimestamp }).eq('id', deal.id)
     markChatUpdated(activeChat.id, messageTimestamp)
 
-    // Extract dollar amount from brand message for offer tracking
-    const numberMatch = userText.match(/\$?([\d,]+)/)
-    if (numberMatch) {
-      const offer = parseInt(numberMatch[1].replace(/,/g, ''))
-      await supabase.from('deals').update({ brand_last_offer: offer, updated_at: new Date().toISOString() }).eq('id', deal.id)
-      setDeal(prev => ({ ...prev, brand_last_offer: offer }))
-    }
-
     setInput('')
     setSending(false)
     setAiTyping(true)
@@ -240,6 +239,9 @@ export default function DealClient({
     setAiReasoningText('')
     setAiScriptText('')
     setAiScriptSubject('')
+    aiTextRef.current = ''
+    aiScriptTextRef.current = ''
+    aiScriptSubjectRef.current = ''
 
     // Request AI response
     const controller = new AbortController()
@@ -279,6 +281,7 @@ export default function DealClient({
         subject?: string
         updatedAt?: string
         message?: DealMessage | null
+        detectedBrandOffer?: number | null
       }
       let finalPayload: StreamPayload | null = null
 
@@ -328,16 +331,19 @@ export default function DealClient({
 
             if (typeof event.payload.advice === 'string') {
               streamedAdvice = event.payload.advice
+              aiTextRef.current = streamedAdvice
               setAiText(streamedAdvice)
             }
 
             if (typeof event.payload.script === 'string') {
               streamedScript = event.payload.script
+              aiScriptTextRef.current = streamedScript
               setAiScriptText(streamedScript)
             }
 
             if (typeof event.payload.subject === 'string') {
               streamedSubject = event.payload.subject
+              aiScriptSubjectRef.current = streamedSubject
               setAiScriptSubject(streamedSubject)
             }
 
@@ -371,6 +377,10 @@ export default function DealClient({
         markChatUpdated(activeChat.id, finalPayload.updatedAt)
       }
 
+      if (typeof finalPayload?.detectedBrandOffer === 'number') {
+        setDeal(prev => ({ ...prev, brand_last_offer: finalPayload!.detectedBrandOffer as number }))
+      }
+
       if (finalPayload?.message) {
         setMessages(prev => [...prev, finalPayload.message!])
       } else if (messageContent) {
@@ -387,7 +397,33 @@ export default function DealClient({
         } as DealMessage])
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.name !== 'AbortError') {
+      if (err instanceof Error && err.name === 'AbortError') {
+        const partial = aiTextRef.current.trim()
+        if (partial) {
+          const partialSubject = aiScriptSubjectRef.current.trim() || null
+          const partialScript = aiScriptTextRef.current.trim() || null
+          const { data: savedPartial } = await supabase.from('deal_messages').insert({
+            deal_id: deal.id,
+            chat_id: activeChat.id,
+            user_id: user?.id ?? '',
+            role: 'ai',
+            content: partial,
+            subject: partialSubject,
+            suggested_script: partialScript,
+          }).select('*').single()
+          setMessages(prev => [...prev, (savedPartial ?? {
+            id: crypto.randomUUID(),
+            deal_id: deal.id,
+            chat_id: activeChat.id,
+            user_id: user?.id ?? '',
+            role: 'ai',
+            content: partial,
+            subject: partialSubject,
+            suggested_script: partialScript,
+            created_at: new Date().toISOString(),
+          }) as DealMessage])
+        }
+      } else if (err instanceof Error) {
         // Save error message so conversation isn't broken
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
@@ -777,16 +813,26 @@ export default function DealClient({
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   placeholder="Tell me what happened in the negotiation..."
-                  disabled={sending || aiTyping}
+                  disabled={sending}
                   className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
                 />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || sending || aiTyping}
-                  className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                {aiTyping ? (
+                  <button
+                    type="button"
+                    onClick={stopGeneration}
+                    className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors"
+                  >
+                    <Square className="w-4 h-4 fill-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || sending}
+                    className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                )}
               </form>
             </div>
           )}

@@ -18,7 +18,7 @@ const RateCardSchema = z.object({
 })
 
 export async function POST(req: Request) {
-  const { niche, subscriberCount, hasSponsorships, csvData, confidence } = await req.json()
+  const { niche, subscriberCount, hasSponsorships, sponsorshipCount, avgDealAmount, csvData, confidence } = await req.json()
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
@@ -41,6 +41,8 @@ Output rules:
 - dedicated_video rates must be higher than 60-second integrations.
 - 60-second integrations must be higher than 30-second integrations.
 - Channels without prior sponsorships should not receive an experience premium.
+- If a channel has prior sponsorships with a known average deal size, treat that as real market evidence of their rate floor. Their new rates should be at or above that average unless data signals a decline.
+- More past sponsorships = more proven track record; factor this in as a mild upward signal on rates.
 - Keep the explanation grounded in the actual data summary.`
 
   const prompt = `Generate a data-backed sponsorship rate card for this YouTube creator.
@@ -48,7 +50,7 @@ Output rules:
 Creator profile:
 - Niche: ${niche}
 - Subscriber count: ${subscriberCount.toLocaleString()}
-- Has previous sponsorships: ${hasSponsorships ? 'Yes' : 'No (first-time sponsor)'}
+- Has previous sponsorships: ${hasSponsorships ? 'Yes' : 'No (first-time sponsor)'}${hasSponsorships && sponsorshipCount != null ? `\n- Number of past sponsorships: ~${sponsorshipCount}` : ''}${hasSponsorships && avgDealAmount != null ? `\n- Average deal size from past sponsorships: ~$${avgDealAmount.toLocaleString()}` : ''}
 - Data confidence: ${confidence}%
 
 ${csvSummary}

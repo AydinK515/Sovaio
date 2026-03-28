@@ -29,8 +29,12 @@ const negotiationResponseSchema = {
       type: 'string',
       description: 'Email subject line when the recommended script is an email. Return an empty string when no subject is needed.',
     },
+    detected_brand_offer: {
+      type: ['integer', 'null'],
+      description: 'The USD dollar amount of a new offer the brand made, if and only if the user message clearly conveys the brand proposed a specific price. Null in all other cases — including when the user mentions a number that is not a brand offer (e.g. their own ask, a view count, a subscriber count, a date, or a past deal they mentioned).',
+    },
   },
-  required: ['intent', 'title', 'advice', 'script', 'subject'],
+  required: ['intent', 'title', 'advice', 'script', 'subject', 'detected_brand_offer'],
   additionalProperties: false,
 } as const
 
@@ -40,6 +44,7 @@ type NegotiationPayload = {
   advice: string
   script: string
   subject: string
+  detected_brand_offer: number | null
 }
 
 type ConversationInputItem = {
@@ -101,7 +106,8 @@ function isNegotiationPayload(value: unknown): value is NegotiationPayload {
       typeof (value as NegotiationPayload).title === 'string' &&
       typeof (value as NegotiationPayload).advice === 'string' &&
       typeof (value as NegotiationPayload).script === 'string' &&
-      typeof (value as NegotiationPayload).subject === 'string'
+      typeof (value as NegotiationPayload).subject === 'string' &&
+      ('detected_brand_offer' in (value as NegotiationPayload))
   )
 }
 
@@ -128,6 +134,7 @@ function buildFallbackPayload(input: {
     advice: fallbackAdvice,
     script: input.lastSent.script || '',
     subject: input.lastSent.subject || '',
+    detected_brand_offer: null,
   }
 }
 
@@ -333,44 +340,64 @@ export async function POST(req: Request) {
       supabase,
     })
 
-    const upstreamResponse = await fetch(`${OPENAI_API_BASE_URL}/responses`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+    const openaiRequestBody = JSON.stringify({
+      model: 'gpt-5',
+      conversation: conversationId,
+      instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle)),
+      input: [
+        {
+          role: 'user',
+          content: latestUserMessage,
+        },
+      ],
+      stream: true,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'negotiation_response',
+          schema: negotiationResponseSchema,
+          description: 'Structured negotiation guidance for a creator-brand discussion',
+          strict: true,
+        },
+        verbosity: 'low',
       },
-      body: JSON.stringify({
-        model: 'gpt-5',
-        conversation: conversationId,
-        instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle)),
-        input: [
-          {
-            role: 'user',
-            content: latestUserMessage,
-          },
-        ],
-        stream: true,
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'negotiation_response',
-            schema: negotiationResponseSchema,
-            description: 'Structured negotiation guidance for a creator-brand discussion',
-            strict: true,
-          },
-          verbosity: 'low',
-        },
-        max_output_tokens: 2000,
-        reasoning: {
-          effort: 'low',
-          summary: 'concise',
-        },
-      }),
+      max_output_tokens: 2000,
+      reasoning: {
+        effort: 'low',
+        summary: 'concise',
+      },
     })
 
-    if (!upstreamResponse.ok || !upstreamResponse.body) {
-      const errorText = await upstreamResponse.text().catch(() => '')
-      console.error('Negotiation AI upstream failed', upstreamResponse.status, errorText)
+    let upstreamResponse: Response | null = null
+    const maxAttempts = 5
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+      const res = await fetch(`${OPENAI_API_BASE_URL}/responses`, {
+        method: 'POST',
+        signal: req.signal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: openaiRequestBody,
+      })
+      if (res.status === 400) {
+        const body = await res.json().catch(() => ({})) as { error?: { code?: string } }
+        if (body?.error?.code === 'conversation_locked' && attempt < maxAttempts - 1) {
+          continue
+        }
+        console.error('Negotiation AI upstream failed', res.status, JSON.stringify(body))
+        return new Response('Failed to generate negotiation advice.', { status: 500 })
+      }
+      upstreamResponse = res
+      break
+    }
+
+    if (!upstreamResponse || !upstreamResponse.ok || !upstreamResponse.body) {
+      const errorText = upstreamResponse ? await upstreamResponse.text().catch(() => '') : ''
+      console.error('Negotiation AI upstream failed', upstreamResponse?.status, errorText)
       return new Response('Failed to generate negotiation advice.', { status: 500 })
     }
 
@@ -390,6 +417,7 @@ export async function POST(req: Request) {
           advice: '',
           script: '',
           subject: '',
+          detected_brand_offer: null,
         }
         let latestResponseId: string | null = null
 
@@ -468,6 +496,7 @@ export async function POST(req: Request) {
                 advice: typeof partial.advice === 'string' ? partial.advice : '',
                 script: typeof partial.script === 'string' ? partial.script : '',
                 subject: typeof partial.subject === 'string' ? partial.subject : '',
+                detected_brand_offer: typeof partial.detected_brand_offer === 'number' ? partial.detected_brand_offer : null,
               }
 
               if (next.intent && next.title && next.advice) {
@@ -531,6 +560,14 @@ export async function POST(req: Request) {
             savedMessage = insertedAiMessage as DealMessage
           }
 
+          if (typeof finalPayload.detected_brand_offer === 'number') {
+            await supabase
+              .from('deals')
+              .update({ brand_last_offer: finalPayload.detected_brand_offer, updated_at: new Date().toISOString() })
+              .eq('id', chat.deal_id)
+              .eq('user_id', user.id)
+          }
+
           const chatUpdatedAt = savedMessage?.created_at ?? new Date().toISOString()
           const chatUpdate: {
             updated_at: string
@@ -567,6 +604,7 @@ export async function POST(req: Request) {
                   reasoning: reasoningBuffer,
                   message: savedMessage,
                   updatedAt: chatUpdatedAt,
+                  detectedBrandOffer: finalPayload.detected_brand_offer,
                 },
               })
             )
