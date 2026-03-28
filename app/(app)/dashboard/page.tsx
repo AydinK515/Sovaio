@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, ArrowRight, Upload, BookOpen, TrendingUp, DollarSign, BarChart3 } from 'lucide-react'
+import { Plus, ArrowRight, Upload, BookOpen, TrendingUp, DollarSign, BarChart3, FileStack } from 'lucide-react'
 import type { RateCard, Deal } from '@/lib/types'
 
 function StatusBadge({ status }: { status: Deal['status'] }) {
@@ -161,6 +161,47 @@ export default async function DashboardPage() {
       </div>
 
       {/* Deal Matrix */}
+      {hasRateCards && (
+        <div className="bg-white rounded-2xl border border-border overflow-hidden mb-8">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <FileStack className="w-4 h-4 text-muted" />
+              <h2 className="font-semibold">Recent Rate Cards</h2>
+            </div>
+            <Link href="/rate-card" className="text-sm font-medium text-primary hover:underline">
+              View All
+            </Link>
+          </div>
+
+          <div className="divide-y divide-border">
+            {rateCards!.slice(0, 3).map((rateCard: RateCard) => (
+              <div key={rateCard.id} className="px-6 py-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">{rateCard.niche || 'Untitled niche'}</h3>
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted-light px-2.5 py-1 text-xs text-muted">
+                      {rateCard.report_confidence}% confidence
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    {formatDate(rateCard.created_at)} - Dedicated {formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href={`/rate-card/${rateCard.id}`}
+                    className="inline-flex items-center gap-1 text-primary text-sm font-medium hover:underline"
+                  >
+                    Open Rate Card
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-border overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="font-semibold">Deal Matrix</h2>

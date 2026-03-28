@@ -2,6 +2,8 @@ export interface Profile {
   id: string
   email: string | null
   full_name: string | null
+  channel_name: string | null
+  avatar_path: string | null
   subscriber_count: number | null
   niche: string | null
   has_sponsorships: boolean

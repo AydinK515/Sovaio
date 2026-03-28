@@ -1,20 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import type { RateCard } from '@/lib/types'
 import { formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
-import { Copy, Check, Download, TrendingUp, Sparkles, FileText } from 'lucide-react'
+import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown } from 'lucide-react'
 
 export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
   const router = useRouter()
+  const exportRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [brandName, setBrandName] = useState('')
   const [showDealModal, setShowDealModal] = useState(false)
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [dealType, setDealType] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s'>('integration_60s')
   const [creatorAsk, setCreatorAsk] = useState('')
   const [creatingDeal, setCreatingDeal] = useState(false)
+  const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
 
   const supabase = createClient()
 
@@ -24,20 +28,99 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  async function handleDownloadPdf() {
+  async function renderExportCanvas() {
     const html2canvas = (await import('html2canvas')).default
-    const jsPDF = (await import('jspdf')).default
 
-    const element = document.getElementById('rate-card-content')
+    const element = exportRef.current
     if (!element) return
 
-    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' })
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const imgWidth = 210
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
-    pdf.save(`RateProof-RateCard-${new Date().toISOString().split('T')[0]}.pdf`)
+    return html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+    })
+  }
+
+  function downloadDataUrl(dataUrl: string, filename: string) {
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
+  async function handleDownload(format: 'png' | 'pdf') {
+    setShowDownloadMenu(false)
+    setDownloadingFormat(format)
+
+    try {
+      const canvas = await renderExportCanvas()
+      if (!canvas) return
+
+      const imgData = canvas.toDataURL('image/png')
+
+      if (format === 'png') {
+        downloadDataUrl(imgData, `RateProof-RateCard-${new Date().toISOString().split('T')[0]}.png`)
+        return
+      }
+
+      const jsPDF = (await import('jspdf')).default
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = 210
+      const pageHeight = 297
+      const margin = 10
+      const usableWidth = pageWidth - margin * 2
+      const imgHeight = (canvas.height * usableWidth) / canvas.width
+
+      if (imgHeight <= pageHeight - margin * 2) {
+        pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, imgHeight)
+      } else {
+        const scaledPageHeight = ((pageHeight - margin * 2) * canvas.width) / usableWidth
+        let currentOffset = 0
+        let pageIndex = 0
+
+        while (currentOffset < canvas.height) {
+          const pageCanvas = document.createElement('canvas')
+          pageCanvas.width = canvas.width
+          pageCanvas.height = Math.min(scaledPageHeight, canvas.height - currentOffset)
+
+          const context = pageCanvas.getContext('2d')
+          if (!context) break
+
+          context.fillStyle = '#ffffff'
+          context.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+          context.drawImage(
+            canvas,
+            0,
+            currentOffset,
+            canvas.width,
+            pageCanvas.height,
+            0,
+            0,
+            pageCanvas.width,
+            pageCanvas.height,
+          )
+
+          if (pageIndex > 0) pdf.addPage()
+          pdf.addImage(
+            pageCanvas.toDataURL('image/png'),
+            'PNG',
+            margin,
+            margin,
+            usableWidth,
+            (pageCanvas.height * usableWidth) / pageCanvas.width,
+          )
+
+          currentOffset += scaledPageHeight
+          pageIndex += 1
+        }
+      }
+
+      pdf.save(`RateProof-RateCard-${new Date().toISOString().split('T')[0]}.pdf`)
+    } finally {
+      setDownloadingFormat(null)
+    }
   }
 
   async function createDeal() {
@@ -100,9 +183,202 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
   }
 
   const tips = rateCard.improvement_tips as { title: string; description: string }[] | null
+  const exportAddOns = [
+    { label: 'Organic usage rights', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.5)) },
+    { label: 'Paid usage rights', value: formatCurrency(Math.round(rateCard.integration_60s_low * 1.25)) },
+    { label: 'Whitelisting', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.75)) },
+    { label: 'Exclusivity (30 days)', value: formatCurrency(Math.round(rateCard.dedicated_video_low * 0.35)) },
+    { label: 'Rush fee', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.4)) },
+    { label: 'Extra revision round', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.25)) },
+  ]
+  const exportBundles = [
+    {
+      label: 'Launch package',
+      value: formatCurrency(Math.round(rateCard.dedicated_video_low + rateCard.integration_60s_low)),
+      description: '1 dedicated video plus 1 integrated follow-up mention for campaign lift and recall.',
+    },
+    {
+      label: 'Momentum package',
+      value: formatCurrency(Math.round(rateCard.integration_60s_low * 2.6)),
+      description: '3 integrated placements across a short run of uploads to build repetition.',
+    },
+  ]
 
   return (
     <div className="py-8">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] opacity-0"
+      >
+        <div
+          ref={exportRef}
+          style={{
+            width: 1400,
+            backgroundColor: '#ffffff',
+            color: '#0f172a',
+            padding: '56px',
+            fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
+            <div>
+              <h1 style={{ margin: '0', fontSize: '72px', lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', maxWidth: '760px' }}>
+                Sponsorship
+                <br />
+                Rate Card
+              </h1>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px' }}>
+            {[
+              { value: rateCard.subscriber_count ? rateCard.subscriber_count.toLocaleString() : 'N/A', label: 'Subscribers' },
+              { value: rateCard.niche || 'General', label: 'Category' },
+              { value: 'Brand integrations', label: 'Media Type' },
+              { value: 'USD', label: 'Currency' },
+            ].map((item) => (
+              <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 22px', backgroundColor: '#ffffff' }}>
+                <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {item.label}
+                </div>
+                <div style={{ marginTop: '10px', fontSize: '28px', fontWeight: 700, lineHeight: 1.2 }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: '38px', fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+            Core Rates
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px', marginTop: '16px' }}>
+            {[
+              {
+                label: 'Dedicated Video',
+                range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
+                note: 'Brand-led feature',
+                accent: '#dc2626',
+                description: 'Includes full-video integration, dedicated CTA, and sponsor-first positioning.',
+              },
+              {
+                label: '60-Second Integration',
+                range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
+                note: 'Mid-roll placement',
+                accent: '#16a34a',
+                description: 'Includes in-video talking points, natural script fit, and clickable callout.',
+              },
+              {
+                label: '30-Second Integration',
+                range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
+                note: 'Efficient awareness slot',
+                accent: '#64748b',
+                description: 'Best for lighter tests, launches, and repeat campaign exposure.',
+              },
+            ].map((tier) => (
+              <div key={tier.label} style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px', backgroundColor: '#ffffff' }}>
+                <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tier.label}</div>
+                <div style={{ marginTop: '18px', fontSize: '46px', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.05em', color: '#0f172a' }}>
+                  {tier.range}
+                </div>
+                <div style={{ marginTop: '16px', fontSize: '15px', color: tier.accent, fontWeight: 600 }}>
+                  {tier.note}
+                </div>
+                <div style={{ marginTop: '10px', fontSize: '16px', lineHeight: 1.55, color: '#64748b' }}>
+                  {tier.description}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '30px', padding: '30px 32px', backgroundColor: '#f8fafc' }}>
+              <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Audience Snapshot</div>
+              <div style={{ marginTop: '16px', fontSize: '18px', color: '#334155', lineHeight: 1.7 }}>
+                Sponsor placements are priced for a {rateCard.niche || 'targeted'} audience with current channel momentum and creator-led integrations designed to feel native on-platform.
+              </div>
+              <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Primary Deliverable</div>
+                  <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>YouTube Sponsorship</div>
+                </div>
+                <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Placement Style</div>
+                  <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>Host-Read</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderRadius: '30px', padding: '30px 30px 32px', backgroundColor: '#0f172a', color: '#ffffff' }}>
+              <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>What&apos;s Included</div>
+              <div style={{ marginTop: '18px', fontSize: '18px', lineHeight: 1.8, color: 'rgba(255,255,255,0.92)' }}>
+                <div>- Sponsored segment tailored to the video format</div>
+                <div>- Brand mention plus spoken call-to-action</div>
+                <div>- Link placement in the description when applicable</div>
+                <div>- Creative alignment before final recording</div>
+                <div>- Standard performance-friendly integration style</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
+              <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                Package Deals
+              </div>
+              <div style={{ marginTop: '18px' }}>
+                {exportBundles.map((bundle) => (
+                  <div key={bundle.label} style={{ marginTop: '18px', paddingTop: '18px', borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', alignItems: 'baseline' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>{bundle.label}</div>
+                      <div style={{ fontSize: '26px', fontWeight: 700, color: '#dc2626' }}>{bundle.value}</div>
+                    </div>
+                    <div style={{ marginTop: '8px', fontSize: '17px', color: '#64748b', lineHeight: 1.6 }}>
+                      {bundle.description}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
+              <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                Add-Ons
+              </div>
+              <div style={{ marginTop: '18px' }}>
+                {exportAddOns.map((item) => (
+                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '14px 0', borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '18px', color: '#0f172a' }}>{item.label}</div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '26px', borderRadius: '28px', padding: '24px 28px', backgroundColor: '#fef2f2', border: '1px solid rgba(220, 38, 38, 0.12)' }}>
+            <div style={{ fontSize: '14px', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>
+              Notes
+            </div>
+            <div style={{ marginTop: '12px', fontSize: '17px', color: '#64748b', lineHeight: 1.7 }}>
+              - Rates are quoted in USD and reflect current channel positioning.
+              <br />
+              - Final campaign scope, revisions, usage, and timelines are confirmed in writing before production.
+              <br />
+              - Additional deliverables, extended licensing, or rush timelines are quoted separately.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
+        <Link href="/rate-card" className="text-primary font-medium hover:underline">
+          All Rate Cards
+        </Link>
+        <span className="text-muted">/</span>
+        <span className="text-muted">{new Date(rateCard.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+      </div>
+
       <div id="rate-card-content">
         <h1 className="text-3xl md:text-4xl font-bold">Your sponsorship rates are ready.</h1>
         <p className="mt-2 text-muted">
@@ -207,13 +483,36 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
 
       {/* Actions */}
       <div className="mt-8 flex flex-col sm:flex-row gap-4">
-        <button
-          onClick={handleDownloadPdf}
-          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover transition-colors"
-        >
-          <Download className="w-5 h-5" />
-          Download PDF Rate Card
-        </button>
+        <div className="relative flex-1">
+          <button
+            onClick={() => setShowDownloadMenu(prev => !prev)}
+            disabled={downloadingFormat !== null}
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+          >
+            <Download className="w-5 h-5" />
+            {downloadingFormat ? `Downloading ${downloadFormatLabel(downloadingFormat)}...` : 'Download Rate Card'}
+            <ChevronDown className="w-4 h-4" />
+          </button>
+
+          {showDownloadMenu && (
+            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-2xl border border-border bg-white p-2 shadow-xl">
+              <button
+                onClick={() => handleDownload('png')}
+                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm hover:bg-muted-light transition-colors"
+              >
+                <ImageIcon className="w-4 h-4 text-primary" />
+                <span>Download PNG</span>
+              </button>
+              <button
+                onClick={() => handleDownload('pdf')}
+                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm hover:bg-muted-light transition-colors"
+              >
+                <FileDown className="w-4 h-4 text-primary" />
+                <span>Download PDF</span>
+              </button>
+            </div>
+          )}
+        </div>
         <button
           onClick={() => setShowDealModal(true)}
           className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-secondary text-white font-semibold hover:bg-secondary-hover transition-colors"
@@ -277,4 +576,8 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
       )}
     </div>
   )
+}
+
+function downloadFormatLabel(format: 'png' | 'pdf') {
+  return format.toUpperCase()
 }

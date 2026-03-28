@@ -46,12 +46,13 @@ export function MarketingNav() {
   )
 }
 
-export function AppNav({ email }: { email?: string }) {
+export function AppNav() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/rate-card', label: 'Rate Cards' },
     { href: '/generate', label: 'New Rate Card' },
     { href: '/settings', label: 'Settings' },
   ]
