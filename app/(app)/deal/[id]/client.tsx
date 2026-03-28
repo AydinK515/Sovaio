@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import type { Deal, DealChat, DealMessage } from '@/lib/types'
-import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown } from 'lucide-react'
+import { Send, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2 } from 'lucide-react'
 
 function formatCurrency(n: number | null) {
   if (n == null) return '--'
@@ -47,6 +47,7 @@ export default function DealClient({
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
   const [creatingChat, setCreatingChat] = useState(false)
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -376,6 +377,41 @@ export default function DealClient({
     router.push(`/deal/${deal.id}?chat=${chatId}`)
   }
 
+  async function deleteChat(chatId: string) {
+    if (deletingChatId) return
+
+    const remainingChats = chats.filter(chat => chat.id !== chatId)
+    const nextChat = currentChat?.id === chatId ? remainingChats[0] ?? null : currentChat
+
+    setDeletingChatId(chatId)
+
+    const { error } = await supabase.from('deal_chats').delete().eq('id', chatId)
+
+    if (error) {
+      setDeletingChatId(null)
+      return
+    }
+
+    setChats(remainingChats)
+
+    if (currentChat?.id === chatId) {
+      setCurrentChat(nextChat)
+      setMessages([])
+      setAiText('')
+      setAiScriptText('')
+      setInput('')
+    }
+
+    setDeletingChatId(null)
+
+    if (nextChat) {
+      router.push(`/deal/${deal.id}?chat=${nextChat.id}`)
+    } else {
+      router.push(`/deal/${deal.id}`)
+      router.refresh()
+    }
+  }
+
   async function updateStatus(status: Deal['status']) {
     if (status === 'closed_won') {
       setShowCloseModal(true)
@@ -510,19 +546,35 @@ export default function DealClient({
                   <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-border bg-white p-2 shadow-xl">
                     <div className="max-h-72 overflow-y-auto">
                       {chats.map(chat => (
-                        <button
+                        <div
                           key={chat.id}
-                          type="button"
-                          onClick={() => openChat(chat.id)}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm transition-colors ${
+                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors ${
                             chat.id === currentChat?.id
                               ? 'bg-primary/8 text-foreground'
                               : 'hover:bg-muted-light'
                           }`}
                         >
-                          <span className="truncate font-medium">{chat.title}</span>
-                          {chat.id === currentChat?.id && <Check className="w-4 h-4 text-primary" />}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => openChat(chat.id)}
+                            className="flex min-w-0 flex-1 items-center justify-between text-left"
+                          >
+                            <span className="truncate font-medium">{chat.title}</span>
+                            {chat.id === currentChat?.id && <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              deleteChat(chat.id)
+                            }}
+                            disabled={deletingChatId === chat.id}
+                            aria-label={`Delete ${chat.title}`}
+                            className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       ))}
                     </div>
 
