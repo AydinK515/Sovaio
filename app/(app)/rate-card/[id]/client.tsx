@@ -1,14 +1,14 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import type { RateCard } from '@/lib/types'
+import type { RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown } from 'lucide-react'
 
-export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
+export default function RateCardClient({ rateCard, profile }: { rateCard: RateCard; profile: Profile | null }) {
   const router = useRouter()
   const exportRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
@@ -20,7 +20,19 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
   const [creatingDeal, setCreatingDeal] = useState(false)
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!profile?.avatar_path) return
+    let cancelled = false
+
+    supabase.storage.from('avatars').createSignedUrl(profile.avatar_path, 60 * 60).then(({ data }) => {
+      if (!cancelled && data?.signedUrl) setAvatarUrl(data.signedUrl)
+    })
+
+    return () => { cancelled = true }
+  }, [profile?.avatar_path, supabase])
 
   async function copyEmail() {
     await navigator.clipboard.writeText(rateCard.pitch_email || '')
@@ -228,6 +240,24 @@ export default function RateCardClient({ rateCard }: { rateCard: RateCard }) {
                 Rate Card
               </h1>
             </div>
+            {(avatarUrl || profile?.channel_name) && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 28px' }}>
+                {avatarUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={profile?.channel_name ?? 'Channel avatar'}
+                    style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                    crossOrigin="anonymous"
+                  />
+                )}
+                {profile?.channel_name && (
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {profile.channel_name}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px' }}>
