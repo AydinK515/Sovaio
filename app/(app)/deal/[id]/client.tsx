@@ -12,38 +12,6 @@ function formatCurrency(n: number | null) {
   return `$${n.toLocaleString()}`
 }
 
-const TITLE_SEPARATOR = '---TITLE---'
-const ADVICE_SEPARATOR = '---ADVICE---'
-const SCRIPT_SEPARATOR = '---SCRIPT---'
-
-function parseNegotiationText(text: string) {
-  if (text.includes(TITLE_SEPARATOR) && text.includes(ADVICE_SEPARATOR)) {
-    const afterTitle = text.slice(text.indexOf(TITLE_SEPARATOR) + TITLE_SEPARATOR.length)
-    const adviceIndex = afterTitle.indexOf(ADVICE_SEPARATOR)
-    const title = (adviceIndex === -1 ? '' : afterTitle.slice(0, adviceIndex)).trim()
-    const afterAdvice = adviceIndex === -1 ? '' : afterTitle.slice(adviceIndex + ADVICE_SEPARATOR.length)
-    const scriptIndex = afterAdvice.indexOf(SCRIPT_SEPARATOR)
-    const advice = (scriptIndex === -1 ? afterAdvice : afterAdvice.slice(0, scriptIndex)).trim()
-    const script = (scriptIndex === -1 ? '' : afterAdvice.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
-
-    return {
-      title: title || null,
-      advice,
-      script: script || null,
-    }
-  }
-
-  const scriptIndex = text.indexOf(SCRIPT_SEPARATOR)
-  const advice = (scriptIndex === -1 ? text : text.slice(0, scriptIndex)).trim()
-  const script = (scriptIndex === -1 ? '' : text.slice(scriptIndex + SCRIPT_SEPARATOR.length)).trim()
-
-  return {
-    title: null,
-    advice,
-    script: script || null,
-  }
-}
-
 const DEAL_TYPE_LABELS = {
   dedicated_video: 'Dedicated Video',
   integration_60s: 'Integrated (60s)',
@@ -74,6 +42,7 @@ export default function DealClient({
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
   const [aiText, setAiText] = useState('')
+  const [aiScriptText, setAiScriptText] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [finalPrice, setFinalPrice] = useState('')
@@ -103,7 +72,7 @@ export default function DealClient({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, aiText])
+  }, [messages, aiText, aiScriptText])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -213,6 +182,7 @@ export default function DealClient({
     setSending(false)
     setAiTyping(true)
     setAiText('')
+    setAiScriptText('')
 
     // Build message history for context (exclude the message we just saved so it goes as the final user turn)
     const historyForContext = messages.map(m => ({ role: m.role, content: m.content }))
@@ -246,31 +216,74 @@ export default function DealClient({
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
-      let fullText = ''
+      let eventBuffer = ''
+      let streamedTitle = ''
+      let streamedAdvice = ''
+      let streamedScript = ''
+      let finalPayload: { title?: string; advice?: string; script?: string } | null = null
 
       while (true) {
         const { value, done } = await reader.read()
         if (done) break
 
-        fullText += decoder.decode(value, { stream: true })
-        const partial = parseNegotiationText(fullText)
-        setAiText(
-          fullText.includes(TITLE_SEPARATOR) || fullText.includes(ADVICE_SEPARATOR)
-            ? partial.advice
-            : fullText.trim()
-        )
+        eventBuffer += decoder.decode(value, { stream: true })
+
+        while (true) {
+          const boundaryIndex = eventBuffer.indexOf('\n\n')
+          if (boundaryIndex === -1) break
+
+          const rawEvent = eventBuffer.slice(0, boundaryIndex)
+          eventBuffer = eventBuffer.slice(boundaryIndex + 2)
+
+          const data = rawEvent
+            .split('\n')
+            .filter(line => line.startsWith('data:'))
+            .map(line => line.slice(5).trim())
+            .join('\n')
+
+          if (!data) continue
+
+          const event = JSON.parse(data) as
+            | { type: 'partial'; payload: { title?: string; advice?: string; script?: string } }
+            | { type: 'final'; payload: { title?: string; advice?: string; script?: string } }
+            | { type: 'error'; message?: string }
+
+          if (event.type === 'error') {
+            throw new Error(event.message || 'Streaming failed')
+          }
+
+          if (event.type === 'partial' || event.type === 'final') {
+            if (typeof event.payload.title === 'string') {
+              streamedTitle = event.payload.title
+            }
+
+            if (typeof event.payload.advice === 'string') {
+              streamedAdvice = event.payload.advice
+              setAiText(streamedAdvice)
+            }
+
+            if (typeof event.payload.script === 'string') {
+              streamedScript = event.payload.script
+              setAiScriptText(streamedScript)
+            }
+          }
+
+          if (event.type === 'final') {
+            finalPayload = event.payload
+          }
+        }
       }
 
-      fullText += decoder.decode()
-
-      const { title, advice, script } = parseNegotiationText(fullText)
-      const messageContent = advice || fullText.trim() || 'I generated a response, but it came back empty.'
+      const messageContent = (finalPayload?.advice ?? streamedAdvice).trim() || 'I generated a response, but it came back empty.'
+      const finalScript = (finalPayload?.script ?? streamedScript).trim() || null
+      const finalTitle = (finalPayload?.title ?? streamedTitle).trim()
 
       setAiText(messageContent)
+      setAiScriptText(finalScript || '')
 
-      if (title && shouldGenerateTitle) {
-        await supabase.from('deal_chats').update({ title }).eq('id', currentChat.id)
-        renameChat(currentChat.id, title)
+      if (finalTitle && shouldGenerateTitle) {
+        await supabase.from('deal_chats').update({ title: finalTitle }).eq('id', currentChat.id)
+        renameChat(currentChat.id, finalTitle)
       }
 
       // Save AI message to Supabase
@@ -280,7 +293,7 @@ export default function DealClient({
         user_id: user.id,
         role: 'ai',
         content: messageContent,
-        suggested_script: script,
+        suggested_script: finalScript,
       }).select('*').single()
 
       if (aiMsg) {
@@ -293,7 +306,7 @@ export default function DealClient({
           user_id: user.id,
           role: 'ai',
           content: messageContent,
-          suggested_script: script,
+          suggested_script: finalScript,
           created_at: new Date().toISOString(),
         } as DealMessage])
       }
@@ -314,6 +327,7 @@ export default function DealClient({
     } finally {
       setAiTyping(false)
       setAiText('')
+      setAiScriptText('')
       abortRef.current = null
     }
   }
@@ -587,6 +601,12 @@ export default function DealClient({
                       </span>
                     )}
                   </p>
+                  {aiScriptText && (
+                    <div className="mt-3 rounded-xl border border-primary/20 bg-white/10 p-4">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-primary">Recommended Script</span>
+                      <p className="mt-2 text-sm italic leading-relaxed text-muted whitespace-pre-wrap">{aiScriptText}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
