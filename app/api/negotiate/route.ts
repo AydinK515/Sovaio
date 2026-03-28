@@ -3,6 +3,11 @@ import { parsePartialJson } from 'ai'
 const negotiationResponseSchema = {
   type: 'object',
   properties: {
+    intent: {
+      type: 'string',
+      enum: ['small_talk', 'meta_question', 'creator_context', 'brand_update', 'strategy_request'],
+      description: 'How the assistant interpreted the latest user message',
+    },
     title: {
       type: 'string',
       description: 'A 1 to 5 word chat title that summarizes the creator update',
@@ -13,10 +18,10 @@ const negotiationResponseSchema = {
     },
     script: {
       type: 'string',
-      description: 'A ready-to-send reply or a short prompt asking the creator for missing context',
+      description: 'A ready-to-send reply. Return an empty string when no script is needed.',
     },
   },
-  required: ['title', 'advice', 'script'],
+  required: ['intent', 'title', 'advice', 'script'],
   additionalProperties: false,
 } as const
 
@@ -35,7 +40,7 @@ export async function POST(req: Request) {
       return new Response('Missing AI_GATEWAY_API_KEY or OPENAI_API_KEY', { status: 500 })
     }
 
-    const systemPrompt = `You are RateProof AI, an expert negotiation advisor for YouTube creators dealing with brand sponsorship negotiations.
+    const systemPrompt = `You are RateProof AI, a smart negotiation copilot for YouTube creators.
 
 The creator's deal context:
 - Brand: ${deal.brand_name}
@@ -48,15 +53,25 @@ ${deal.notes ? `- Additional notes: ${deal.notes}` : ''}
 You are speaking to the creator, not the brand.
 Treat every user message as the creator talking to you unless they clearly signal they are quoting or paraphrasing the brand with phrasing like "they said", "the brand replied", quotes, pasted email text, or similar context.
 
-Your job is to help the creator think through the negotiation update they just shared and give tactical advice. Be direct, specific, and commercially realistic.
+Before answering, classify the latest user message into exactly one intent:
+- small_talk: greetings, pleasantries, banter, casual check-ins.
+- meta_question: asking what you know, what information exists, what happened so far, or how you are reasoning.
+- creator_context: the creator is sharing context, goals, emotions, or background, but not a concrete brand response.
+- brand_update: the creator clearly shared or pasted what the brand said, offered, requested, or changed.
+- strategy_request: the creator is explicitly asking what to do next, whether to counter, whether to accept, or asking for a reply draft.
 
-Rules:
-- Protect the creator's leverage without sounding hostile.
-- If the creator clearly shared the brand's position, analyze it and suggest a credible next move.
-- If the creator did not clearly share what the brand said, do not pretend they did. Ask for the missing context and tell them exactly what details to paste next.
-- Never invent campaign details that were not provided.
-- Keep the advice concise and the reply usable in a real email or DM thread.
-- The chat title must be 1 to 5 words, plain text only, and summarize the creator's latest update.
+Behavior rules:
+- For small_talk: reply naturally and briefly like a helpful assistant. Do not pivot into negotiation analysis.
+- For meta_question: answer only from known facts in the deal context and conversation history. Be precise about what you know vs. what you do not know.
+- For creator_context: be helpful, but do not pretend a brand message exists if none was shared.
+- For brand_update and strategy_request: give clear, commercially realistic negotiation help.
+- Never invent campaign details, exact brand wording, deadlines, usage rights, payment terms, or internal facts that were not provided.
+- Do not aggressively ask for missing details unless the user is actually trying to analyze a negotiation step.
+- Only provide a recommended script when it would genuinely help.
+- If the user is just chatting, asking a meta question, or thinking out loud, return script as an empty string.
+- If the user asks for a draft, asks what to send, or has clearly provided enough brand context for a concrete reply, return a useful script.
+- The advice should fit the detected intent instead of forcing everything into negotiation triage.
+- The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.
 ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is already good.'}`
 
     const history = (messageHistory as Array<{ role: string; content: string }>)
@@ -75,7 +90,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: useGateway ? 'openai/gpt-5-mini' : 'gpt-5-mini',
+          model: useGateway ? 'openai/gpt-5' : 'gpt-5',
           messages: [
             { role: 'system', content: systemPrompt },
             ...history,
@@ -90,8 +105,8 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
               schema: negotiationResponseSchema,
             },
           },
-          max_completion_tokens: 400,
-          reasoning_effort: 'minimal',
+          max_completion_tokens: 2000,
+          reasoning_effort: 'low',
           verbosity: 'low',
         }),
       }
@@ -111,7 +126,14 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
         const reader = upstreamResponse.body!.getReader()
         let eventBuffer = ''
         let jsonBuffer = ''
+        let lastValidPayload: {
+          intent: string
+          title: string
+          advice: string
+          script: string
+        } | null = null
         let lastSent = {
+          intent: '',
           title: '',
           advice: '',
           script: '',
@@ -156,12 +178,18 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
               }
 
               const next = {
+                intent: typeof partial.intent === 'string' ? partial.intent : '',
                 title: typeof partial.title === 'string' ? partial.title : '',
                 advice: typeof partial.advice === 'string' ? partial.advice : '',
                 script: typeof partial.script === 'string' ? partial.script : '',
               }
 
+              if (next.intent && next.title && next.advice) {
+                lastValidPayload = next
+              }
+
               if (
+                next.intent !== lastSent.intent ||
                 next.title !== lastSent.title ||
                 next.advice !== lastSent.advice ||
                 next.script !== lastSent.script
@@ -186,6 +214,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
             finalObject &&
             typeof finalObject === 'object' &&
             !Array.isArray(finalObject) &&
+            typeof finalObject.intent === 'string' &&
             typeof finalObject.title === 'string' &&
             typeof finalObject.advice === 'string' &&
             typeof finalObject.script === 'string'
@@ -195,10 +224,20 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
                 formatSseEvent({
                   type: 'final',
                   payload: {
+                    intent: finalObject.intent,
                     title: finalObject.title,
                     advice: finalObject.advice,
                     script: finalObject.script,
                   },
+                })
+              )
+            )
+          } else if (lastValidPayload) {
+            controller.enqueue(
+              encoder.encode(
+                formatSseEvent({
+                  type: 'final',
+                  payload: lastValidPayload,
                 })
               )
             )
@@ -207,7 +246,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
               encoder.encode(
                 formatSseEvent({
                   type: 'error',
-                  message: 'The model returned an invalid structured response.',
+                  message: 'The model returned an incomplete structured response.',
                 })
               )
             )
@@ -218,7 +257,7 @@ ${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is 
             encoder.encode(
               formatSseEvent({
                 type: 'error',
-                message: 'Failed to stream negotiation advice.',
+                message: error instanceof Error ? error.message : 'Failed to stream negotiation advice.',
               })
             )
           )
