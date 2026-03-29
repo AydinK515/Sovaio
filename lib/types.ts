@@ -69,6 +69,7 @@ export interface DealMessage {
   content: string
   subject: string | null
   suggested_script: string | null
+  reasoning_summary?: string | null
   created_at: string
 }
 

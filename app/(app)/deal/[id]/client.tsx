@@ -124,6 +124,31 @@ function ThinkingLabel() {
   )
 }
 
+function ReasoningDropdown({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors"
+      >
+        <ChevronDown
+          className="w-3.5 h-3.5 transition-transform duration-200"
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+        Thought
+      </button>
+      {open && (
+        <p className="mt-2 text-sm leading-relaxed text-muted whitespace-pre-wrap border-l-2 border-border pl-3">
+          {text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function getDraftChat(deal: Deal): DealChat {
   return {
     id: '__draft__',
@@ -427,6 +452,7 @@ export default function DealClient({
         title?: string
         advice?: string
         reasoning?: string
+        reasoningDelta?: string
         script?: string
         subject?: string
         updatedAt?: string
@@ -468,8 +494,8 @@ export default function DealClient({
           }
 
           if (event.type === 'reasoning') {
-            if (typeof event.payload.reasoning === 'string') {
-              streamedReasoning = event.payload.reasoning
+            if (typeof event.payload.reasoningDelta === 'string') {
+              streamedReasoning += event.payload.reasoningDelta
               setAiReasoningText(streamedReasoning)
             }
             continue
@@ -548,6 +574,7 @@ export default function DealClient({
           content: messageContent,
           subject: finalSubject,
           suggested_script: finalScript,
+          reasoning_summary: streamedReasoning.trim() || null,
           created_at: new Date().toISOString(),
         } as DealMessage])
       }
@@ -557,6 +584,7 @@ export default function DealClient({
         if (partial) {
           const partialSubject = aiScriptSubjectRef.current.trim() || null
           const partialScript = aiScriptTextRef.current.trim() || null
+          const partialReasoning = aiReasoningText.trim() || null
           const { data: savedPartial } = await supabase.from('deal_messages').insert({
             deal_id: deal.id,
             chat_id: activeChat.id,
@@ -565,6 +593,7 @@ export default function DealClient({
             content: partial,
             subject: partialSubject,
             suggested_script: partialScript,
+            reasoning_summary: partialReasoning,
           }).select('*').single()
           setMessages(prev => [...prev, (savedPartial ?? {
             id: crypto.randomUUID(),
@@ -575,6 +604,7 @@ export default function DealClient({
             content: partial,
             subject: partialSubject,
             suggested_script: partialScript,
+            reasoning_summary: partialReasoning,
             created_at: new Date().toISOString(),
           }) as DealMessage])
         }
@@ -908,6 +938,9 @@ export default function DealClient({
                   <p className="text-xs font-medium mb-1 opacity-60">
                     {msg.role === 'ai' ? 'RateProof AI' : 'You'}
                   </p>
+                  {msg.role === 'ai' && msg.reasoning_summary && (
+                    <ReasoningDropdown text={msg.reasoning_summary} />
+                  )}
                   {msg.role === 'ai' ? renderMarkdown(msg.content) : <p className="text-sm leading-relaxed">{msg.content}</p>}
 
                   {msg.suggested_script && (
@@ -937,14 +970,25 @@ export default function DealClient({
               <div className="flex justify-start">
                 <div className="max-w-[80%] bg-muted-light rounded-2xl rounded-bl-sm px-5 py-3">
                   <p className="text-xs font-medium mb-1 opacity-60">RateProof AI</p>
-                  <div className="text-sm leading-relaxed">
-                    {aiText ? renderMarkdown(aiText) : <ThinkingLabel />}
-                  </div>
-                  {aiReasoningText && (
-                    <div className="mt-3 rounded-xl border border-border bg-white/50 p-4">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted">Thinking</span>
-                      <p className="mt-2 text-sm leading-relaxed text-muted whitespace-pre-wrap">{aiReasoningText}</p>
+
+                  {/* Thinking phase: show reasoning live as it streams */}
+                  {!aiText && (
+                    <div className="text-sm leading-relaxed">
+                      {aiReasoningText
+                        ? <p className="text-sm leading-relaxed text-muted whitespace-pre-wrap">{aiReasoningText}</p>
+                        : <ThinkingLabel />
+                      }
                     </div>
+                  )}
+
+                  {/* Writing phase: real response is streaming, reasoning collapses into dropdown */}
+                  {aiText && (
+                    <>
+                      {aiReasoningText && <ReasoningDropdown text={aiReasoningText} />}
+                      <div className="text-sm leading-relaxed mt-1">
+                        {renderMarkdown(aiText)}
+                      </div>
+                    </>
                   )}
                   {aiScriptText && (
                     <div className="mt-3 rounded-xl border border-primary/20 bg-white/10 p-4">
