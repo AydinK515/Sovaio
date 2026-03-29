@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowRight, Upload, BookOpen, DollarSign, BarChart3, FileStack } from 'lucide-react'
+import { ArrowRight, Upload, DollarSign, BarChart3, FileStack } from 'lucide-react'
 import type { RateCard, Deal } from '@/lib/types'
 import { formatDealTarget } from '@/lib/deal-chat'
 
@@ -12,6 +12,7 @@ function StatusBadge({ status, finalPrice }: { status: Deal['status'], finalPric
     closed_lost: 'bg-red-50 text-red-700 border-red-200',
     stalled: 'bg-amber-50 text-amber-700 border-amber-200',
   }
+
   let label: string
   if (status === 'closed_won') {
     label = finalPrice ? `Closed for ${formatCurrency(finalPrice)}` : 'Closed Won'
@@ -22,6 +23,7 @@ function StatusBadge({ status, finalPrice }: { status: Deal['status'], finalPric
   } else {
     label = 'Stalled'
   }
+
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>
       {label}
@@ -34,7 +36,7 @@ function formatDate(d: string) {
 }
 
 function formatCurrency(n: number | null) {
-  if (n == null) return '—'
+  if (n == null) return '-'
   return `$${n.toLocaleString()}`
 }
 
@@ -63,11 +65,10 @@ export default async function DashboardPage() {
 
     return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
   })
-  const avgRateIncrease = hasRateCards ? '+42%' : '—'
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
 
-  // Empty state — new user
+  // Empty state - new user
   if (!hasRateCards && !hasDeals) {
     return (
       <div className="py-12">
@@ -79,61 +80,46 @@ export default async function DashboardPage() {
         <div className="mt-12 grid md:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl border border-border p-8">
             <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
-              <Upload className="w-6 h-6 text-primary" />
+              <BarChart3 className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold">Step 1: Export Your Data</h3>
+            <h3 className="text-lg font-semibold">What is a rate card?</h3>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Go to <a href="https://studio.youtube.com/channel/UC/analytics" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">YouTube Studio Analytics</a>, switch to Advanced Mode, and export your data as CSVs.
+              A rate card gives brands a clear price range for working with you, so you can stop guessing what to charge and start negotiating from a real position of confidence.
             </p>
-            <div className="mt-4 space-y-2 text-sm text-muted">
-              <p>You&apos;ll want these YouTube Studio exports:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><strong>Content</strong> (Top videos) — <span className="text-primary">Required</span></li>
-                <li><strong>Geography</strong> <span className="text-primary">(Required)</span></li>
-                <li><strong>Demographics</strong> <span className="text-muted">(Optional)</span></li>
-                <li><strong>Audience Size &amp; Growth</strong> <span className="text-muted">(Optional)</span></li>
-                <li><strong>Traffic Sources</strong> <span className="text-muted">(Optional)</span></li>
-              </ul>
+            <div className="mt-4 space-y-2 text-sm text-muted leading-relaxed">
+              <p>
+                Instead of relying on a generic calculator, your card is built from your actual channel data, audience quality, niche, and sponsorship context.
+              </p>
+              <p>
+                That gives you pricing you can actually use in outreach, inbound conversations, and negotiations with brands.
+              </p>
             </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-border p-8">
             <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
-              <BarChart3 className="w-6 h-6 text-primary" />
+              <Upload className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold">Step 2: Generate Your Rate Card</h3>
+            <h3 className="text-lg font-semibold">Let&apos;s get started</h3>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Upload your CSVs and fill in a few details about your channel. We&apos;ll analyze everything and generate your sponsorship rate card with a pitch email.
+              Upload your YouTube Studio reports, answer a few quick questions, and we&apos;ll turn that data into a personalized sponsorship rate card with confidence scoring and outreach-ready pricing.
+            </p>
+            <p className="mt-3 text-sm text-muted leading-relaxed">
+              The more complete your reports are, the stronger the analysis becomes, which helps you walk into deals with better numbers and a better story.
             </p>
             <Link
               href="/generate"
               className="mt-6 inline-flex items-center gap-2 bg-primary text-white font-medium px-6 py-3 rounded-xl hover:bg-primary-hover transition-colors text-sm"
             >
               <Upload className="w-4 h-4" />
-              Upload Analytics
+              Create My Rate Card
             </Link>
-          </div>
-        </div>
-
-        <div className="mt-12 bg-secondary rounded-2xl p-8 text-white text-center">
-          <h3 className="text-xl font-semibold">Optimize Your Leverage</h3>
-          <p className="mt-2 text-white/70">The more data you upload, the higher your Report Confidence and the stronger your negotiating position.</p>
-          <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/generate" className="inline-flex items-center gap-2 bg-primary hover:bg-primary-hover text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm">
-              <Upload className="w-4 h-4" />
-              Upload Analytics
-            </Link>
-            <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm">
-              <BookOpen className="w-4 h-4" />
-              Read Creator Guide
-            </a>
           </div>
         </div>
       </div>
     )
   }
 
-  // User has rate cards and/or deals
   return (
     <div className="py-8">
       <div className="mb-8">
@@ -147,7 +133,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-2xl border border-border p-6">
           <p className="text-xs text-muted uppercase tracking-wider font-medium">Total Deals</p>
@@ -168,7 +153,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Deal Matrix */}
       {hasRateCards && (
         <div className="bg-white rounded-2xl border border-border overflow-hidden mb-8">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -192,7 +176,9 @@ export default async function DashboardPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-muted">
-                    {formatDate(rateCard.created_at)}{rateCard.subscriber_count ? ` - ${rateCard.subscriber_count.toLocaleString()} subscribers` : ''}{rateCard.has_sponsorships ? ' - Has sponsorship history' : ''}
+                    {formatDate(rateCard.created_at)}
+                    {rateCard.subscriber_count ? ` - ${rateCard.subscriber_count.toLocaleString()} subscribers` : ''}
+                    {rateCard.has_sponsorships ? ' - Has sponsorship history' : ''}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3 lg:shrink-0">
@@ -256,22 +242,6 @@ export default async function DashboardPage() {
             </Link>
           </div>
         )}
-      </div>
-
-      {/* CTA */}
-      <div className="mt-8 bg-secondary rounded-2xl p-8 text-white text-center">
-        <h3 className="text-xl font-semibold">Optimize Your Leverage</h3>
-        <p className="mt-2 text-white/70">Ready to land your next deal? Upload your latest YouTube Studio CSVs to generate a fresh rate card.</p>
-        <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/generate" className="inline-flex items-center gap-2 bg-primary hover:bg-primary-hover text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm">
-            <Upload className="w-4 h-4" />
-            Upload Analytics
-          </Link>
-          <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-6 py-3 rounded-xl transition-colors text-sm">
-            <BookOpen className="w-4 h-4" />
-            Read Creator Guide
-          </a>
-        </div>
       </div>
     </div>
   )

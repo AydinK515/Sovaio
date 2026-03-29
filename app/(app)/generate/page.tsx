@@ -65,7 +65,7 @@ const TUTORIAL_STEPS = [
     id: 'step-4',
     label: 'Step 4',
     title: 'Download the right CSVs',
-    description: 'Select each report below and download it one-by-one as CSV. You can upload the raw CSV files or the zipped export bundle here.',
+    description: 'Select each report from the dropdown and download it one-by-one as CSV (comma-separated values). You can upload the full zipped export bundle here that Youtube gives you for each report.',
     image: step4Image,
     alt: 'YouTube Studio report list and download button highlighting which CSVs to export.',
   },
@@ -544,16 +544,13 @@ export default function GeneratePage() {
       <p className="mt-2 text-muted">Connect your YouTube Studio data to generate a verified rate card powered by AI.</p>
 
       <div className="mt-8 rounded-[28px] border border-border bg-white p-5 shadow-sm md:p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
           <div>
             <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">Tutorial</p>
             <h2 className="mt-2 text-2xl font-semibold">How to get the right YouTube Studio files</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
               Follow these four steps in YouTube Studio, then upload the CSVs here. The required reports are <span className="font-medium text-foreground">Content</span> and <span className="font-medium text-foreground">Geography</span>.
             </p>
-          </div>
-          <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-muted">
-            Optional uploads that improve the report: Demographics, Audience Size &amp; Growth, and Traffic Sources.
           </div>
         </div>
 
@@ -578,7 +575,7 @@ export default function GeneratePage() {
           })}
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_320px]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_320px] lg:items-start">
           <div className="overflow-hidden rounded-[24px] border border-border bg-slate-950/95">
             <Image
               src={TUTORIAL_STEPS[activeTutorialStep].image}
@@ -589,13 +586,34 @@ export default function GeneratePage() {
           </div>
 
           <div className="rounded-[24px] border border-border bg-slate-50 p-5">
-            <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">
-              {TUTORIAL_STEPS[activeTutorialStep].label}
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">
+                {TUTORIAL_STEPS[activeTutorialStep].label}
+              </p>
+              {activeTutorialStep < TUTORIAL_STEPS.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTutorialStep((current) => Math.min(current + 1, TUTORIAL_STEPS.length - 1))}
+                  className="text-sm font-medium text-muted underline underline-offset-4 transition-colors hover:text-foreground"
+                >
+                  Next <span aria-hidden="true">-&gt;</span>
+                </button>
+              )}
+            </div>
             <h3 className="mt-3 text-xl font-semibold">{TUTORIAL_STEPS[activeTutorialStep].title}</h3>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               {TUTORIAL_STEPS[activeTutorialStep].description}
             </p>
+
+            <a
+              href="https://studio.youtube.com/channel/UC/analytics"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-secondary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+            >
+              Open YouTube Studio
+              <ExternalLink className="h-4 w-4" />
+            </a>
 
             {activeTutorialStep === 3 && (
               <div className="mt-5 space-y-4">
@@ -621,7 +639,7 @@ export default function GeneratePage() {
                         key={csvType.key}
                         className="rounded-full border border-border bg-white px-3 py-1 text-sm font-medium text-foreground"
                       >
-                        {csvType.label}
+                        {csvType.key === 'demographics' ? 'Audience by Age & Gender' : csvType.label}
                       </span>
                     ))}
                   </div>
@@ -790,6 +808,9 @@ export default function GeneratePage() {
               <BarChart3 className="w-5 h-5 text-primary" />
               <h3 className="font-semibold">Report Confidence</h3>
             </div>
+            <p className="text-xs text-muted mb-4">
+              Upload more reports to improve accuracy and give the model a fuller picture of your channel.
+            </p>
             <div className="w-full bg-border rounded-full h-3 overflow-hidden mb-3">
               <div className={`${barColor} h-3 rounded-full transition-all duration-500`} style={{ width: `${confidence}%` }} />
             </div>
