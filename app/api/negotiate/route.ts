@@ -1,5 +1,5 @@
 import { parsePartialJson } from 'ai'
-import { getOpeningMessage } from '@/lib/deal-chat'
+import { formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { createClient } from '@/lib/supabase-server'
 import { buildCsvSummary } from '@/lib/csv-summary'
 import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
@@ -34,8 +34,12 @@ const negotiationResponseSchema = {
       type: ['integer', 'null'],
       description: 'The USD dollar amount of a new offer the brand made, if and only if the user message clearly conveys the brand proposed a specific price. Null in all other cases — including when the user mentions a number that is not a brand offer (e.g. their own ask, a view count, a subscriber count, a date, or a past deal they mentioned).',
     },
+    detected_creator_ask: {
+      type: ['integer', 'null'],
+      description: 'The USD dollar amount the creator says they want, asked for, or plan to counter with. Null when the creator does not clearly state their own asking price.',
+    },
   },
-  required: ['intent', 'title', 'advice', 'script', 'subject', 'detected_brand_offer'],
+  required: ['intent', 'title', 'advice', 'script', 'subject', 'detected_brand_offer', 'detected_creator_ask'],
   additionalProperties: false,
 } as const
 
@@ -46,6 +50,7 @@ type NegotiationPayload = {
   script: string
   subject: string
   detected_brand_offer: number | null
+  detected_creator_ask: number | null
 }
 
 type ConversationInputItem = {
@@ -58,13 +63,13 @@ function formatSseEvent(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`
 }
 
-function buildSystemPrompt(deal: Deal, generateTitle: boolean, channelContext: string | null) {
+function buildSystemPrompt(deal: Deal, generateTitle: boolean, channelContext: string | null, rateCard: RateCard | null) {
   return `You are RateProof AI, a smart negotiation copilot for YouTube creators.
 
 The creator's deal context:
 - Brand: ${deal.brand_name}
 - Deal type: ${deal.deal_type === 'dedicated_video' ? 'Dedicated Video' : deal.deal_type === 'integration_60s' ? '60-second Integration' : '30-second Integration'}
-- Creator's asking price: $${deal.creator_ask?.toLocaleString() ?? 'not set'}
+- Creator's current ask: ${formatDealTarget(deal, rateCard)}
 ${deal.brand_last_offer ? `- Brand's last known offer: $${deal.brand_last_offer.toLocaleString()}` : ''}
 ${deal.timeline ? `- Timeline: ${deal.timeline}` : ''}
 ${deal.notes ? `- Additional notes: ${deal.notes}` : ''}
@@ -93,7 +98,7 @@ Script rules — follow these exactly based on the detected intent:
 - meta_question → script MUST be "" (empty string). No exceptions.
 - creator_context → script MUST be "" unless the creator explicitly asks for a draft or says "what should I send/say".
 - brand_update → script MAY be provided if there is enough context to write a useful reply to the brand. Otherwise "".
-- strategy_request → script SHOULD be provided if the creator is asking what to send or how to respond.
+- strategy_request → script MAY be provided if the creator is asking what to send or how to respond.
 
 Additional script formatting rules:
 - If script is email-style and needs a subject line, return it ONLY in the subject field — never inside the script body.
@@ -115,7 +120,8 @@ function isNegotiationPayload(value: unknown): value is NegotiationPayload {
       typeof (value as NegotiationPayload).advice === 'string' &&
       typeof (value as NegotiationPayload).script === 'string' &&
       typeof (value as NegotiationPayload).subject === 'string' &&
-      ('detected_brand_offer' in (value as NegotiationPayload))
+      ('detected_brand_offer' in (value as NegotiationPayload)) &&
+      ('detected_creator_ask' in (value as NegotiationPayload))
   )
 }
 
@@ -143,6 +149,7 @@ function buildFallbackPayload(input: {
     script: input.lastSent.script || '',
     subject: input.lastSent.subject || '',
     detected_brand_offer: null,
+    detected_creator_ask: null,
   }
 }
 
@@ -184,8 +191,8 @@ function serializeAssistantMessage(message: DealMessage) {
   return sections.filter(Boolean).join('\n\n')
 }
 
-function buildConversationSeedItems(messages: DealMessage[], deal: Deal, latestUserMessage: string) {
-  const openingMessage = getOpeningMessage(deal)
+function buildConversationSeedItems(messages: DealMessage[], deal: Deal, latestUserMessage: string, rateCard: RateCard | null) {
+  const openingMessage = getOpeningMessage(deal, rateCard)
   const trimmedLatestMessage = latestUserMessage.trim()
   const messagesToSeed = [...messages]
   const newestMessage = messagesToSeed.at(-1)
@@ -242,6 +249,7 @@ async function ensureConversationState(input: {
   apiKey: string
   chat: DealChat
   deal: Deal
+  rateCard: RateCard | null
   latestUserMessage: string
   messages: DealMessage[]
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -250,7 +258,7 @@ async function ensureConversationState(input: {
     return input.chat.openai_conversation_id
   }
 
-  const seedItems = buildConversationSeedItems(input.messages, input.deal, input.latestUserMessage)
+  const seedItems = buildConversationSeedItems(input.messages, input.deal, input.latestUserMessage, input.rateCard)
   const initialItems = seedItems.slice(0, 20)
   const remainingItems = seedItems.slice(20)
 
@@ -335,15 +343,17 @@ export async function POST(req: Request) {
 
     // Fetch channel context from rate card + CSV uploads (if deal was created from a rate card)
     let channelContext: string | null = null
+    let rateCard: RateCard | null = null
     if (deal.rate_card_id) {
-      const { data: rateCard } = await supabase
+      const { data: fetchedRateCard } = await supabase
         .from('rate_cards')
         .select('*')
         .eq('id', deal.rate_card_id)
         .single()
 
-      if (rateCard) {
-        const rc = rateCard as RateCard
+      if (fetchedRateCard) {
+        rateCard = fetchedRateCard as RateCard
+        const rc = rateCard
         const isProductExchangeZone = rc.integration_60s_low <= 150
         const rateCardLines = [
           `Creator's channel profile (from rate card):`,
@@ -420,17 +430,18 @@ export async function POST(req: Request) {
       apiKey,
       chat: chat as DealChat,
       deal: deal as Deal,
+      rateCard,
       latestUserMessage,
       messages: (existingMessages || []) as DealMessage[],
       supabase,
     })
 
-    console.log('\n=== negotiate SYSTEM PROMPT ===\n', buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext), '\n=== USER MESSAGE ===\n', latestUserMessage, '\n==============================\n')
+    console.log('\n=== negotiate SYSTEM PROMPT ===\n', buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext, rateCard), '\n=== USER MESSAGE ===\n', latestUserMessage, '\n==============================\n')
 
     const openaiRequestBody = JSON.stringify({
       model: 'gpt-5',
       conversation: conversationId,
-      instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext),
+      instructions: buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext, rateCard),
       input: [
         {
           role: 'user',
@@ -505,6 +516,7 @@ export async function POST(req: Request) {
           script: '',
           subject: '',
           detected_brand_offer: null,
+          detected_creator_ask: null,
         }
         let latestResponseId: string | null = null
 
@@ -584,6 +596,7 @@ export async function POST(req: Request) {
                 script: typeof partial.script === 'string' ? partial.script : '',
                 subject: typeof partial.subject === 'string' ? partial.subject : '',
                 detected_brand_offer: typeof partial.detected_brand_offer === 'number' ? partial.detected_brand_offer : null,
+                detected_creator_ask: typeof partial.detected_creator_ask === 'number' ? partial.detected_creator_ask : null,
               }
 
               if (next.intent && next.title && next.advice) {
@@ -595,7 +608,9 @@ export async function POST(req: Request) {
                 next.title !== lastSent.title ||
                 next.advice !== lastSent.advice ||
                 next.script !== lastSent.script ||
-                next.subject !== lastSent.subject
+                next.subject !== lastSent.subject ||
+                next.detected_brand_offer !== lastSent.detected_brand_offer ||
+                next.detected_creator_ask !== lastSent.detected_creator_ask
               ) {
                 lastSent = next
                 controller.enqueue(
@@ -649,10 +664,29 @@ export async function POST(req: Request) {
             savedMessage = insertedAiMessage as DealMessage
           }
 
-          if (typeof finalPayload.detected_brand_offer === 'number') {
+          if (
+            typeof finalPayload.detected_brand_offer === 'number' ||
+            typeof finalPayload.detected_creator_ask === 'number'
+          ) {
+            const dealUpdate: {
+              updated_at: string
+              brand_last_offer?: number
+              creator_ask?: number
+            } = {
+              updated_at: new Date().toISOString(),
+            }
+
+            if (typeof finalPayload.detected_brand_offer === 'number') {
+              dealUpdate.brand_last_offer = finalPayload.detected_brand_offer
+            }
+
+            if (typeof finalPayload.detected_creator_ask === 'number') {
+              dealUpdate.creator_ask = finalPayload.detected_creator_ask
+            }
+
             await supabase
               .from('deals')
-              .update({ brand_last_offer: finalPayload.detected_brand_offer, updated_at: new Date().toISOString() })
+              .update(dealUpdate)
               .eq('id', chat.deal_id)
               .eq('user_id', user.id)
           }
@@ -694,6 +728,7 @@ export async function POST(req: Request) {
                   message: savedMessage,
                   updatedAt: chatUpdatedAt,
                   detectedBrandOffer: finalPayload.detected_brand_offer,
+                  detectedCreatorAsk: finalPayload.detected_creator_ask,
                 },
               })
             )

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
-import type { Deal, DealChat, DealMessage } from '@/lib/types'
+import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 import DealClient from './client'
 
 export default async function DealPage({
@@ -25,6 +25,15 @@ export default async function DealPage({
 
   if (!deal) notFound()
 
+  const { data: rateCard } = deal.rate_card_id
+    ? await supabase
+      .from('rate_cards')
+      .select('*')
+      .eq('id', deal.rate_card_id)
+      .eq('user_id', user.id)
+      .single()
+    : { data: null }
+
   const { data: messages } = await supabase
     .from('deal_chats')
     .select('*')
@@ -47,6 +56,7 @@ export default async function DealPage({
   return (
     <DealClient
       deal={deal as Deal}
+      rateCard={(rateCard as RateCard | null) ?? null}
       initialChats={chats}
       initialChat={selectedChat}
       initialMessages={(threadMessages || []) as DealMessage[]}

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, ArrowRight, Upload, BookOpen, TrendingUp, DollarSign, BarChart3, FileStack } from 'lucide-react'
 import type { RateCard, Deal } from '@/lib/types'
+import { formatDealTarget } from '@/lib/deal-chat'
 
 function StatusBadge({ status, finalPrice }: { status: Deal['status'], finalPrice?: number | null }) {
   const styles = {
@@ -50,6 +51,7 @@ export default async function DashboardPage() {
   const hasDeals = deals && deals.length > 0
   const activeDeals = deals?.filter(d => d.status === 'negotiating') || []
   const totalPipeline = deals?.filter(d => d.status === 'negotiating').reduce((sum, d) => sum + (d.creator_ask || 0), 0) || 0
+  const rateCardById = new Map((rateCards || []).map(rateCard => [rateCard.id, rateCard]))
   const avgRateIncrease = hasRateCards ? '+42%' : '—'
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
@@ -229,7 +231,7 @@ export default async function DashboardPage() {
                     <td className="px-6 py-4 font-medium">{deal.brand_name}</td>
                     <td className="px-6 py-4"><StatusBadge status={deal.status} finalPrice={deal.final_price} /></td>
                     <td className="px-6 py-4 text-muted">{formatDate(deal.updated_at)}</td>
-                    <td className="px-6 py-4 font-medium">{formatCurrency(deal.creator_ask)}</td>
+                    <td className="px-6 py-4 font-medium">{formatDealTarget(deal, deal.rate_card_id ? rateCardById.get(deal.rate_card_id) ?? null : null)}</td>
                     <td className="px-6 py-4">
                       <Link
                         href={`/deal/${deal.id}`}

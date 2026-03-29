@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import type { RateCard, Profile } from '@/lib/types'
-import { formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
+import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown } from 'lucide-react'
 
 export default function RateCardClient({ rateCard, profile }: { rateCard: RateCard; profile: Profile | null }) {
   const router = useRouter()
   const exportRef = useRef<HTMLDivElement>(null)
+  const previewViewportRef = useRef<HTMLDivElement>(null)
+  const previewContentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [brandName, setBrandName] = useState('')
   const [showDealModal, setShowDealModal] = useState(false)
@@ -21,6 +23,8 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
   const [expandedRangeInfo, setExpandedRangeInfo] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s' | null>(null)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [previewScale, setPreviewScale] = useState(1)
+  const [previewHeight, setPreviewHeight] = useState(0)
 
   const [supabase] = useState(() => createClient())
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -53,6 +57,29 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [])
+
+  useEffect(() => {
+    if (!showPreviewModal) return
+
+    const viewport = previewViewportRef.current
+    const content = previewContentRef.current
+    if (!viewport || !content) return
+
+    const updatePreviewScale = () => {
+      const availableWidth = viewport.clientWidth - 24
+      const nextScale = Math.min(availableWidth / 1400, 1)
+      setPreviewScale(nextScale)
+      setPreviewHeight(content.scrollHeight * nextScale)
+    }
+
+    updatePreviewScale()
+
+    const resizeObserver = new ResizeObserver(() => updatePreviewScale())
+    resizeObserver.observe(viewport)
+    resizeObserver.observe(content)
+
+    return () => resizeObserver.disconnect()
+  }, [showPreviewModal, avatarUrl, profile?.channel_name, rateCard])
 
   const liveRateTiers = [
     {
@@ -91,6 +118,9 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
       explanation: 'This range covers shorter sponsor mentions that still benefit from your audience trust and delivery style. The low end works for lighter, test-budget campaigns, while the high end fits stronger-performing videos, better placement, or brands that want a tighter, more polished mention without paying for a full 60-second read.',
     },
   ]
+
+  const selectedDealRange = getDealTypeRange(rateCard, dealType)
+  const selectedDealRangeLabel = `${formatCurrency(selectedDealRange.low)} - ${formatCurrency(selectedDealRange.high)}`
 
   async function copyEmail() {
     await navigator.clipboard.writeText(rateCard.pitch_email || '')
@@ -203,13 +233,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
       return
     }
 
-    const askAmount = creatorAsk ? parseInt(creatorAsk.replace(/,/g, '')) : (() => {
-      switch (dealType) {
-        case 'dedicated_video': return rateCard.dedicated_video_low
-        case 'integration_60s': return rateCard.integration_60s_low
-        case 'integration_30s': return rateCard.integration_30s_low
-      }
-    })()
+    const askAmount = creatorAsk ? parseInt(creatorAsk.replace(/,/g, '')) : null
 
     const { data: deal, error } = await supabase.from('deals').insert({
       user_id: user.id,
@@ -244,9 +268,9 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
       role: 'ai',
       content: getOpeningMessage({
         brand_name: brandName.trim(),
-        creator_ask: askAmount!,
+        creator_ask: askAmount,
         deal_type: dealType,
-      }),
+      }, rateCard),
     })
 
     router.push(`/deal/${deal.id}?chat=${chat.id}`)
@@ -254,10 +278,9 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
 
   const tips = rateCard.improvement_tips as { title: string; description: string }[] | null
   const exportAddOns = [
-    { label: 'Organic usage rights', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.5)) },
-    { label: 'Paid usage rights', value: formatCurrency(Math.round(rateCard.integration_60s_low * 1.25)) },
-    { label: 'Whitelisting', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.75)) },
-    { label: 'Exclusivity (30 days)', value: formatCurrency(Math.round(rateCard.dedicated_video_low * 0.35)) },
+    { label: 'Organic usage rights (30 days)', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.2)) },
+    { label: 'Paid usage rights (30 days)', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.3)) },
+    { label: 'Exclusivity (30 days)', value: formatCurrency(Math.round(rateCard.dedicated_video_low * 0.3)) },
     { label: 'Rush fee', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.4)) },
     { label: 'Extra revision round', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.25)) },
   ]
@@ -438,11 +461,11 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           >
             <Download className="w-5 h-5" />
             {downloadingFormat ? `Downloading ${downloadFormatLabel(downloadingFormat)}...` : 'Download Rate Card'}
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showDownloadMenu ? 'rotate-180' : ''}`} />
           </button>
 
           {showDownloadMenu && (
-            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-2xl border border-border bg-white p-2 shadow-xl">
+            <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 z-20 rounded-2xl border border-border bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150">
               <button
                 onClick={() => handleDownload('png')}
                 className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm hover:bg-muted-light transition-colors"
@@ -457,7 +480,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
                 <FileDown className="w-4 h-4 text-primary" />
                 <span>Download PDF</span>
               </button>
-              <div className="my-2 border-t border-border" />
+              <div className="my-2 border-t-2 border-slate-300" />
               <button
                 onClick={() => {
                   setShowDownloadMenu(false)
@@ -512,9 +535,12 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
                 <input
                   value={creatorAsk}
                   onChange={e => setCreatorAsk(e.target.value)}
-                  placeholder="Leave blank to use rate card range"
+                  placeholder={`Leave blank to use ${selectedDealRangeLabel}`}
                   className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
+                <p className="mt-1.5 text-xs text-muted">
+                  If left blank, this deal will use the selected range: {selectedDealRangeLabel}
+                </p>
               </div>
             </div>
             <div className="mt-6 flex gap-3">
@@ -534,8 +560,14 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
       )}
 
       {showPreviewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
-          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl animate-slide-up">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          onClick={() => setShowPreviewModal(false)}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl animate-slide-up"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-5">
               <div>
                 <h2 className="text-xl font-bold">Rate Card Preview</h2>
@@ -553,32 +585,41 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
               <button
                 onClick={() => handleDownload('png')}
                 disabled={downloadingFormat !== null}
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
               >
-                <ImageIcon className="w-4 h-4 text-primary" />
+                <ImageIcon className="w-4 h-4" />
                 {downloadingFormat === 'png' ? 'Downloading PNG...' : 'Download PNG'}
               </button>
               <button
                 onClick={() => handleDownload('pdf')}
                 disabled={downloadingFormat !== null}
-                className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
               >
-                <FileDown className="w-4 h-4" />
+                <FileDown className="w-4 h-4 text-primary" />
                 {downloadingFormat === 'pdf' ? 'Downloading PDF...' : 'Download PDF'}
               </button>
             </div>
 
-            <div className="overflow-auto bg-slate-100 p-4 md:p-6">
-              <div className="mx-auto overflow-hidden rounded-[32px] border border-border bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <div className="min-w-[1100px] origin-top-left scale-[0.32] sm:scale-[0.48] lg:scale-[0.68]" style={{ width: '1400px', marginBottom: '-60%' }}>
-                    <ExportRateCardContent
-                      rateCard={rateCard}
-                      profile={profile}
-                      avatarUrl={avatarUrl}
-                      exportAddOns={exportAddOns}
-                      exportBundles={exportBundles}
-                    />
+            <div className="overflow-y-auto bg-slate-100 p-4 md:p-6">
+              <div className="mx-auto rounded-[32px] border border-border bg-white p-3 shadow-sm md:p-4">
+                <div ref={previewViewportRef} className="w-full">
+                  <div style={{ height: previewHeight || undefined }}>
+                    <div
+                      style={{
+                        width: '1400px',
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: 'top left',
+                      }}
+                    >
+                      <ExportRateCardContent
+                        containerRef={previewContentRef}
+                        rateCard={rateCard}
+                        profile={profile}
+                        avatarUrl={avatarUrl}
+                        exportAddOns={exportAddOns}
+                        exportBundles={exportBundles}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -631,7 +672,7 @@ function ExportRateCardContent({
         {(avatarUrl || profile?.channel_name) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
             {profile?.channel_name && (
-              <div style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '36px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap', letterSpacing: '-0.03em' }}>
                 {profile.channel_name}
               </div>
             )}
@@ -640,7 +681,7 @@ function ExportRateCardContent({
               <img
                 src={avatarUrl}
                 alt={profile?.channel_name ?? 'Channel avatar'}
-                style={{ width: '84px', height: '84px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
                 crossOrigin="anonymous"
               />
             )}
@@ -689,7 +730,7 @@ function ExportRateCardContent({
           {
             label: '30-Second Integration',
             range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
-            note: 'Efficient awareness slot',
+            note: 'High-efficiency brand mention',
             accent: '#64748b',
             description: 'Best for lighter tests, launches, and repeat campaign exposure.',
           },

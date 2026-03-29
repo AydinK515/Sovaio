@@ -4,8 +4,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-import type { Deal, DealChat, DealMessage } from '@/lib/types'
-import { DEAL_TYPE_LABELS, formatCurrency, getOpeningMessage } from '@/lib/deal-chat'
+import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
+import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
 
 function renderMarkdown(text: string) {
@@ -139,11 +139,13 @@ function getDraftChat(deal: Deal): DealChat {
 
 export default function DealClient({
   deal: initialDeal,
+  rateCard,
   initialChats,
   initialChat,
   initialMessages,
 }: {
   deal: Deal
+  rateCard: RateCard | null
   initialChats: DealChat[]
   initialChat: DealChat | null
   initialMessages: DealMessage[]
@@ -259,7 +261,7 @@ export default function DealClient({
 
   function getVisibleMessages() {
     const activeChat = currentChat ?? getDraftChat(deal)
-    const openingMessage = getOpeningMessage(deal)
+    const openingMessage = getOpeningMessage(deal, rateCard)
     const hasOpeningMessage = messages.some(msg => msg.role === 'ai' && msg.content === openingMessage)
 
     if (hasOpeningMessage) {
@@ -330,7 +332,7 @@ export default function DealClient({
         chat_id: newChat.id,
         user_id: user.id,
         role: 'ai',
-        content: getOpeningMessage(deal),
+        content: getOpeningMessage(deal, rateCard),
       }).select('*').single()
 
       activeChat = newChat as DealChat
@@ -430,6 +432,7 @@ export default function DealClient({
         updatedAt?: string
         message?: DealMessage | null
         detectedBrandOffer?: number | null
+        detectedCreatorAsk?: number | null
       }
       let finalPayload: StreamPayload | null = null
 
@@ -527,6 +530,10 @@ export default function DealClient({
 
       if (typeof finalPayload?.detectedBrandOffer === 'number') {
         setDeal(prev => ({ ...prev, brand_last_offer: finalPayload!.detectedBrandOffer as number }))
+      }
+
+      if (typeof finalPayload?.detectedCreatorAsk === 'number') {
+        setDeal(prev => ({ ...prev, creator_ask: finalPayload!.detectedCreatorAsk as number }))
       }
 
       if (finalPayload?.message) {
@@ -706,7 +713,7 @@ export default function DealClient({
             <div className="space-y-3 text-sm">
               <div>
                 <p className="text-xs text-muted uppercase tracking-wider mb-1">Your Ask</p>
-                <p className="text-2xl font-bold">{formatCurrency(deal.creator_ask)}</p>
+                <p className="text-2xl font-bold">{formatDealTarget(deal, rateCard)}</p>
               </div>
               {deal.brand_last_offer && (
                 <div className="border-t border-border pt-3">
