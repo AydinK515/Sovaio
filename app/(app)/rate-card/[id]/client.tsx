@@ -11,7 +11,6 @@ import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, Ima
 export default function RateCardClient({ rateCard, profile }: { rateCard: RateCard; profile: Profile | null }) {
   const router = useRouter()
   const exportRef = useRef<HTMLDivElement>(null)
-  const pageRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [brandName, setBrandName] = useState('')
   const [showDealModal, setShowDealModal] = useState(false)
@@ -21,6 +20,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
   const [creatingDeal, setCreatingDeal] = useState(false)
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
   const [expandedRangeInfo, setExpandedRangeInfo] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s' | null>(null)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
 
   const [supabase] = useState(() => createClient())
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -58,12 +58,17 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
     {
       id: 'dedicated_video' as const,
       tier: 'Tier 01',
-      title: 'Dedicated Video',
+       title: 'Dedicated Video',
       range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
       badge: 'Premium Placement',
       badgeClassName: 'text-primary',
       icon: Sparkles,
-      explanation: 'This is your expected pricing band for a full sponsor-focused video, not one exact price. The low end fits shorter or simpler dedicated deliverables, while the high end fits bigger asks like longer videos, heavier scripting, more revisions, or deeper brand integration. Dedicated video ranges are usually the widest because total workload changes a lot depending on video length and production scope.',
+      explanation: (
+        <>
+          This is your expected pricing band for a full sponsor-focused video, not one exact price. The low end fits shorter or simpler dedicated deliverables, while the high end fits bigger asks like longer videos, heavier scripting, more revisions, or deeper brand integration.{' '}
+          <strong className="font-semibold text-foreground">Dedicated video ranges are usually the widest because total workload changes a lot depending on video length and production scope.</strong>
+        </>
+      ),
     },
     {
       id: 'integration_60s' as const,
@@ -270,7 +275,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
   ]
 
   return (
-    <div ref={pageRef} className="py-8">
+        <div className="py-8">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] opacity-0"
@@ -452,6 +457,17 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
                 <FileDown className="w-4 h-4 text-primary" />
                 <span>Download PDF</span>
               </button>
+              <div className="my-2 border-t border-border" />
+              <button
+                onClick={() => {
+                  setShowDownloadMenu(false)
+                  setShowPreviewModal(true)
+                }}
+                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm hover:bg-muted-light transition-colors"
+              >
+                <FileText className="w-4 h-4 text-primary" />
+                <span>Preview Rate Card</span>
+              </button>
             </div>
           )}
         </div>
@@ -462,47 +478,6 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           <FileText className="w-5 h-5" />
           Start Tracking This Deal
         </button>
-      </div>
-
-      <div className="mt-8 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold">Download Preview</h2>
-            <p className="mt-1 text-sm text-muted">This is the exact rate card layout used for your PNG and PDF downloads.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              onClick={() => handleDownload('png')}
-              disabled={downloadingFormat !== null}
-              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
-            >
-              <ImageIcon className="w-4 h-4 text-primary" />
-              {downloadingFormat === 'png' ? 'Downloading PNG...' : 'Download PNG'}
-            </button>
-            <button
-              onClick={() => handleDownload('pdf')}
-              disabled={downloadingFormat !== null}
-              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-            >
-              <FileDown className="w-4 h-4" />
-              {downloadingFormat === 'pdf' ? 'Downloading PDF...' : 'Download PDF'}
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-[32px] border border-border bg-slate-100 p-3 md:p-5">
-          <div className="overflow-x-auto">
-            <div className="min-w-[1100px] origin-top-left scale-[0.34] sm:scale-[0.5] lg:scale-[0.72]" style={{ width: '1400px', marginBottom: '-58%' }}>
-              <ExportRateCardContent
-                rateCard={rateCard}
-                profile={profile}
-                avatarUrl={avatarUrl}
-                exportAddOns={exportAddOns}
-                exportBundles={exportBundles}
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Deal creation modal */}
@@ -557,6 +532,60 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           </div>
         </div>
       )}
+
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl animate-slide-up">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-5">
+              <div>
+                <h2 className="text-xl font-bold">Rate Card Preview</h2>
+                <p className="mt-1 text-sm text-muted">This is exactly what your exported PNG and PDF will look like.</p>
+              </div>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="rounded-xl border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted-light"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 border-b border-border bg-slate-50 px-6 py-4 sm:flex-row">
+              <button
+                onClick={() => handleDownload('png')}
+                disabled={downloadingFormat !== null}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
+              >
+                <ImageIcon className="w-4 h-4 text-primary" />
+                {downloadingFormat === 'png' ? 'Downloading PNG...' : 'Download PNG'}
+              </button>
+              <button
+                onClick={() => handleDownload('pdf')}
+                disabled={downloadingFormat !== null}
+                className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+              >
+                <FileDown className="w-4 h-4" />
+                {downloadingFormat === 'pdf' ? 'Downloading PDF...' : 'Download PDF'}
+              </button>
+            </div>
+
+            <div className="overflow-auto bg-slate-100 p-4 md:p-6">
+              <div className="mx-auto overflow-hidden rounded-[32px] border border-border bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1100px] origin-top-left scale-[0.32] sm:scale-[0.48] lg:scale-[0.68]" style={{ width: '1400px', marginBottom: '-60%' }}>
+                    <ExportRateCardContent
+                      rateCard={rateCard}
+                      profile={profile}
+                      avatarUrl={avatarUrl}
+                      exportAddOns={exportAddOns}
+                      exportBundles={exportBundles}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -600,20 +629,20 @@ function ExportRateCardContent({
           </h1>
         </div>
         {(avatarUrl || profile?.channel_name) && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+            {profile?.channel_name && (
+              <div style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                {profile.channel_name}
+              </div>
+            )}
             {avatarUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={avatarUrl}
                 alt={profile?.channel_name ?? 'Channel avatar'}
-                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                style={{ width: '84px', height: '84px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
                 crossOrigin="anonymous"
               />
-            )}
-            {profile?.channel_name && (
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                {profile.channel_name}
-              </div>
             )}
           </div>
         )}
