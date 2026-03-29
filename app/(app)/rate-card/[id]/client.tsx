@@ -38,7 +38,9 @@ export default function RateCardClient({
   const [brandName, setBrandName] = useState('')
   const [showDealModal, setShowDealModal] = useState(false)
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
-  const [dealType, setDealType] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s'>('integration_60s')
+  const [dealType, setDealType] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s'>(
+    rateCard.offers_dedicated_videos ? 'dedicated_video' : 'integration_60s'
+  )
   const [creatorAsk, setCreatorAsk] = useState('')
   const [creatingDeal, setCreatingDeal] = useState(false)
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
@@ -139,9 +141,17 @@ export default function RateCardClient({
       explanation: 'This range covers shorter sponsor mentions that still benefit from your audience trust and delivery style. The low end works for lighter, test-budget campaigns, while the high end fits stronger-performing videos, better placement, or brands that want a tighter, more polished mention without paying for a full 60-second read.',
     },
   ]
+  const visibleLiveRateTiers = liveRateTiers.filter((tier) => rateCard.offers_dedicated_videos || tier.id !== 'dedicated_video')
+  const availableDealTypes = visibleLiveRateTiers.map((tier) => tier.id)
 
   const selectedDealRange = getDealTypeRange(rateCard, dealType)
   const selectedDealRangeLabel = `${formatCurrency(selectedDealRange.low)} - ${formatCurrency(selectedDealRange.high)}`
+
+  useEffect(() => {
+    if (!availableDealTypes.includes(dealType)) {
+      setDealType(availableDealTypes[0] ?? 'integration_60s')
+    }
+  }, [availableDealTypes, dealType])
 
   async function copyEmail() {
     await navigator.clipboard.writeText(rateCard.pitch_email || '')
@@ -325,7 +335,7 @@ export default function RateCardClient({
   const exportAddOns = [
     { label: 'Organic usage rights (30 days)', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.2)) },
     { label: 'Paid usage rights (30 days)', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.3)) },
-    { label: 'Exclusivity (30 days)', value: formatCurrency(Math.round(rateCard.dedicated_video_low * 0.3)) },
+    { label: 'Exclusivity (30 days)', value: formatCurrency(Math.round((rateCard.offers_dedicated_videos ? rateCard.dedicated_video_low : rateCard.integration_60s_high) * 0.3)) },
     { label: 'Rush fee', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.4)) },
     { label: 'Extra revision round', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.25)) },
   ]
@@ -403,8 +413,8 @@ export default function RateCardClient({
         </div>
 
         {/* Rate Tiers */}
-        <div className="mt-8 grid sm:grid-cols-3 gap-4">
-          {liveRateTiers.map((tier) => {
+        <div className={`mt-8 grid gap-4 ${visibleLiveRateTiers.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          {visibleLiveRateTiers.map((tier) => {
             const isOpen = expandedRangeInfo === tier.id
             const Icon = tier.icon
 
@@ -604,7 +614,9 @@ export default function RateCardClient({
                   onChange={e => setDealType(e.target.value as typeof dealType)}
                   className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
-                  <option value="dedicated_video">Dedicated Video ({formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)})</option>
+                  {rateCard.offers_dedicated_videos && (
+                    <option value="dedicated_video">Dedicated Video ({formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)})</option>
+                  )}
                   <option value="integration_60s">60-Second Integration ({formatCurrency(rateCard.integration_60s_low)} - {formatCurrency(rateCard.integration_60s_high)})</option>
                   <option value="integration_30s">30-Second Integration ({formatCurrency(rateCard.integration_30s_low)} - {formatCurrency(rateCard.integration_30s_high)})</option>
                 </select>
@@ -732,6 +744,32 @@ function ExportRateCardContent({
   exportAddOns: { label: string; value: string }[]
   containerRef?: RefObject<HTMLDivElement | null>
 }) {
+  const exportRateTiers = [
+    ...(rateCard.offers_dedicated_videos
+      ? [{
+          label: 'Dedicated Video',
+          range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
+          note: 'Brand-led feature',
+          accent: '#dc2626',
+          description: 'Includes full-video integration, dedicated CTA, and sponsor-first positioning.',
+        }]
+      : []),
+    {
+      label: '60-Second Integration',
+      range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
+      note: 'Mid-roll placement',
+      accent: '#16a34a',
+      description: 'Includes in-video talking points, natural script fit, and clickable callout.',
+    },
+    {
+      label: '30-Second Integration',
+      range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
+      note: 'High-efficiency brand mention',
+      accent: '#64748b',
+      description: 'Best for lighter tests, launches, and repeat campaign exposure.',
+    },
+  ]
+
   return (
     <div
       ref={containerRef}
@@ -793,30 +831,8 @@ function ExportRateCardContent({
         Core Rates
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px', marginTop: '16px' }}>
-        {[
-          {
-            label: 'Dedicated Video',
-            range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
-            note: 'Brand-led feature',
-            accent: '#dc2626',
-            description: 'Includes full-video integration, dedicated CTA, and sponsor-first positioning.',
-          },
-          {
-            label: '60-Second Integration',
-            range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
-            note: 'Mid-roll placement',
-            accent: '#16a34a',
-            description: 'Includes in-video talking points, natural script fit, and clickable callout.',
-          },
-          {
-            label: '30-Second Integration',
-            range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
-            note: 'High-efficiency brand mention',
-            accent: '#64748b',
-            description: 'Best for lighter tests, launches, and repeat campaign exposure.',
-          },
-        ].map((tier) => (
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${exportRateTiers.length}, minmax(0, 1fr))`, gap: '18px', marginTop: '16px' }}>
+        {exportRateTiers.map((tier) => (
           <div key={tier.label} style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px', backgroundColor: '#ffffff' }}>
             <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tier.label}</div>
             <div style={{ marginTop: '18px', fontSize: '46px', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.05em', color: '#0f172a' }}>

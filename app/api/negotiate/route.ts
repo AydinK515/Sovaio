@@ -33,11 +33,11 @@ const negotiationResponseSchema = {
     },
     script: {
       type: 'string',
-      description: 'A ready-to-send reply. Body only — no subject line, no "Subject:" prefix, no metadata. Start directly with the salutation or first sentence. Return an empty string when no script is needed.',
+      description: 'A ready-to-send reply. Body only — no subject line, no "Subject:" prefix, no metadata. Start directly with the salutation or first sentence. Return an empty string when no script is needed. If this is non-empty, subject must also be non-empty.',
     },
     subject: {
       type: 'string',
-      description: 'Email subject line when the recommended script is an email. Return an empty string when no subject is needed.',
+      description: 'Subject line for the recommended script. If script is non-empty, this must also be non-empty. Return an empty string only when script is empty.',
     },
     detected_brand_offer: {
       type: ['integer', 'null'],
@@ -121,8 +121,9 @@ Per-intent rules:
 If the creator says anything like "ask me questions", "help me think through this", "what should I consider", "what do you need to know", or is clearly not ready to send a message yet — script MUST be "". Put everything in advice only.
 
 Additional script formatting rules:
-- If script is email-style and needs a subject line, return it ONLY in the subject field — never inside the script body.
-- If no subject is needed, return subject as an empty string.
+- If you return any non-empty script at all, you MUST also return a non-empty subject in the subject field.
+- Never put the subject inside the script body. Return it ONLY in the subject field.
+- The pair is all-or-nothing: if script is "", subject must be ""; if script is non-empty, subject must be non-empty.
 - The script field must ONLY contain the body of the message — no "Subject:" line, no metadata, no labels of any kind. Start directly with the salutation or first sentence.
 - Preserve paragraph breaks and list formatting inside the script body when useful.
 - The advice should fit the detected intent instead of forcing everything into negotiation triage.

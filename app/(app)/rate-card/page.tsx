@@ -18,6 +18,28 @@ function confidenceTone(confidence: number) {
   return 'text-primary bg-primary-light border-primary/20'
 }
 
+function getVisibleRateSummaries(rateCard: RateCard) {
+  return [
+    ...(rateCard.offers_dedicated_videos
+      ? [{
+          label: 'Dedicated Video',
+          shortLabel: 'Dedicated',
+          range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
+        }]
+      : []),
+    {
+      label: '60-Second Integration',
+      shortLabel: '60s Integration',
+      range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
+    },
+    {
+      label: '30-Second Integration',
+      shortLabel: '30s Integration',
+      range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
+    },
+  ]
+}
+
 export default async function RateCardsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -56,6 +78,7 @@ export default async function RateCardsPage() {
   }
 
   const latestCard = rateCards[0] as RateCard
+  const latestCardSummaries = getVisibleRateSummaries(latestCard)
 
   return (
     <div className="py-8">
@@ -82,25 +105,22 @@ export default async function RateCardsPage() {
               Generated on {formatDate(latestCard.created_at)} with {latestCard.report_confidence}% confidence.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-full md:min-w-[520px]">
-            <div className="rounded-2xl bg-white/10 px-4 py-4">
-              <p className="text-xs text-white/60">Dedicated</p>
-              <p className="mt-1 text-lg font-semibold">{formatCurrency(latestCard.dedicated_video_low)} - {formatCurrency(latestCard.dedicated_video_high)}</p>
-            </div>
-            <div className="rounded-2xl bg-white/10 px-4 py-4">
-              <p className="text-xs text-white/60">60s Integration</p>
-              <p className="mt-1 text-lg font-semibold">{formatCurrency(latestCard.integration_60s_low)} - {formatCurrency(latestCard.integration_60s_high)}</p>
-            </div>
-            <div className="rounded-2xl bg-white/10 px-4 py-4">
-              <p className="text-xs text-white/60">30s Integration</p>
-              <p className="mt-1 text-lg font-semibold">{formatCurrency(latestCard.integration_30s_low)} - {formatCurrency(latestCard.integration_30s_high)}</p>
-            </div>
+          <div className={`grid grid-cols-1 gap-3 min-w-full ${latestCardSummaries.length === 3 ? 'sm:grid-cols-3 md:min-w-[520px]' : 'sm:grid-cols-2 md:min-w-[360px]'}`}>
+            {latestCardSummaries.map((summary) => (
+              <div key={summary.label} className="rounded-2xl bg-white/10 px-4 py-4">
+                <p className="text-xs text-white/60">{summary.shortLabel}</p>
+                <p className="mt-1 text-lg font-semibold">{summary.range}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       <div className="mt-8 grid gap-4">
-        {rateCards.map((rateCard) => (
+        {rateCards.map((rateCard) => {
+          const summaries = getVisibleRateSummaries(rateCard as RateCard)
+
+          return (
           <div key={rateCard.id} className="bg-white rounded-2xl border border-border p-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
               <div className="min-w-0">
@@ -113,19 +133,13 @@ export default async function RateCardsPage() {
                 <p className="mt-1 text-sm text-muted">
                   {formatDate(rateCard.created_at)}{rateCard.subscriber_count ? ` - ${rateCard.subscriber_count.toLocaleString()} subscribers` : ''}{rateCard.has_sponsorships ? ' - Has sponsorship history' : ''}
                 </p>
-                <div className="mt-4 grid sm:grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-xl bg-muted-light px-4 py-3">
-                    <p className="text-muted">Dedicated Video</p>
-                    <p className="mt-1 font-semibold">{formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)}</p>
-                  </div>
-                  <div className="rounded-xl bg-muted-light px-4 py-3">
-                    <p className="text-muted">60-Second Integration</p>
-                    <p className="mt-1 font-semibold">{formatCurrency(rateCard.integration_60s_low)} - {formatCurrency(rateCard.integration_60s_high)}</p>
-                  </div>
-                  <div className="rounded-xl bg-muted-light px-4 py-3">
-                    <p className="text-muted">30-Second Integration</p>
-                    <p className="mt-1 font-semibold">{formatCurrency(rateCard.integration_30s_low)} - {formatCurrency(rateCard.integration_30s_high)}</p>
-                  </div>
+                <div className={`mt-4 grid gap-3 text-sm ${summaries.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                  {summaries.map((summary) => (
+                    <div key={summary.label} className="rounded-xl bg-muted-light px-4 py-3">
+                      <p className="text-muted">{summary.label}</p>
+                      <p className="mt-1 font-semibold">{summary.range}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -140,7 +154,7 @@ export default async function RateCardsPage() {
               </div>
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   )

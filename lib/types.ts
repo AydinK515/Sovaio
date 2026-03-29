@@ -28,6 +28,7 @@ export interface RateCard {
   niche: string | null
   subscriber_count: number | null
   has_sponsorships: boolean
+  offers_dedicated_videos: boolean
   dedicated_video_low: number
   dedicated_video_high: number
   integration_60s_low: number

@@ -77,6 +77,7 @@ export default function GeneratePage() {
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([])
   const [niche, setNiche] = useState('')
   const [hasSponsorships, setHasSponsorships] = useState<boolean | null>(null)
+  const [offersDedicatedVideos, setOffersDedicatedVideos] = useState<boolean | null>(null)
   const [sponsorshipCount, setSponsorshipCount] = useState('')
   const [avgDealAmount, setAvgDealAmount] = useState('')
   const [subscriberCount, setSubscriberCount] = useState('')
@@ -85,6 +86,7 @@ export default function GeneratePage() {
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState('')
   const [activeTutorialStep, setActiveTutorialStep] = useState(0)
+  const [showDedicatedTooltip, setShowDedicatedTooltip] = useState(false)
 
   const supabase = createClient()
 
@@ -322,7 +324,7 @@ export default function GeneratePage() {
   }
 
   async function handleGenerate() {
-    if (!niche || hasSponsorships === null || !subscriberCount) {
+    if (!niche || hasSponsorships === null || offersDedicatedVideos === null || !subscriberCount) {
       setError('Please fill in all required fields.')
       return
     }
@@ -376,6 +378,7 @@ export default function GeneratePage() {
           niche,
           subscriberCount: subCount,
           hasSponsorships,
+          offersDedicatedVideos,
           sponsorshipCount: sponsorshipCount ? parseInt(sponsorshipCount.replace(/,/g, '')) : null,
           avgDealAmount: avgDealAmount ? parseInt(avgDealAmount.replace(/[$,]/g, '')) : null,
           csvData,
@@ -395,6 +398,7 @@ export default function GeneratePage() {
         niche,
         subscriber_count: subCount,
         has_sponsorships: hasSponsorships,
+        offers_dedicated_videos: offersDedicatedVideos,
         sponsorship_count: hasSponsorships && sponsorshipCount ? parseInt(sponsorshipCount.replace(/,/g, '')) : null,
         avg_deal_amount: hasSponsorships && avgDealAmount ? parseInt(avgDealAmount.replace(/[$,]/g, '')) : null,
         dedicated_video_low: aiRates.dedicated_video_low,
@@ -702,7 +706,7 @@ export default function GeneratePage() {
           )}
 
           {/* Form fields */}
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-2">Niche Category</label>
               <select
@@ -772,11 +776,59 @@ export default function GeneratePage() {
             </div>
           )}
 
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="md:col-span-2">
+              <div className="mb-2 flex items-center gap-2">
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider leading-tight">Do You Offer Dedicated Videos?</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label="What counts as a dedicated video?"
+                    aria-expanded={showDedicatedTooltip}
+                    onClick={() => setShowDedicatedTooltip((open) => !open)}
+                    onMouseEnter={() => setShowDedicatedTooltip(true)}
+                    onMouseLeave={() => setShowDedicatedTooltip(false)}
+                    onFocus={() => setShowDedicatedTooltip(true)}
+                    onBlur={() => setShowDedicatedTooltip(false)}
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-white text-muted transition-colors hover:text-foreground"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                  {showDedicatedTooltip && (
+                    <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-border bg-white p-4 text-xs leading-relaxed text-muted shadow-xl">
+                      Dedicated videos are full sponsor-focused uploads where the brand is the main subject of the video. If you mostly do mid-roll reads or quick mentions instead, selecting No will hide dedicated-video pricing from your rate card. It&apos;s ultimately your call and you can still choose what fits your channel best.
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="max-w-sm flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOffersDedicatedVideos(true)}
+                  className={`flex-1 rounded-xl border py-3 text-sm font-medium transition-colors ${
+                    offersDedicatedVideos === true ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'
+                  }`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOffersDedicatedVideos(false)}
+                  className={`flex-1 rounded-xl border py-3 text-sm font-medium transition-colors ${
+                    offersDedicatedVideos === false ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'
+                  }`}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+
           {error && <p className="text-sm text-primary bg-primary-light rounded-lg px-4 py-2">{error}</p>}
 
           {/* Privacy notice */}
-          <div className="flex items-start gap-3 bg-muted-light rounded-xl p-4 border border-border">
-            <Info className="w-5 h-5 text-muted shrink-0 mt-0.5" />
+          <div className="flex items-center gap-3 bg-muted-light rounded-xl p-4 border border-border">
+            <Info className="w-5 h-5 text-muted shrink-0" />
             <p className="text-xs text-muted">
               We never store your raw CSV data. Our AI extracts metrics and discards the files immediately.
             </p>

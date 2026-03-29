@@ -142,7 +142,7 @@ function buildPitchEmailContext(input: {
 }
 
 export async function POST(req: Request) {
-  const { niche, subscriberCount, hasSponsorships, sponsorshipCount, avgDealAmount, csvData, confidence } = await req.json()
+  const { niche, subscriberCount, hasSponsorships, offersDedicatedVideos, sponsorshipCount, avgDealAmount, csvData, confidence } = await req.json()
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
@@ -261,6 +261,7 @@ Creator profile:
 - Subscriber count: ${subscriberCount.toLocaleString()}
 - Median views/video to use for pricing: ${medianViews?.toLocaleString() ?? 'Not available from analytics'}
 - Has previous sponsorships: ${hasSponsorships ? 'Yes' : 'No (first-time sponsor)'}${hasSponsorships && sponsorshipCount != null ? `\n- Number of past sponsorships: ~${sponsorshipCount}` : ''}${hasSponsorships && avgDealAmount != null ? `\n- Average deal size from past sponsorships: ~$${avgDealAmount.toLocaleString()}` : ''}
+- Creator currently offers dedicated videos: ${offersDedicatedVideos === false ? 'No' : 'Yes'}
 - Data confidence: ${confidence}%
 
 ${csvSummary || 'No analytics data provided. Use niche, subscriber count, and sponsorship history only. Apply no geography premium, no retention bonus, and assume first-tier conservative estimates.'}
