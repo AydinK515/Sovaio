@@ -85,6 +85,27 @@ export interface DealChat {
   updated_at: string
 }
 
+export interface ChannelAiChat {
+  id: string
+  user_id: string
+  rate_card_id: string | null
+  title: string
+  openai_conversation_id: string | null
+  openai_last_response_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ChannelAiMessage {
+  id: string
+  chat_id: string
+  user_id: string
+  role: 'creator' | 'ai'
+  content: string
+  reasoning_summary?: string | null
+  created_at: string
+}
+
 export const NICHES = [
   'Personal Finance & Investing',
   'Business & Entrepreneurship',

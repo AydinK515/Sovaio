@@ -98,6 +98,10 @@ function inlineFormat(text: string): React.ReactNode[] {
 }
 
 const THINKING_LABELS = ['Thinking...', 'Analyzing...', 'Reviewing offer...', 'Crafting response...', 'Strategizing...']
+const NEGOTIATION_TEMPLATE_QUESTIONS = [
+  'What can you do?',
+  'What do you know about this deal?',
+]
 
 function ThinkingLabel() {
   const [index, setIndex] = useState(0)
@@ -139,7 +143,7 @@ function ReasoningDropdown({ text }: { text: string }) {
           className="w-3.5 h-3.5 transition-transform duration-200"
           style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
         />
-        Thought
+        Thought for a couple seconds
       </button>
       {open && (
         <p className="mt-2 text-sm leading-relaxed text-muted whitespace-pre-wrap border-l-2 border-border pl-3">
@@ -319,8 +323,9 @@ export default function DealClient({
     abortRef.current?.abort()
   }
 
-  async function sendMessage() {
-    if (!input.trim() || sending) return
+  async function sendMessage(prefilledText?: string) {
+    const trimmedInput = (prefilledText ?? input).trim()
+    if (!trimmedInput || sending) return
 
     // Frontend guard: check per-chat creator message count before hitting the server.
     const creatorCount = messages.filter(m => m.role === 'creator').length
@@ -337,7 +342,7 @@ export default function DealClient({
       return
     }
 
-    const userText = input.trim()
+    const userText = trimmedInput
     let activeChat = currentChat
     const shouldGenerateTitle = !activeChat || activeChat.title === 'New Chat'
 
@@ -706,6 +711,7 @@ export default function DealClient({
 
   const visibleMessages = getVisibleMessages()
   const displayChat = currentChat ?? getDraftChat(deal)
+  const showTemplateQuestions = currentChat === null && messages.length === 0 && deal.status === 'negotiating' && !aiTyping
 
   return (
     <div className="flex flex-col py-8 lg:h-[calc(100vh-14rem)] lg:overflow-hidden">
@@ -1029,46 +1035,63 @@ export default function DealClient({
                   <p className="mt-0.5 text-sm text-red-700">Come back tomorrow and your limit will reset.</p>
                 </div>
               ) : (
-                <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-3">
-                  <textarea
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        sendMessage()
-                      }
-                    }}
-                    placeholder="Tell me what happened in the negotiation..."
-                    disabled={sending}
-                    rows={1}
-                    className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 resize-none overflow-hidden"
-                    style={{ minHeight: '44px', maxHeight: '160px' }}
-                    ref={el => {
-                      if (el) {
-                        el.style.height = 'auto'
-                        el.style.height = Math.min(el.scrollHeight, 160) + 'px'
-                      }
-                    }}
-                  />
-                  {aiTyping ? (
-                    <button
-                      type="button"
-                      onClick={stopGeneration}
-                      className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors"
-                    >
-                      <Square className="w-4 h-4 fill-white" />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!input.trim() || sending}
-                      className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
+                <>
+                  {showTemplateQuestions && (
+                    <div className="mb-3 flex flex-col gap-2">
+                      {NEGOTIATION_TEMPLATE_QUESTIONS.map(question => (
+                        <button
+                          key={question}
+                          type="button"
+                          onClick={() => sendMessage(question)}
+                          disabled={sending}
+                          className="rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted-light disabled:opacity-50"
+                        >
+                          {question}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </form>
+                  <form onSubmit={e => { e.preventDefault(); sendMessage() }} className="flex items-end gap-3">
+                    <textarea
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
+                      placeholder="Tell me what happened in the negotiation..."
+                      disabled={sending}
+                      rows={1}
+                      className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 resize-none overflow-hidden"
+                      style={{ minHeight: '44px', maxHeight: '160px' }}
+                      ref={el => {
+                        if (el) {
+                          el.style.height = 'auto'
+                          el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+                        }
+                      }}
+                    />
+                    {aiTyping ? (
+                      <button
+                        type="button"
+                        onClick={stopGeneration}
+                        className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors"
+                      >
+                        <Square className="w-4 h-4 fill-white" />
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={!input.trim() || sending}
+                        className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    )}
+                  </form>
+                </>
               )}
             </div>
           )}
