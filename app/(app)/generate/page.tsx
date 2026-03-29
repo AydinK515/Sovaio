@@ -16,16 +16,20 @@ interface ParsedFile {
   quality: number
 }
 
-const LOADING_MESSAGES = [
-  'Analyzing your audience demographics...',
-  'Calculating niche benchmarks...',
-  'Reviewing your top content performance...',
-  'Evaluating audience retention patterns...',
-  'Comparing traffic source quality...',
-  'Generating price range models...',
-  'Crafting your pitch email template...',
-  'Finalizing your rate card...',
-]
+const LOADING_PHASES = [
+  {
+    title: 'Data pass',
+    message: 'Analyzing your audience, channel data, and top-performing content...',
+  },
+  {
+    title: 'Benchmarking',
+    message: 'Comparing your niche, audience quality, and sponsorship benchmarks...',
+  },
+  {
+    title: 'Final modeling',
+    message: 'Finalizing your price ranges and writing your pitch email...',
+  },
+] as const
 
 export default function GeneratePage() {
   const router = useRouter()
@@ -37,7 +41,6 @@ export default function GeneratePage() {
   const [avgDealAmount, setAvgDealAmount] = useState('')
   const [subscriberCount, setSubscriberCount] = useState('')
   const [loading, setLoading] = useState(false)
-  const [loadingMessage, setLoadingMessage] = useState('')
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState('')
@@ -61,36 +64,36 @@ export default function GeneratePage() {
   const confidenceLabel = confidence < 40 ? 'Low' : confidence < 70 ? 'Medium' : 'High'
   const confidenceColor = confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
   const barColor = confidence < 40 ? 'bg-primary' : confidence < 70 ? 'bg-warning' : 'bg-success'
-  const currentLoadingStep = Math.max(LOADING_MESSAGES.indexOf(loadingMessage), 0)
+  const currentLoadingStep =
+    loadingProgress >= 100
+      ? LOADING_PHASES.length - 1
+      : Math.min(
+          Math.floor((loadingProgress / 100) * LOADING_PHASES.length),
+          LOADING_PHASES.length - 1
+        )
+  const loadingMessage = LOADING_PHASES[currentLoadingStep]?.message ?? LOADING_PHASES[0].message
 
   useEffect(() => {
     if (!loading) {
       setLoadingProgress(0)
-      setLoadingMessage('')
       return
     }
 
-    setLoadingMessage(LOADING_MESSAGES[0])
-    setLoadingProgress(7)
+    setLoadingProgress(3)
 
-    let messageIndex = 0
-    const messageInterval = window.setInterval(() => {
-      messageIndex = (messageIndex + 1) % LOADING_MESSAGES.length
-      setLoadingMessage(LOADING_MESSAGES[messageIndex])
-    }, 2600)
+    const progressStartTime = Date.now()
+    const progressDurationMs = 40_000
+    const progressCeiling = 92
 
     const progressInterval = window.setInterval(() => {
-      setLoadingProgress((prev) => {
-        if (prev >= 94) return prev
-        if (prev < 28) return Math.min(prev + 5 + Math.random() * 7, 94)
-        if (prev < 58) return Math.min(prev + 2.5 + Math.random() * 4.5, 94)
-        if (prev < 82) return Math.min(prev + 1.2 + Math.random() * 2.8, 94)
-        return Math.min(prev + 0.4 + Math.random() * 1.4, 94)
-      })
-    }, 700)
+      const elapsed = Date.now() - progressStartTime
+      const normalizedProgress = Math.min(elapsed / progressDurationMs, 1)
+      const nextProgress = 3 + (progressCeiling - 3) * normalizedProgress
+
+      setLoadingProgress(prev => Math.max(prev, Math.min(nextProgress, progressCeiling)))
+    }, 250)
 
     return () => {
-      window.clearInterval(messageInterval)
       window.clearInterval(progressInterval)
     }
   }, [loading])
@@ -464,7 +467,7 @@ export default function GeneratePage() {
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                {LOADING_MESSAGES.slice(0, 3).map((_, index) => {
+                {LOADING_PHASES.map((phase, index) => {
                   const isDone = currentLoadingStep > index
                   const isActive = currentLoadingStep === index
 
@@ -481,9 +484,7 @@ export default function GeneratePage() {
                     >
                       <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted">Phase {index + 1}</p>
                       <p className="mt-1 text-sm font-medium text-foreground">
-                        {index === 0 && 'Data pass'}
-                        {index === 1 && 'Benchmarking'}
-                        {index === 2 && 'Final modeling'}
+                        {phase.title}
                       </p>
                     </div>
                   )

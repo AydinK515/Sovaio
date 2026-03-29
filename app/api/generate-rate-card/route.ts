@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import { buildCsvSummary } from '@/lib/csv-summary'
+import { buildCsvSummary, toNumber } from '@/lib/csv-summary'
 
 const RateCardSchema = z.object({
   dedicated_video_low: z.number().describe('Low end of dedicated video rate in USD'),
@@ -10,13 +10,79 @@ const RateCardSchema = z.object({
   integration_60s_high: z.number().describe('High end of 60-second integration rate in USD'),
   integration_30s_low: z.number().describe('Low end of 30-second integration rate in USD'),
   integration_30s_high: z.number().describe('High end of 30-second integration rate in USD'),
-  explanation: z.string().describe('2-3 sentence explanation of the rates and key value drivers'),
+  explanation: z.string().describe('2-3 sentence plain-English explanation of the rates and key value drivers without including numeric ranges, percentages, multipliers, CPM values, or intermediate calculations'),
   improvement_tips: z.array(z.object({
     title: z.string(),
     description: z.string(),
   })).describe('2-3 actionable tips to increase rates'),
   pitch_email: z.string().describe('A complete pitch email template the creator can use to reach out to brands'),
 })
+
+const NICHE_CPM_BANDS: Record<string, { low: number; high: number }> = {
+  'Personal Finance & Investing': { low: 50, high: 200 },
+  'Business & Entrepreneurship': { low: 30, high: 80 },
+  'Tech & Software': { low: 15, high: 35 },
+  'Health & Fitness': { low: 10, high: 20 },
+  'Education & Tutorials': { low: 10, high: 18 },
+  Automotive: { low: 10, high: 20 },
+  'DIY & Home Improvement': { low: 8, high: 18 },
+  'Sports & Outdoors': { low: 8, high: 15 },
+  'Science & Nature': { low: 8, high: 15 },
+  'News & Politics': { low: 7, high: 14 },
+  Gaming: { low: 5, high: 15 },
+  'Beauty & Fashion': { low: 8, high: 15 },
+  'Food & Cooking': { low: 5, high: 12 },
+  'Parenting & Family': { low: 5, high: 12 },
+  Travel: { low: 5, high: 12 },
+  'Lifestyle & Vlogging': { low: 5, high: 10 },
+  'Music & Arts': { low: 4, high: 10 },
+  'Entertainment & Comedy': { low: 3, high: 8 },
+  Other: { low: 5, high: 12 },
+}
+
+function getMedianViews(csvData: Record<string, Record<string, unknown>[]>) {
+  const rows = Array.isArray(csvData.content)
+    ? csvData.content
+        .filter(row => String(row['Video title'] ?? '').trim() !== '')
+        .slice(0, 10)
+    : []
+
+  if (rows.length === 0) {
+    return null
+  }
+
+  const viewCounts = rows
+    .map(row => toNumber(row['Views'] ?? row['views']))
+    .filter(value => value > 0)
+    .sort((a, b) => a - b)
+
+  if (viewCounts.length === 0) {
+    return null
+  }
+
+  const middle = Math.floor(viewCounts.length / 2)
+  return viewCounts.length % 2 === 0
+    ? Math.round((viewCounts[middle - 1] + viewCounts[middle]) / 2)
+    : viewCounts[middle]
+}
+
+function getAccessibleCpmBand(niche: string, medianViews: number | null) {
+  const baseBand = NICHE_CPM_BANDS[niche] ?? NICHE_CPM_BANDS.Other
+
+  if (medianViews === null) {
+    return baseBand
+  }
+
+  const ceilingMultiplier =
+    medianViews < 25_000 ? 0.4
+    : medianViews < 100_000 ? 0.7
+    : 1
+
+  return {
+    low: baseBand.low,
+    high: Math.max(baseBand.low, Math.round(baseBand.high * ceilingMultiplier)),
+  }
+}
 
 export async function POST(req: Request) {
   const { niche, subscriberCount, hasSponsorships, sponsorshipCount, avgDealAmount, csvData, confidence } = await req.json()
@@ -28,6 +94,8 @@ export async function POST(req: Request) {
 
   const openai = createOpenAI({ apiKey })
   const csvSummary = buildCsvSummary(csvData)
+  const medianViews = getMedianViews(csvData)
+  const accessibleCpmBand = getAccessibleCpmBand(niche, medianViews)
 
   const system = `You are RateProof AI, a data-driven YouTube sponsorship rate strategist.
 
@@ -39,41 +107,12 @@ Rate = (Niche CPM x View Tier Multiplier) x Geography Multiplier x Sponsorship H
 Apply each factor in order. Niche and geography do the heavy lifting. Everything else is a modifier on top.
 
 ## STEP 1 - Niche CPM baseline (biggest lever, up to 20x spread)
-These are sponsorship CPMs (not AdSense). Pick the range that best fits the creator's niche:
-- Personal Finance & Investing: $50-200 (highest-paying vertical - brands pay a massive premium to reach buyers with money)
-- Business & Entrepreneurship: $30-80
-- Tech & Software: $15-35
-- Health & Fitness: $10-20
-- Education & Tutorials: $10-18
-- Automotive: $10-20
-- DIY & Home Improvement: $8-18
-- Sports & Outdoors: $8-15
-- Science & Nature: $8-15
-- News & Politics: $7-14
-- Gaming: $5-15
-- Beauty & Fashion: $8-15
-- Food & Cooking: $5-12
-- Parenting & Family: $5-12
-- Travel: $5-12
-- Lifestyle & Vlogging: $5-10
-- Music & Arts: $4-10
-- Entertainment & Comedy: $3-8
-If the niche is genuinely mixed (e.g. tech/gaming), identify the primary niche by content volume or stated focus, use that tier's CPM range, and apply a 10-15% downward confidence adjustment. Do not automatically default to the cheaper niche's floor just because of ambiguity.
+Use the niche CPM baseline provided in the creator profile. Treat that range as the correct starting point for this creator and do not widen or replace it.
+If the niche is genuinely mixed (e.g. tech/gaming), stay anchored to the provided primary niche baseline and apply a 10-15% downward confidence adjustment. Do not automatically default to the cheaper niche's floor just because of ambiguity.
 
 ## STEP 2 - Median views per video (base volume)
 This is the primary input. Subscriber count is a credibility proxy only - do not use it to set rates.
 Use the MEDIAN views/video from the analytics data. If the summary explicitly calls out an outlier skew (avg much higher than median), use the median, not the average. If only avg is available and no skew is flagged, use avg. If no analytics are provided, estimate conservatively from subscriber count.
-
-Before applying any multipliers, cap how much of the niche CPM range the channel can access based on median views:
-- Under 25,000 median views/video: the accessible CPM range is only the lower 40% of the niche range.
-- 25,000 to under 100,000 median views/video: the accessible CPM range is only the lower 70% of the niche range.
-- 100,000+ median views/video: the full niche CPM range is accessible.
-
-How to apply the cap:
-- Keep the niche floor unchanged.
-- Reduce only the ceiling to the allowed percentile of that niche range.
-- Then generate the actual CPM estimate and all downstream rates from that capped CPM band, not from the original full niche band.
-- Example: finance at $50-200 with 18,000 median views becomes an accessible CPM band of $50-80, so the rate card should be generated from roughly $50-80 rather than using $200 as the ceiling.
 
 View tier multipliers - small-channel premium is conditional, not automatic:
 - <5,000 views/video: CPM multiplier 1.0-1.5x. The 1.5x end only applies if engagement signals are strong (CTR above 5%, meaningful subscriber gain per view). Weak or missing engagement signals: use 1.0-1.2x.
@@ -125,7 +164,6 @@ Round to clean numbers. Low end = conservative, high end = with favorable modifi
 - If a channel has 1 subscriber or tiny traction, produce honest low rates. That is more useful than fake optimism.
 - If data confidence is low, skew toward the conservative end of every range.
 - Never assume premium geography or strong engagement unless the data shows it.
-- Respect the accessible CPM cap from Step 2 even if the niche itself has a much higher theoretical ceiling.
 - If the calculated 60-second integration rate is below $150, note explicitly in the explanation that cash sponsorship deals are uncommon at this rate level - brands at this range typically offer product exchanges rather than cash payment. Present the numbers honestly but set that expectation.
 
 Output rules:
@@ -134,13 +172,17 @@ Output rules:
 - dedicated_video > integration_60s > integration_30s.
 - Channels without prior sponsorships must not receive an experience premium.
 - If prior avg deal amount is known, it is the rate floor.
-- Keep the explanation grounded in the actual data - name the specific factors that drove the numbers.`
+- Keep the explanation grounded in the actual data - name the specific factors that drove the numbers.
+- The explanation must stay qualitative. Do not include any raw numbers, dollar amounts, CPM bands, percentages, multipliers, ranges, parentheses with figures, or intermediate math.
+- In the explanation, describe the factors in plain English instead, for example: strong premium-market audience, modest view volume for the niche, first-time sponsor discount, or strong engagement signals.`
 
   const prompt = `Generate a data-backed sponsorship rate card for this YouTube creator.
 
 Creator profile:
 - Niche: ${niche}
+- Niche CPM baseline for this creator: $${accessibleCpmBand.low}-$${accessibleCpmBand.high}
 - Subscriber count: ${subscriberCount.toLocaleString()}
+- Median views/video to use for pricing: ${medianViews?.toLocaleString() ?? 'Not available from analytics'}
 - Has previous sponsorships: ${hasSponsorships ? 'Yes' : 'No (first-time sponsor)'}${hasSponsorships && sponsorshipCount != null ? `\n- Number of past sponsorships: ~${sponsorshipCount}` : ''}${hasSponsorships && avgDealAmount != null ? `\n- Average deal size from past sponsorships: ~$${avgDealAmount.toLocaleString()}` : ''}
 - Data confidence: ${confidence}%
 
@@ -148,8 +190,10 @@ ${csvSummary || 'No analytics data provided. Use niche, subscriber count, and sp
 
 Instructions:
 - Follow the formula in order: niche CPM -> view tier (using median views) -> geography -> sponsorship history -> engagement quality.
+- Use the provided niche CPM baseline exactly as the starting band for your calculations.
 - If the analytics summary flags an outlier skew, use the median views figure, not the average.
-- Show your reasoning for the key factors in the explanation field (niche tier used, median views used, geography multiplier applied, why).
+- In the explanation field, explain the main drivers in plain English without exposing any numeric inputs or calculations.
+- Do not include values such as dollar ranges, view counts, percentages, x-multipliers, CPM bands, or final CPM math in the explanation.
 - Do not invent data that was not provided.
 
 For pitch_email:

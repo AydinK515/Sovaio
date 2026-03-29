@@ -6,9 +6,30 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import type { RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
-import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown } from 'lucide-react'
+import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight } from 'lucide-react'
 
-export default function RateCardClient({ rateCard, profile }: { rateCard: RateCard; profile: Profile | null }) {
+type AudienceSnapshot = {
+  genderSplit: string
+  usUkCaAuAudience: string
+  ageGroupBreakdown: Array<{ label: string; value: string; isDominant: boolean }>
+}
+
+type PerformanceSnapshotItem = {
+  label: string
+  value: string
+}
+
+export default function RateCardClient({
+  rateCard,
+  profile,
+  audienceSnapshot,
+  performanceSnapshot,
+}: {
+  rateCard: RateCard
+  profile: Profile | null
+  audienceSnapshot: AudienceSnapshot
+  performanceSnapshot: PerformanceSnapshotItem[]
+}) {
   const router = useRouter()
   const exportRef = useRef<HTMLDivElement>(null)
   const previewViewportRef = useRef<HTMLDivElement>(null)
@@ -93,7 +114,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
       explanation: (
         <>
           This is your expected pricing band for a full sponsor-focused video, not one exact price. The low end fits shorter or simpler dedicated deliverables, while the high end fits bigger asks like longer videos, heavier scripting, more revisions, or deeper brand integration.{' '}
-          <strong className="font-semibold text-foreground">Dedicated video ranges are usually the widest because total workload changes a lot depending on video length and production scope.</strong>
+          <strong className="font-semibold text-foreground">Dedicated video ranges are usually the widest because total workload changes a lot depending on video length and production scope.</strong> It is rare to reach the upper end of this range.
         </>
       ),
     },
@@ -133,6 +154,30 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
 
     const element = exportRef.current
     if (!element) return
+
+    if ('fonts' in document) {
+      await document.fonts.ready
+    }
+
+    const images = Array.from(element.querySelectorAll('img'))
+    await Promise.all(
+      images.map(async (image) => {
+        if (!image.complete) {
+          await new Promise<void>((resolve) => {
+            const finalize = () => resolve()
+            image.addEventListener('load', finalize, { once: true })
+            image.addEventListener('error', finalize, { once: true })
+          })
+        }
+
+        if (typeof image.decode === 'function') {
+          await image.decode().catch(() => undefined)
+        }
+      })
+    )
+
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
     return html2canvas(element, {
       backgroundColor: '#ffffff',
@@ -284,19 +329,6 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
     { label: 'Rush fee', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.4)) },
     { label: 'Extra revision round', value: formatCurrency(Math.round(rateCard.integration_30s_low * 0.25)) },
   ]
-  const exportBundles = [
-    {
-      label: 'Launch package',
-      value: formatCurrency(Math.round(rateCard.dedicated_video_low + rateCard.integration_60s_low)),
-      description: '1 dedicated video plus 1 integrated follow-up mention for campaign lift and recall.',
-    },
-    {
-      label: 'Momentum package',
-      value: formatCurrency(Math.round(rateCard.integration_60s_low * 2.6)),
-      description: '3 integrated placements across a short run of uploads to build repetition.',
-    },
-  ]
-
   return (
         <div className="py-8">
       <div
@@ -307,9 +339,10 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           containerRef={exportRef}
           rateCard={rateCard}
           profile={profile}
+          audienceSnapshot={audienceSnapshot}
+          performanceSnapshot={performanceSnapshot}
           avatarUrl={avatarUrl}
           exportAddOns={exportAddOns}
-          exportBundles={exportBundles}
         />
       </div>
 
@@ -337,6 +370,38 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           </div>
         )}
 
+        <div className="mt-8 rounded-[28px] border border-primary/15 bg-[linear-gradient(135deg,rgba(254,243,199,0.45),rgba(255,255,255,0.98))] p-6 shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold">How To Use These Ranges</h2>
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            These numbers are not telling you to default to the bottom. In most normal negotiations, you should usually open in the upper-middle of the range and try to hold there unless the scope is especially light.
+          </p>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
+              <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">Where To Start</p>
+              <p className="mt-2 text-sm text-foreground">
+                Aim to quote above the midpoint when the brand fit is strong, the brief is standard, and you are not desperate to close quickly.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
+              <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">When To Push Higher</p>
+              <p className="mt-2 text-sm text-foreground">
+                Push toward the top when they want tighter scripting, stronger placement, usage rights, exclusivity, extra revisions, or a fast turnaround.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
+              <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">About The Low End</p>
+              <p className="mt-2 text-sm text-foreground">
+                The lower bound is still a fair rate, not a failure. It is the right outcome for lighter-scope deals, test budgets, or brands with less flexibility.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Rate Tiers */}
         <div className="mt-8 grid sm:grid-cols-3 gap-4">
           {liveRateTiers.map((tier) => {
@@ -352,8 +417,8 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
               >
                 <p className="text-xs font-mono text-muted uppercase">{tier.tier}</p>
                 <h3 className="mt-1 text-lg font-semibold">{tier.title}</h3>
-                <p className={`mt-3 text-3xl md:text-4xl font-bold ${tier.id === 'dedicated_video' ? 'text-primary' : ''}`}>
-                  {tier.range}
+                <p className="mt-3 text-3xl md:text-4xl font-bold">
+                  {tier.range}*
                 </p>
                 <p className={`mt-2 text-xs flex items-center gap-1 ${tier.badgeClassName}`}>
                   <Icon className="w-3 h-3" /> {tier.badge}
@@ -388,6 +453,9 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
             )
           })}
         </div>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          * Final price depends on scope, usage rights, placement, etc. These numbers are intended as a range, not one fixed quote.
+        </p>
 
         {/* Why This Rate */}
         <div className="mt-8 grid lg:grid-cols-2 gap-8">
@@ -452,8 +520,9 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
       </div>
 
       {/* Actions */}
-      <div className="mt-8 flex flex-col sm:flex-row gap-4">
-        <div data-download-root className="relative flex-1">
+      <div className="mt-8">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div data-download-root className="relative">
           <button
             onClick={() => setShowDownloadMenu(prev => !prev)}
             disabled={downloadingFormat !== null}
@@ -494,13 +563,23 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowDealModal(true)}
-          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-secondary text-white font-semibold hover:bg-secondary-hover transition-colors"
-        >
-          <FileText className="w-5 h-5" />
-          Start Tracking This Deal
-        </button>
+          <button
+            onClick={() => setShowDealModal(true)}
+            className="flex items-center justify-center gap-2 py-4 rounded-xl bg-secondary text-white font-semibold hover:bg-secondary-hover transition-colors"
+          >
+            <FileText className="w-5 h-5" />
+            Start Tracking A Deal
+          </button>
+        </div>
+        <div className="mt-4 flex justify-center">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-2 text-sm font-medium text-muted transition-colors hover:text-foreground"
+          >
+            <span>Continue to dashboard</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       {/* Deal creation modal */}
@@ -615,9 +694,10 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
                         containerRef={previewContentRef}
                         rateCard={rateCard}
                         profile={profile}
+                        audienceSnapshot={audienceSnapshot}
+                        performanceSnapshot={performanceSnapshot}
                         avatarUrl={avatarUrl}
                         exportAddOns={exportAddOns}
-                        exportBundles={exportBundles}
                       />
                     </div>
                   </div>
@@ -638,16 +718,18 @@ function downloadFormatLabel(format: 'png' | 'pdf') {
 function ExportRateCardContent({
   rateCard,
   profile,
+  audienceSnapshot,
+  performanceSnapshot,
   avatarUrl,
   exportAddOns,
-  exportBundles,
   containerRef,
 }: {
   rateCard: RateCard
   profile: Profile | null
+  audienceSnapshot: AudienceSnapshot
+  performanceSnapshot: PerformanceSnapshotItem[]
   avatarUrl: string | null
   exportAddOns: { label: string; value: string }[]
-  exportBundles: { label: string; value: string; description: string }[]
   containerRef?: RefObject<HTMLDivElement | null>
 }) {
   return (
@@ -738,7 +820,7 @@ function ExportRateCardContent({
           <div key={tier.label} style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px', backgroundColor: '#ffffff' }}>
             <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tier.label}</div>
             <div style={{ marginTop: '18px', fontSize: '46px', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.05em', color: '#0f172a' }}>
-              {tier.range}
+              {tier.range}*
             </div>
             <div style={{ marginTop: '16px', fontSize: '15px', color: tier.accent, fontWeight: 600 }}>
               {tier.note}
@@ -749,21 +831,38 @@ function ExportRateCardContent({
           </div>
         ))}
       </div>
+      <div style={{ marginTop: '14px', fontSize: '15px', lineHeight: 1.6, color: '#64748b' }}>
+        * Final price depends on scope, usage rights, placement, etc. These numbers are intended as a range, not one fixed quote.
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '30px', padding: '30px 32px', backgroundColor: '#f8fafc' }}>
           <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Audience Snapshot</div>
-          <div style={{ marginTop: '16px', fontSize: '18px', color: '#334155', lineHeight: 1.7 }}>
-            Sponsor placements are priced for a {rateCard.niche || 'targeted'} audience with current channel momentum and creator-led integrations designed to feel native on-platform.
-          </div>
           <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Primary Deliverable</div>
-              <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>YouTube Sponsorship</div>
+            <div style={{ display: 'grid', gap: '14px' }}>
+              <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Gender Split</div>
+                <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>{audienceSnapshot.genderSplit}</div>
+              </div>
+              <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>US / UK / CA / AU Audience</div>
+                <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>{audienceSnapshot.usUkCaAuAudience}</div>
+              </div>
             </div>
-            <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Placement Style</div>
-              <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>Host-Read</div>
+            <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+              <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Age Group Breakdown</div>
+              <div style={{ marginTop: '16px', display: 'grid', gap: '10px' }}>
+                {audienceSnapshot.ageGroupBreakdown.length > 0 ? (
+                  audienceSnapshot.ageGroupBreakdown.map((group) => (
+                    <div key={group.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '15px', lineHeight: 1.35 }}>
+                      <span style={{ color: group.isDominant ? '#0f172a' : '#64748b', fontWeight: group.isDominant ? 700 : 500 }}>{group.label}</span>
+                      <span style={{ fontWeight: group.isDominant ? 800 : 700, color: '#0f172a' }}>{group.value}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '15px', color: '#64748b' }}>Not available</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -783,25 +882,6 @@ function ExportRateCardContent({
       <div style={{ marginTop: '28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
           <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-            Package Deals
-          </div>
-          <div style={{ marginTop: '18px' }}>
-            {exportBundles.map((bundle) => (
-              <div key={bundle.label} style={{ marginTop: '18px', paddingTop: '18px', borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', alignItems: 'baseline' }}>
-                  <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>{bundle.label}</div>
-                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#dc2626' }}>{bundle.value}</div>
-                </div>
-                <div style={{ marginTop: '8px', fontSize: '17px', color: '#64748b', lineHeight: 1.6 }}>
-                  {bundle.description}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
-          <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
             Add-Ons
           </div>
           <div style={{ marginTop: '18px' }}>
@@ -809,6 +889,20 @@ function ExportRateCardContent({
               <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '14px 0', borderTop: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: '18px', color: '#0f172a' }}>{item.label}</div>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
+          <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+            Performance
+          </div>
+          <div style={{ marginTop: '18px' }}>
+            {(performanceSnapshot.length > 0 ? performanceSnapshot : [{ label: 'Performance Snapshot', value: 'Available upon request' }]).map((item) => (
+              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '14px 0', borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '18px', color: '#0f172a' }}>{item.label}</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>{item.value}</div>
               </div>
             ))}
           </div>
