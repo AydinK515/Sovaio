@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
 import { strFromU8, unzipSync } from 'fflate'
@@ -38,6 +38,7 @@ export default function GeneratePage() {
   const [subscriberCount, setSubscriberCount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState('')
 
@@ -47,19 +48,52 @@ export default function GeneratePage() {
     let score = 0
     const types = parsedFiles.map(f => f.type)
     if (types.includes('content')) score += 35
-    if (types.includes('audience_growth')) score += 25
+    if (types.includes('geography')) score += 30
     if (types.includes('demographics')) score += 20
-    if (types.includes('geography')) score += 10
-    if (types.includes('traffic_sources')) score += 10
+    if (types.includes('audience_growth')) score += 10
+    if (types.includes('traffic_sources')) score += 5
     return score
   })()
 
-  const hasRequiredTypes = ['content', 'audience_growth'].every(t => parsedFiles.some(f => f.type === t))
-  const missingRequired = (['content', 'audience_growth'] as const).filter(t => !parsedFiles.some(f => f.type === t))
+  const hasRequiredTypes = ['content', 'geography'].every(t => parsedFiles.some(f => f.type === t))
+  const missingRequired = (['content', 'geography'] as const).filter(t => !parsedFiles.some(f => f.type === t))
 
   const confidenceLabel = confidence < 40 ? 'Low' : confidence < 70 ? 'Medium' : 'High'
   const confidenceColor = confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
   const barColor = confidence < 40 ? 'bg-primary' : confidence < 70 ? 'bg-warning' : 'bg-success'
+  const currentLoadingStep = Math.max(LOADING_MESSAGES.indexOf(loadingMessage), 0)
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingProgress(0)
+      setLoadingMessage('')
+      return
+    }
+
+    setLoadingMessage(LOADING_MESSAGES[0])
+    setLoadingProgress(7)
+
+    let messageIndex = 0
+    const messageInterval = window.setInterval(() => {
+      messageIndex = (messageIndex + 1) % LOADING_MESSAGES.length
+      setLoadingMessage(LOADING_MESSAGES[messageIndex])
+    }, 2600)
+
+    const progressInterval = window.setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 94) return prev
+        if (prev < 28) return Math.min(prev + 5 + Math.random() * 7, 94)
+        if (prev < 58) return Math.min(prev + 2.5 + Math.random() * 4.5, 94)
+        if (prev < 82) return Math.min(prev + 1.2 + Math.random() * 2.8, 94)
+        return Math.min(prev + 0.4 + Math.random() * 1.4, 94)
+      })
+    }, 700)
+
+    return () => {
+      window.clearInterval(messageInterval)
+      window.clearInterval(progressInterval)
+    }
+  }, [loading])
 
   function detectCsvType(headers: string[], fileName: string): string | null {
     const h = headers.map(s => s.toLowerCase().trim())
@@ -265,14 +299,6 @@ export default function GeneratePage() {
     setLoading(true)
     setError('')
 
-    // Rotate loading messages
-    let msgIndex = 0
-    setLoadingMessage(LOADING_MESSAGES[0])
-    const interval = setInterval(() => {
-      msgIndex = (msgIndex + 1) % LOADING_MESSAGES.length
-      setLoadingMessage(LOADING_MESSAGES[msgIndex])
-    }, 2500)
-
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -342,7 +368,7 @@ export default function GeneratePage() {
 
       if (rcError) throw rcError
 
-      clearInterval(interval)
+      setLoadingProgress(100)
 
       // Update profile
       await supabase.from('profiles').update({
@@ -352,9 +378,10 @@ export default function GeneratePage() {
         generations_used: (await supabase.from('rate_cards').select('id').eq('user_id', user.id)).data?.length || 1,
       }).eq('id', user.id)
 
-      router.push(`/rate-card/${rateCard.id}`)
+      setTimeout(() => {
+        router.push(`/rate-card/${rateCard.id}`)
+      }, 220)
     } catch (err: unknown) {
-      clearInterval(interval)
       setLoading(false)
       setError(err instanceof Error ? err.message : 'Something went wrong')
     }
@@ -363,17 +390,107 @@ export default function GeneratePage() {
   // Full-page loading state
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8">
-            <Sparkles className="w-10 h-10 text-primary animate-pulse" />
+      <div className="fixed inset-0 z-50 overflow-hidden bg-[radial-gradient(circle_at_top,#fef3c7_0%,#fff8eb_28%,#fff_68%)]">
+        <div className="absolute inset-0 opacity-60">
+          <div className="absolute left-[10%] top-[14%] h-40 w-40 rounded-full bg-primary/12 blur-3xl animate-pulse" />
+          <div className="absolute right-[12%] top-[24%] h-52 w-52 rounded-full bg-amber-200/50 blur-3xl animate-pulse" style={{ animationDelay: '900ms' }} />
+          <div className="absolute bottom-[12%] left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-secondary/10 blur-3xl animate-pulse" style={{ animationDelay: '1400ms' }} />
+        </div>
+
+        <div className="relative flex h-full items-center justify-center px-4">
+          <div className="w-full max-w-2xl rounded-[32px] border border-white/70 bg-white/85 p-8 shadow-[0_24px_120px_rgba(15,23,42,0.12)] backdrop-blur-xl md:p-10">
+            <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-primary-light px-4 py-2 text-xs font-medium text-primary">
+              <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+              AI pricing analysis in progress
+            </div>
+
+            <div className="relative mx-auto mt-8 flex h-28 w-28 items-center justify-center">
+              <div className="absolute inset-0 rounded-full border border-primary/15" />
+              <div className="absolute inset-2 rounded-full border-2 border-dashed border-primary/20 animate-spin" style={{ animationDuration: '14s' }} />
+              <div className="absolute inset-5 rounded-full bg-[conic-gradient(from_220deg,rgba(245,158,11,0.18),rgba(234,88,12,0.55),rgba(251,191,36,0.18))] blur-[1px] animate-spin" style={{ animationDuration: '9s' }} />
+              <div className="absolute inset-[26px] rounded-full bg-white/95 shadow-inner" />
+              <Sparkles className="relative z-10 h-10 w-10 text-primary animate-pulse" />
+              <span className="absolute left-1/2 top-1.5 h-3 w-3 -translate-x-1/2 rounded-full bg-secondary shadow-[0_0_18px_rgba(234,88,12,0.5)]" />
+              <span className="absolute bottom-3 left-3 h-2.5 w-2.5 rounded-full bg-amber-400 animate-bounce" style={{ animationDuration: '1.9s' }} />
+              <span className="absolute right-3 top-5 h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '250ms', animationDuration: '1.6s' }} />
+            </div>
+
+            <div className="mt-8 text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">Generating your rate card</h2>
+              <p className="mt-3 text-base text-muted">We&apos;re estimating sponsor pricing, pressure-testing the ranges, and writing your pitch email. This can take up to 30 seconds.</p>
+            </div>
+
+            <div className="mt-8">
+              <div className="mb-3 flex items-center justify-between text-xs font-medium uppercase tracking-[0.18em] text-muted">
+                <span>Estimated progress</span>
+                <span>{Math.round(loadingProgress)}%</span>
+              </div>
+              <div
+                className="relative h-3 overflow-hidden rounded-full bg-slate-200/80"
+                role="progressbar"
+                aria-label="Estimated rate card generation progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(loadingProgress)}
+              >
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-amber-400 to-secondary transition-[width] duration-700 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+                <div
+                  className="absolute inset-y-0 w-24 -skew-x-12 bg-white/40 blur-sm transition-[left] duration-700 ease-out"
+                  style={{ left: `calc(${Math.max(loadingProgress - 14, 0)}% - 2rem)` }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-border/70 bg-slate-50/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">Current step</p>
+                  <p className="mt-2 text-sm font-medium text-foreground transition-all duration-500" key={loadingMessage}>
+                    {loadingMessage}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2].map((dot) => (
+                    <span
+                      key={dot}
+                      className="h-2.5 w-2.5 rounded-full bg-primary/30 animate-bounce"
+                      style={{ animationDelay: `${dot * 160}ms`, animationDuration: '1.2s' }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {LOADING_MESSAGES.slice(0, 3).map((_, index) => {
+                  const isDone = currentLoadingStep > index
+                  const isActive = currentLoadingStep === index
+
+                  return (
+                    <div
+                      key={index}
+                      className={`rounded-2xl border px-3 py-3 text-left transition-all duration-500 ${
+                        isActive
+                          ? 'border-primary/40 bg-primary-light shadow-sm'
+                          : isDone
+                            ? 'border-emerald-200 bg-emerald-50'
+                            : 'border-border bg-white/70'
+                      }`}
+                    >
+                      <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted">Phase {index + 1}</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">
+                        {index === 0 && 'Data pass'}
+                        {index === 1 && 'Benchmarking'}
+                        {index === 2 && 'Final modeling'}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold mb-4">Generating Your Rate Card</h2>
-          <p className="text-muted mb-8 animate-fade-in" key={loadingMessage}>{loadingMessage}</p>
-          <div className="w-full bg-border rounded-full h-2 overflow-hidden">
-            <div className="bg-primary h-2 rounded-full animate-pulse" style={{ width: '60%' }} />
-          </div>
-          <p className="mt-4 text-xs text-muted">This usually takes about 10 seconds</p>
         </div>
       </div>
     )

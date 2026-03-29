@@ -344,6 +344,7 @@ export async function POST(req: Request) {
 
       if (rateCard) {
         const rc = rateCard as RateCard
+        const isProductExchangeZone = rc.integration_60s_low <= 150
         const rateCardLines = [
           `Creator's channel profile (from rate card):`,
           `- Niche: ${rc.niche ?? 'unknown'}`,
@@ -352,6 +353,14 @@ export async function POST(req: Request) {
           `- Market rate for 60-second integration: $${rc.integration_60s_low.toLocaleString()}–$${rc.integration_60s_high.toLocaleString()}`,
           `- Market rate for 30-second integration: $${rc.integration_30s_low.toLocaleString()}–$${rc.integration_30s_high.toLocaleString()}`,
           rc.explanation ? `- Rate card rationale: ${rc.explanation}` : null,
+          ``,
+          `Rate benchmarking context (use this to evaluate brand offers):`,
+          `- These rates were calculated using niche CPM tiers, geography multipliers, median view volume, and sponsorship history.`,
+          `- A brand offer below the low end of the creator's market rate range is a low-ball — advise the creator accordingly.`,
+          `- A brand offer at or above the high end is a strong offer — the creator may not need to push hard.`,
+          `- The creator's ask price is their opening position, not necessarily their floor.`,
+          `- When a brand counters, calculate whether it's closer to the low or high end of the market range before advising.`,
+          isProductExchangeZone ? `- Important: this channel's rates are in the product-exchange zone. At this view volume, most brands offer product gifting rather than cash payment. If a brand proposes product exchange, that is a realistic and potentially valuable outcome — advise the creator accordingly rather than treating it as a low-ball.` : null,
         ].filter(Boolean).join('\n')
 
         const csvUploadIds: string[] = Array.isArray(rc.csv_upload_ids) ? rc.csv_upload_ids : []

@@ -19,6 +19,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
   const [creatorAsk, setCreatorAsk] = useState('')
   const [creatingDeal, setCreatingDeal] = useState(false)
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
+  const [expandedRangeInfo, setExpandedRangeInfo] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s' | null>(null)
 
   const [supabase] = useState(() => createClient())
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -33,6 +34,39 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
 
     return () => { cancelled = true }
   }, [profile?.avatar_path, supabase])
+
+  const liveRateTiers = [
+    {
+      id: 'dedicated_video' as const,
+      tier: 'Tier 01',
+      title: 'Dedicated Video',
+      range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
+      badge: 'Premium Placement',
+      badgeClassName: 'text-primary',
+      icon: Sparkles,
+      explanation: 'This is your expected pricing band for a full sponsor-focused video, not one exact price. The low end fits shorter or simpler dedicated deliverables, while the high end fits bigger asks like longer videos, heavier scripting, more revisions, or deeper brand integration. Dedicated video ranges are usually the widest because total workload changes a lot depending on video length and production scope.',
+    },
+    {
+      id: 'integration_60s' as const,
+      tier: 'Tier 02',
+      title: '60-Second Integration',
+      range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
+      badge: 'Optimal ROI',
+      badgeClassName: 'text-success',
+      icon: Check,
+      explanation: 'This range is your likely quote band for a standard one-minute in-video sponsor segment. The lower end is for straightforward placements with lighter creative demands, while the upper end fits stronger audience quality, better geography, or campaigns that need more polish, brand talking points, or a better slot in the video.',
+    },
+    {
+      id: 'integration_30s' as const,
+      tier: 'Tier 03',
+      title: '30-Second Integration',
+      range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
+      badge: 'Quick Turnaround',
+      badgeClassName: 'text-muted',
+      icon: TrendingUp,
+      explanation: 'This range covers shorter sponsor mentions that still benefit from your audience trust and delivery style. The low end works for lighter, test-budget campaigns, while the high end fits stronger-performing videos, better placement, or brands that want a tighter, more polished mention without paying for a full 60-second read.',
+    },
+  ]
 
   async function copyEmail() {
     await navigator.clipboard.writeText(rateCard.pitch_email || '')
@@ -415,38 +449,66 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           Based on your latest channel performance, audience demographics, and current market demand for {rateCard.niche}.
         </p>
 
+        {/* Low-volume advisory — shown when 60s rate implies avg views are too small for real deals */}
+        {rateCard.integration_60s_low <= 25 && (
+          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5">
+            <p className="text-sm font-semibold text-amber-800">At your current view level, most brands won&apos;t engage for paid deals yet.</p>
+            <p className="mt-1.5 text-sm text-amber-700 leading-relaxed">
+              Your calculated rates reflect genuine market value, but deals this size rarely clear a brand&apos;s minimum budget threshold — which means your outreach will mostly go unanswered. The highest-leverage move right now is growing your average views per video. Focus on publishing consistency, strong titles and thumbnails, and going deeper into your niche to build the audience density that unlocks real sponsorship conversations.
+            </p>
+          </div>
+        )}
+
         {/* Rate Tiers */}
         <div className="mt-8 grid sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-border p-6">
-            <p className="text-xs font-mono text-muted uppercase">Tier 01</p>
-            <h3 className="mt-1 text-lg font-semibold">Dedicated Video</h3>
-            <p className="mt-3 text-3xl md:text-4xl font-bold text-primary">
-              {formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)}
-            </p>
-            <p className="mt-2 text-xs text-muted flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Premium Placement
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border border-border p-6">
-            <p className="text-xs font-mono text-muted uppercase">Tier 02</p>
-            <h3 className="mt-1 text-lg font-semibold">60-Second Integration</h3>
-            <p className="mt-3 text-3xl md:text-4xl font-bold">
-              {formatCurrency(rateCard.integration_60s_low)} - {formatCurrency(rateCard.integration_60s_high)}
-            </p>
-            <p className="mt-2 text-xs text-success flex items-center gap-1">
-              <Check className="w-3 h-3" /> Optimal ROI
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border border-border p-6">
-            <p className="text-xs font-mono text-muted uppercase">Tier 03</p>
-            <h3 className="mt-1 text-lg font-semibold">30-Second Integration</h3>
-            <p className="mt-3 text-3xl md:text-4xl font-bold">
-              {formatCurrency(rateCard.integration_30s_low)} - {formatCurrency(rateCard.integration_30s_high)}
-            </p>
-            <p className="mt-2 text-xs text-muted flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> Quick Turnaround
-            </p>
-          </div>
+          {liveRateTiers.map((tier) => {
+            const isOpen = expandedRangeInfo === tier.id
+            const Icon = tier.icon
+
+            return (
+              <div
+                key={tier.id}
+                className={`relative overflow-visible rounded-2xl border border-border bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
+                  isOpen ? 'z-30' : 'z-0 hover:z-10'
+                }`}
+              >
+                <p className="text-xs font-mono text-muted uppercase">{tier.tier}</p>
+                <h3 className="mt-1 text-lg font-semibold">{tier.title}</h3>
+                <p className={`mt-3 text-3xl md:text-4xl font-bold ${tier.id === 'dedicated_video' ? 'text-primary' : ''}`}>
+                  {tier.range}
+                </p>
+                <p className={`mt-2 text-xs flex items-center gap-1 ${tier.badgeClassName}`}>
+                  <Icon className="w-3 h-3" /> {tier.badge}
+                </p>
+
+                <div className="relative mt-4 inline-block">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedRangeInfo(isOpen ? null : tier.id)}
+                    aria-expanded={isOpen}
+                    aria-controls={`range-info-${tier.id}`}
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-slate-50 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-slate-100"
+                  >
+                    What does this range mean?
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <div
+                    id={`range-info-${tier.id}`}
+                    className={`pointer-events-none absolute top-full z-20 mt-3 w-[26rem] max-w-[calc(100vw-3rem)] transition-all duration-200 ease-out ${
+                      tier.id === 'integration_30s' ? 'left-0 right-auto sm:left-auto sm:right-0' : 'left-0 right-auto'
+                    } ${
+                      isOpen ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+                    }`}
+                  >
+                    <div className="rounded-2xl border border-primary/10 bg-primary-light/95 p-4 text-sm leading-relaxed text-muted shadow-[0_18px_50px_rgba(15,23,42,0.14)] backdrop-blur-sm">
+                      {tier.explanation}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Why This Rate */}

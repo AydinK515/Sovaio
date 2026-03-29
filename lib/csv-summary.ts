@@ -15,10 +15,15 @@ export function buildCsvSummary(csvData: Record<string, Record<string, unknown>[
       .map(row => toNumber(row['Impressions click-through rate (%)'] ?? row['impressions click-through rate (%)']))
       .filter(value => value > 0)
 
+    const viewCounts = rows.map(row => toNumber(row['Views'] ?? row['views']))
     const avgViews = rows.length > 0 ? Math.round(totalViews / rows.length) : 0
+    const medianViews = medianOfSorted(viewCounts)
+    const outlierSkew = rows.length >= 3 && avgViews > medianViews * 2
     const avgWatchHoursPerVideo = rows.length > 0 ? (totalWatchHours / rows.length).toFixed(1) : '0'
     const avgCtr = ctrValues.length > 0 ? (ctrValues.reduce((sum, v) => sum + v, 0) / ctrValues.length).toFixed(1) : null
     const avgImpressions = totalImpressions > 0 && rows.length > 0 ? Math.round(totalImpressions / rows.length) : null
+    // Subscriber gain per view: proxy for audience engagement quality (no video length in CSV so true retention % is unavailable)
+    const subsPerView = totalViews > 0 ? (totalSubscribersGained / totalViews) : null
 
     const topVideo = rows.reduce<Record<string, unknown> | null>((best, row) => {
       if (!best) return row
@@ -26,7 +31,7 @@ export function buildCsvSummary(csvData: Record<string, Record<string, unknown>[
     }, null)
 
     parts.push(
-      `Content performance (${rows.length} videos): avg ${avgViews.toLocaleString()} views/video, avg ${avgWatchHoursPerVideo}h watch time/video, ${Math.round(totalWatchHours).toLocaleString()} total watch hours, ${totalSubscribersGained.toLocaleString()} subscribers gained${avgCtr ? `, avg CTR ${avgCtr}%` : ''}${avgImpressions ? `, avg ${avgImpressions.toLocaleString()} impressions/video` : ''}.`
+      `Content performance (${rows.length} videos): median ${medianViews.toLocaleString()} views/video${outlierSkew ? ` (avg ${avgViews.toLocaleString()} — skewed high by outlier, use median for rate calc)` : `, avg ${avgViews.toLocaleString()}`}, avg ${avgWatchHoursPerVideo}h watch time/video, ${Math.round(totalWatchHours).toLocaleString()} total watch hours, ${totalSubscribersGained.toLocaleString()} subscribers gained${avgCtr ? `, avg CTR ${avgCtr}%` : ''}${avgImpressions ? `, avg ${avgImpressions.toLocaleString()} impressions/video` : ''}${subsPerView !== null ? `, ${subsPerView.toFixed(4)} subs gained per view` : ''}.`
     )
 
     if (topVideo) {
@@ -183,6 +188,13 @@ export function toNumber(value: unknown): number {
   const normalized = value.replace(/[$,%\s]/g, '').replace(/,/g, '')
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function medianOfSorted(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2)
 }
 
 function summarizeRow(row: Record<string, unknown>) {
