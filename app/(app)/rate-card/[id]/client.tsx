@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
@@ -11,6 +11,7 @@ import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, Ima
 export default function RateCardClient({ rateCard, profile }: { rateCard: RateCard; profile: Profile | null }) {
   const router = useRouter()
   const exportRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [brandName, setBrandName] = useState('')
   const [showDealModal, setShowDealModal] = useState(false)
@@ -34,6 +35,24 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
 
     return () => { cancelled = true }
   }, [profile?.avatar_path, supabase])
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (!(target instanceof Element)) return
+
+      if (!target.closest('[data-range-info-root]')) {
+        setExpandedRangeInfo(null)
+      }
+
+      if (!target.closest('[data-download-root]')) {
+        setShowDownloadMenu(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
 
   const liveRateTiers = [
     {
@@ -251,188 +270,19 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
   ]
 
   return (
-    <div className="py-8">
+    <div ref={pageRef} className="py-8">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] opacity-0"
       >
-        <div
-          ref={exportRef}
-          style={{
-            width: 1400,
-            backgroundColor: '#ffffff',
-            color: '#0f172a',
-            padding: '56px',
-            fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
-            <div>
-              <h1 style={{ margin: '0', fontSize: '72px', lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', maxWidth: '760px' }}>
-                Sponsorship
-                <br />
-                Rate Card
-              </h1>
-            </div>
-            {(avatarUrl || profile?.channel_name) && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 28px' }}>
-                {avatarUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrl}
-                    alt={profile?.channel_name ?? 'Channel avatar'}
-                    style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-                    crossOrigin="anonymous"
-                  />
-                )}
-                {profile?.channel_name && (
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {profile.channel_name}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px' }}>
-            {[
-              { value: rateCard.subscriber_count ? rateCard.subscriber_count.toLocaleString() : 'N/A', label: 'Subscribers' },
-              { value: rateCard.niche || 'General', label: 'Category' },
-              { value: 'Brand integrations', label: 'Media Type' },
-              { value: 'USD', label: 'Currency' },
-            ].map((item) => (
-              <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 22px', backgroundColor: '#ffffff' }}>
-                <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {item.label}
-                </div>
-                <div style={{ marginTop: '10px', fontSize: '28px', fontWeight: 700, lineHeight: 1.2 }}>
-                  {item.value}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginTop: '38px', fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
-            Core Rates
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px', marginTop: '16px' }}>
-            {[
-              {
-                label: 'Dedicated Video',
-                range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
-                note: 'Brand-led feature',
-                accent: '#dc2626',
-                description: 'Includes full-video integration, dedicated CTA, and sponsor-first positioning.',
-              },
-              {
-                label: '60-Second Integration',
-                range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
-                note: 'Mid-roll placement',
-                accent: '#16a34a',
-                description: 'Includes in-video talking points, natural script fit, and clickable callout.',
-              },
-              {
-                label: '30-Second Integration',
-                range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
-                note: 'Efficient awareness slot',
-                accent: '#64748b',
-                description: 'Best for lighter tests, launches, and repeat campaign exposure.',
-              },
-            ].map((tier) => (
-              <div key={tier.label} style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px', backgroundColor: '#ffffff' }}>
-                <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tier.label}</div>
-                <div style={{ marginTop: '18px', fontSize: '46px', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.05em', color: '#0f172a' }}>
-                  {tier.range}
-                </div>
-                <div style={{ marginTop: '16px', fontSize: '15px', color: tier.accent, fontWeight: 600 }}>
-                  {tier.note}
-                </div>
-                <div style={{ marginTop: '10px', fontSize: '16px', lineHeight: 1.55, color: '#64748b' }}>
-                  {tier.description}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '30px', padding: '30px 32px', backgroundColor: '#f8fafc' }}>
-              <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Audience Snapshot</div>
-              <div style={{ marginTop: '16px', fontSize: '18px', color: '#334155', lineHeight: 1.7 }}>
-                Sponsor placements are priced for a {rateCard.niche || 'targeted'} audience with current channel momentum and creator-led integrations designed to feel native on-platform.
-              </div>
-              <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Primary Deliverable</div>
-                  <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>YouTube Sponsorship</div>
-                </div>
-                <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Placement Style</div>
-                  <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>Host-Read</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ borderRadius: '30px', padding: '30px 30px 32px', backgroundColor: '#0f172a', color: '#ffffff' }}>
-              <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>What&apos;s Included</div>
-              <div style={{ marginTop: '18px', fontSize: '18px', lineHeight: 1.8, color: 'rgba(255,255,255,0.92)' }}>
-                <div>- Sponsored segment tailored to the video format</div>
-                <div>- Brand mention plus spoken call-to-action</div>
-                <div>- Link placement in the description when applicable</div>
-                <div>- Creative alignment before final recording</div>
-                <div>- Standard performance-friendly integration style</div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-                Package Deals
-              </div>
-              <div style={{ marginTop: '18px' }}>
-                {exportBundles.map((bundle) => (
-                  <div key={bundle.label} style={{ marginTop: '18px', paddingTop: '18px', borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', alignItems: 'baseline' }}>
-                      <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>{bundle.label}</div>
-                      <div style={{ fontSize: '26px', fontWeight: 700, color: '#dc2626' }}>{bundle.value}</div>
-                    </div>
-                    <div style={{ marginTop: '8px', fontSize: '17px', color: '#64748b', lineHeight: 1.6 }}>
-                      {bundle.description}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
-              <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-                Add-Ons
-              </div>
-              <div style={{ marginTop: '18px' }}>
-                {exportAddOns.map((item) => (
-                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '14px 0', borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '18px', color: '#0f172a' }}>{item.label}</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{item.value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '26px', borderRadius: '28px', padding: '24px 28px', backgroundColor: '#fef2f2', border: '1px solid rgba(220, 38, 38, 0.12)' }}>
-            <div style={{ fontSize: '14px', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>
-              Notes
-            </div>
-            <div style={{ marginTop: '12px', fontSize: '17px', color: '#64748b', lineHeight: 1.7 }}>
-              - Rates are quoted in USD and reflect current channel positioning.
-              <br />
-              - Final campaign scope, revisions, usage, and timelines are confirmed in writing before production.
-              <br />
-              - Additional deliverables, extended licensing, or rush timelines are quoted separately.
-            </div>
-          </div>
-        </div>
+        <ExportRateCardContent
+          containerRef={exportRef}
+          rateCard={rateCard}
+          profile={profile}
+          avatarUrl={avatarUrl}
+          exportAddOns={exportAddOns}
+          exportBundles={exportBundles}
+        />
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
@@ -481,7 +331,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
                   <Icon className="w-3 h-3" /> {tier.badge}
                 </p>
 
-                <div className="relative mt-4 inline-block">
+                <div data-range-info-root className="relative mt-4 inline-block">
                   <button
                     type="button"
                     onClick={() => setExpandedRangeInfo(isOpen ? null : tier.id)}
@@ -575,7 +425,7 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
 
       {/* Actions */}
       <div className="mt-8 flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+        <div data-download-root className="relative flex-1">
           <button
             onClick={() => setShowDownloadMenu(prev => !prev)}
             disabled={downloadingFormat !== null}
@@ -612,6 +462,47 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
           <FileText className="w-5 h-5" />
           Start Tracking This Deal
         </button>
+      </div>
+
+      <div className="mt-8 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Download Preview</h2>
+            <p className="mt-1 text-sm text-muted">This is the exact rate card layout used for your PNG and PDF downloads.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => handleDownload('png')}
+              disabled={downloadingFormat !== null}
+              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
+            >
+              <ImageIcon className="w-4 h-4 text-primary" />
+              {downloadingFormat === 'png' ? 'Downloading PNG...' : 'Download PNG'}
+            </button>
+            <button
+              onClick={() => handleDownload('pdf')}
+              disabled={downloadingFormat !== null}
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+            >
+              <FileDown className="w-4 h-4" />
+              {downloadingFormat === 'pdf' ? 'Downloading PDF...' : 'Download PDF'}
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[32px] border border-border bg-slate-100 p-3 md:p-5">
+          <div className="overflow-x-auto">
+            <div className="min-w-[1100px] origin-top-left scale-[0.34] sm:scale-[0.5] lg:scale-[0.72]" style={{ width: '1400px', marginBottom: '-58%' }}>
+              <ExportRateCardContent
+                rateCard={rateCard}
+                profile={profile}
+                avatarUrl={avatarUrl}
+                exportAddOns={exportAddOns}
+                exportBundles={exportBundles}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Deal creation modal */}
@@ -672,4 +563,200 @@ export default function RateCardClient({ rateCard, profile }: { rateCard: RateCa
 
 function downloadFormatLabel(format: 'png' | 'pdf') {
   return format.toUpperCase()
+}
+
+function ExportRateCardContent({
+  rateCard,
+  profile,
+  avatarUrl,
+  exportAddOns,
+  exportBundles,
+  containerRef,
+}: {
+  rateCard: RateCard
+  profile: Profile | null
+  avatarUrl: string | null
+  exportAddOns: { label: string; value: string }[]
+  exportBundles: { label: string; value: string; description: string }[]
+  containerRef?: RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: 1400,
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        padding: '56px',
+        fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
+        <div>
+          <h1 style={{ margin: '0', fontSize: '72px', lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', maxWidth: '760px' }}>
+            Sponsorship
+            <br />
+            Rate Card
+          </h1>
+        </div>
+        {(avatarUrl || profile?.channel_name) && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 28px' }}>
+            {avatarUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt={profile?.channel_name ?? 'Channel avatar'}
+                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                crossOrigin="anonymous"
+              />
+            )}
+            {profile?.channel_name && (
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                {profile.channel_name}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px' }}>
+        {[
+          { value: rateCard.subscriber_count ? rateCard.subscriber_count.toLocaleString() : 'N/A', label: 'Subscribers' },
+          { value: rateCard.niche || 'General', label: 'Category' },
+          { value: 'Brand integrations', label: 'Media Type' },
+          { value: 'USD', label: 'Currency' },
+        ].map((item) => (
+          <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 22px', backgroundColor: '#ffffff' }}>
+            <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              {item.label}
+            </div>
+            <div style={{ marginTop: '10px', fontSize: '28px', fontWeight: 700, lineHeight: 1.2 }}>
+              {item.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: '38px', fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+        Core Rates
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px', marginTop: '16px' }}>
+        {[
+          {
+            label: 'Dedicated Video',
+            range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
+            note: 'Brand-led feature',
+            accent: '#dc2626',
+            description: 'Includes full-video integration, dedicated CTA, and sponsor-first positioning.',
+          },
+          {
+            label: '60-Second Integration',
+            range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
+            note: 'Mid-roll placement',
+            accent: '#16a34a',
+            description: 'Includes in-video talking points, natural script fit, and clickable callout.',
+          },
+          {
+            label: '30-Second Integration',
+            range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
+            note: 'Efficient awareness slot',
+            accent: '#64748b',
+            description: 'Best for lighter tests, launches, and repeat campaign exposure.',
+          },
+        ].map((tier) => (
+          <div key={tier.label} style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px', backgroundColor: '#ffffff' }}>
+            <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tier.label}</div>
+            <div style={{ marginTop: '18px', fontSize: '46px', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.05em', color: '#0f172a' }}>
+              {tier.range}
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '15px', color: tier.accent, fontWeight: 600 }}>
+              {tier.note}
+            </div>
+            <div style={{ marginTop: '10px', fontSize: '16px', lineHeight: 1.55, color: '#64748b' }}>
+              {tier.description}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '30px', padding: '30px 32px', backgroundColor: '#f8fafc' }}>
+          <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Audience Snapshot</div>
+          <div style={{ marginTop: '16px', fontSize: '18px', color: '#334155', lineHeight: 1.7 }}>
+            Sponsor placements are priced for a {rateCard.niche || 'targeted'} audience with current channel momentum and creator-led integrations designed to feel native on-platform.
+          </div>
+          <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Primary Deliverable</div>
+              <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>YouTube Sponsorship</div>
+            </div>
+            <div style={{ borderRadius: '20px', backgroundColor: '#ffffff', padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Placement Style</div>
+              <div style={{ marginTop: '8px', fontSize: '20px', fontWeight: 700 }}>Host-Read</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ borderRadius: '30px', padding: '30px 30px 32px', backgroundColor: '#0f172a', color: '#ffffff' }}>
+          <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>What&apos;s Included</div>
+          <div style={{ marginTop: '18px', fontSize: '18px', lineHeight: 1.8, color: 'rgba(255,255,255,0.92)' }}>
+            <div>- Sponsored segment tailored to the video format</div>
+            <div>- Brand mention plus spoken call-to-action</div>
+            <div>- Link placement in the description when applicable</div>
+            <div>- Creative alignment before final recording</div>
+            <div>- Standard performance-friendly integration style</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
+          <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+            Package Deals
+          </div>
+          <div style={{ marginTop: '18px' }}>
+            {exportBundles.map((bundle) => (
+              <div key={bundle.label} style={{ marginTop: '18px', paddingTop: '18px', borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', alignItems: 'baseline' }}>
+                  <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>{bundle.label}</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#dc2626' }}>{bundle.value}</div>
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '17px', color: '#64748b', lineHeight: 1.6 }}>
+                  {bundle.description}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px 30px', backgroundColor: '#ffffff' }}>
+          <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+            Add-Ons
+          </div>
+          <div style={{ marginTop: '18px' }}>
+            {exportAddOns.map((item) => (
+              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '14px 0', borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '18px', color: '#0f172a' }}>{item.label}</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '26px', borderRadius: '28px', padding: '24px 28px', backgroundColor: '#fef2f2', border: '1px solid rgba(220, 38, 38, 0.12)' }}>
+        <div style={{ fontSize: '14px', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>
+          Notes
+        </div>
+        <div style={{ marginTop: '12px', fontSize: '17px', color: '#64748b', lineHeight: 1.7 }}>
+          - Rates are quoted in USD and reflect current channel positioning.
+          <br />
+          - Final campaign scope, revisions, usage, and timelines are confirmed in writing before production.
+          <br />
+          - Additional deliverables, extended licensing, or rush timelines are quoted separately.
+        </div>
+      </div>
+    </div>
+  )
 }
