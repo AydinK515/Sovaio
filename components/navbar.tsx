@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X, Sparkles } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 
 export function MarketingNav() {
   const [open, setOpen] = useState(false)
@@ -75,13 +75,6 @@ export function AppNav() {
                 {l.label}
               </Link>
             ))}
-            <Link
-              href="/generate"
-              className="inline-flex items-center gap-2 bg-primary text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
-            >
-              <Sparkles className="w-4 h-4" />
-              Get My Rate
-            </Link>
           </div>
 
           <button className="md:hidden" onClick={() => setOpen(!open)}>

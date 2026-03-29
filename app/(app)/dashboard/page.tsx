@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, ArrowRight, Upload, BookOpen, TrendingUp, DollarSign, BarChart3, FileStack } from 'lucide-react'
+import { ArrowRight, Upload, BookOpen, DollarSign, BarChart3, FileStack } from 'lucide-react'
 import type { RateCard, Deal } from '@/lib/types'
 import { formatDealTarget } from '@/lib/deal-chat'
 
@@ -50,8 +50,19 @@ export default async function DashboardPage() {
   const hasRateCards = rateCards && rateCards.length > 0
   const hasDeals = deals && deals.length > 0
   const activeDeals = deals?.filter(d => d.status === 'negotiating') || []
+  const activeDealCount = activeDeals.length
   const totalPipeline = deals?.filter(d => d.status === 'negotiating').reduce((sum, d) => sum + (d.creator_ask || 0), 0) || 0
   const rateCardById = new Map((rateCards || []).map(rateCard => [rateCard.id, rateCard]))
+  const sortedDeals = [...(deals || [])].sort((a, b) => {
+    const aIsArchived = a.status !== 'negotiating'
+    const bIsArchived = b.status !== 'negotiating'
+
+    if (aIsArchived !== bIsArchived) {
+      return aIsArchived ? 1 : -1
+    }
+
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  })
   const avgRateIncrease = hasRateCards ? '+42%' : '—'
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
@@ -75,13 +86,13 @@ export default async function DashboardPage() {
               Go to <a href="https://studio.youtube.com/channel/UC/analytics" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">YouTube Studio Analytics</a>, switch to Advanced Mode, and export your data as CSVs.
             </p>
             <div className="mt-4 space-y-2 text-sm text-muted">
-              <p>You&apos;ll need exports from:</p>
+              <p>You&apos;ll want these YouTube Studio exports:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li><strong>Content</strong> (Top videos) — <span className="text-primary">Required</span></li>
-                <li>Demographics (Age & Gender)</li>
-                <li>Geography (Viewer locations)</li>
-                <li>Traffic Sources</li>
-                <li>Retention</li>
+                <li><strong>Geography</strong> <span className="text-primary">(Required)</span></li>
+                <li><strong>Demographics</strong> <span className="text-muted">(Optional)</span></li>
+                <li><strong>Audience Size &amp; Growth</strong> <span className="text-muted">(Optional)</span></li>
+                <li><strong>Traffic Sources</strong> <span className="text-muted">(Optional)</span></li>
               </ul>
             </div>
           </div>
@@ -125,7 +136,7 @@ export default async function DashboardPage() {
   // User has rate cards and/or deals
   return (
     <div className="py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+      <div className="mb-8">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Hi, {firstName}</h1>
           {activeDeals.length > 0 && (
@@ -134,13 +145,6 @@ export default async function DashboardPage() {
             </p>
           )}
         </div>
-        <Link
-          href="/generate"
-          className="inline-flex items-center gap-2 bg-primary text-white font-medium px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          New Rate Card
-        </Link>
       </div>
 
       {/* Stats */}
@@ -158,11 +162,9 @@ export default async function DashboardPage() {
           {totalPipeline > 0 && <p className="mt-1 text-xs text-success font-medium">In active negotiations</p>}
         </div>
         <div className="bg-white rounded-2xl border border-border p-6">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-muted" />
-            <p className="text-xs text-muted uppercase tracking-wider font-medium">Avg Rate Increase</p>
-          </div>
-          <p className="mt-2 text-3xl font-bold text-success">{avgRateIncrease}</p>
+          <p className="text-xs text-muted uppercase tracking-wider font-medium">Active Deals</p>
+          <p className="mt-2 text-3xl font-bold">{activeDealCount}</p>
+          {activeDealCount > 0 && <p className="mt-1 text-xs text-success font-medium">Live conversations in progress</p>}
         </div>
       </div>
 
@@ -182,7 +184,7 @@ export default async function DashboardPage() {
           <div className="divide-y divide-border">
             {rateCards!.slice(0, 3).map((rateCard: RateCard) => (
               <div key={rateCard.id} className="px-6 py-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium">{rateCard.niche || 'Untitled niche'}</h3>
                     <span className="inline-flex items-center rounded-full border border-border bg-muted-light px-2.5 py-1 text-xs text-muted">
@@ -190,10 +192,10 @@ export default async function DashboardPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-muted">
-                    {formatDate(rateCard.created_at)} - Dedicated {formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)}
+                    {formatDate(rateCard.created_at)}{rateCard.subscriber_count ? ` - ${rateCard.subscriber_count.toLocaleString()} subscribers` : ''}{rateCard.has_sponsorships ? ' - Has sponsorship history' : ''}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3 lg:shrink-0">
                   <Link
                     href={`/rate-card/${rateCard.id}`}
                     className="inline-flex items-center gap-1 text-primary text-sm font-medium hover:underline"
@@ -226,7 +228,7 @@ export default async function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {deals!.map((deal: Deal) => (
+                {sortedDeals.map((deal: Deal) => (
                   <tr key={deal.id} className="border-b border-border last:border-0 hover:bg-muted-light/50 transition-colors">
                     <td className="px-6 py-4 font-medium">{deal.brand_name}</td>
                     <td className="px-6 py-4"><StatusBadge status={deal.status} finalPrice={deal.final_price} /></td>

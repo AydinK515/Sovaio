@@ -129,19 +129,13 @@ export default async function RateCardsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 lg:shrink-0">
+              <div className="flex lg:shrink-0">
                 <Link
                   href={`/rate-card/${rateCard.id}`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-white px-5 py-3 text-sm font-medium hover:bg-primary-hover transition-colors"
                 >
                   Open Rate Card
                   <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  href="/generate"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-medium hover:bg-muted-light transition-colors"
-                >
-                  Generate New One
                 </Link>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { buildCsvSummary, toNumber } from '@/lib/csv-summary'
+import { createClient } from '@/lib/supabase-server'
 
 const RateCardSchema = z.object({
   dedicated_video_low: z.number().describe('Low end of dedicated video rate in USD'),
@@ -84,6 +85,62 @@ function getAccessibleCpmBand(niche: string, medianViews: number | null) {
   }
 }
 
+function getTopVideo(csvData: Record<string, Record<string, unknown>[]>) {
+  const rows = Array.isArray(csvData.content)
+    ? csvData.content.filter(row => String(row['Video title'] ?? '').trim() !== '').slice(0, 10)
+    : []
+
+  return rows.reduce<Record<string, unknown> | null>((best, row) => {
+    if (!best) return row
+    return toNumber(row['Views'] ?? row['views']) > toNumber(best['Views'] ?? best['views']) ? row : best
+  }, null)
+}
+
+function buildPitchEmailContext(input: {
+  channelName: string | null
+  creatorName: string | null
+  subscriberCount: number
+  medianViews: number | null
+  csvData: Record<string, Record<string, unknown>[]>
+}) {
+  const facts: string[] = []
+
+  if (input.channelName) {
+    facts.push(`- Actual channel name: ${input.channelName}`)
+  }
+
+  if (input.creatorName) {
+    facts.push(`- Actual creator name: ${input.creatorName}`)
+  }
+
+  facts.push(`- Subscriber count: ${input.subscriberCount.toLocaleString()}`)
+
+  if (input.medianViews != null) {
+    facts.push(`- Median views per recent video: ${input.medianViews.toLocaleString()}`)
+  }
+
+  const topVideo = getTopVideo(input.csvData)
+  if (topVideo) {
+    const topVideoTitle = String(topVideo['Video title'] ?? '').trim()
+    const topVideoViews = toNumber(topVideo['Views'] ?? topVideo['views'])
+    const topVideoCtr = toNumber(topVideo['Impressions click-through rate (%)'] ?? topVideo['impressions click-through rate (%)'])
+
+    if (topVideoTitle) {
+      facts.push(`- Strongest recent video title: "${topVideoTitle}"`)
+    }
+
+    if (topVideoViews > 0) {
+      facts.push(`- Strongest recent video views: ${topVideoViews.toLocaleString()}`)
+    }
+
+    if (topVideoCtr > 0) {
+      facts.push(`- Strongest recent video CTR: ${topVideoCtr}%`)
+    }
+  }
+
+  return facts.join('\n')
+}
+
 export async function POST(req: Request) {
   const { niche, subscriberCount, hasSponsorships, sponsorshipCount, avgDealAmount, csvData, confidence } = await req.json()
   const apiKey = process.env.OPENAI_API_KEY
@@ -93,9 +150,29 @@ export async function POST(req: Request) {
   }
 
   const openai = createOpenAI({ apiKey })
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, channel_name')
+    .eq('id', user.id)
+    .single()
+
   const csvSummary = buildCsvSummary(csvData)
   const medianViews = getMedianViews(csvData)
   const accessibleCpmBand = getAccessibleCpmBand(niche, medianViews)
+  const pitchEmailContext = buildPitchEmailContext({
+    channelName: profile?.channel_name ?? null,
+    creatorName: profile?.full_name ?? null,
+    subscriberCount,
+    medianViews,
+    csvData,
+  })
 
   const system = `You are RateProof AI, a data-driven YouTube sponsorship rate strategist.
 
@@ -188,6 +265,8 @@ Creator profile:
 
 ${csvSummary || 'No analytics data provided. Use niche, subscriber count, and sponsorship history only. Apply no geography premium, no retention bonus, and assume first-tier conservative estimates.'}
 
+${pitchEmailContext ? `Pitch email personalization data:\n${pitchEmailContext}` : ''}
+
 Instructions:
 - Follow the formula in order: niche CPM -> view tier (using median views) -> geography -> sponsorship history -> engagement quality.
 - Use the provided niche CPM baseline exactly as the starting band for your calculations.
@@ -201,7 +280,11 @@ For pitch_email:
 - Keep it concise and professional.
 - Look at all the data available and identify the single most impressive thing about this channel from a brand's perspective - whatever that actually is. Lead with that. It might be strong geography, high CTR, a loyal demographic, growing momentum, or view count if it's genuinely good. Pick the real standout and open with it.
 - Do not lead with a weak stat just to have something concrete. If nothing is clearly impressive, lead with the niche and audience fit instead.
-- Placeholders: [Your Channel Name], [Brand Name], [Contact Name], [Relevant Video or Series].`
+- Use the real channel name and real creator name whenever they are available in the provided data. Do not leave [Your Channel Name] or [Your Name] as placeholders if you know them.
+- Use actual video titles, channel stats, and audience numbers when they materially strengthen the pitch. Good examples include subscriber count, median views, top-video views, premium-country audience share, CTR, or audience demographic concentration.
+- If a concrete recent video title is available, prefer citing that exact title instead of using [Relevant Video or Series].
+- Keep placeholders only for information that is truly unknown or brand-specific, such as [Brand Name] or [Contact Name].
+- Do not invent achievements, campaigns, or stats that are not in the provided data.`
 
   console.log('\n=== generate-rate-card SYSTEM PROMPT ===\n', system, '\n=== USER PROMPT ===\n', prompt, '\n========================================\n')
 
