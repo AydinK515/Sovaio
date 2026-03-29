@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
@@ -7,6 +8,10 @@ import { strFromU8, unzipSync } from 'fflate'
 import { createClient } from '@/lib/supabase-browser'
 import { CSV_TYPES, NICHES } from '@/lib/types'
 import { Upload, CheckCircle2, Circle, ExternalLink, Sparkles, Info, X, FileText, BarChart3 } from 'lucide-react'
+import step1Image from '@/public/Step 1.jpg'
+import step2Image from '@/public/step 2.jpg'
+import step3Image from '@/public/Step 3.jpg'
+import step4Image from '@/public/Step 4.jpg'
 
 interface ParsedFile {
   type: string
@@ -31,6 +36,41 @@ const LOADING_PHASES = [
   },
 ] as const
 
+const TUTORIAL_STEPS = [
+  {
+    id: 'step-1',
+    label: 'Step 1',
+    title: 'Open YouTube Studio Analytics',
+    description: 'From the left sidebar in YouTube Studio, click Analytics.',
+    image: step1Image,
+    alt: 'YouTube Studio sidebar highlighting the Analytics menu item.',
+  },
+  {
+    id: 'step-2',
+    label: 'Step 2',
+    title: 'Switch to Advanced mode',
+    description: 'Use the Advanced mode button in the top-right so you can export the detailed report tables.',
+    image: step2Image,
+    alt: 'YouTube Studio Analytics page highlighting the Advanced mode button.',
+  },
+  {
+    id: 'step-3',
+    label: 'Step 3',
+    title: 'Open the report picker',
+    description: 'Click the Report dropdown to choose which analytics table you want to export.',
+    image: step3Image,
+    alt: 'YouTube Studio advanced analytics view highlighting the report dropdown.',
+  },
+  {
+    id: 'step-4',
+    label: 'Step 4',
+    title: 'Download the right CSVs',
+    description: 'Select each report below and download it one-by-one as CSV. You can upload the raw CSV files or the zipped export bundle here.',
+    image: step4Image,
+    alt: 'YouTube Studio report list and download button highlighting which CSVs to export.',
+  },
+] as const
+
 export default function GeneratePage() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -44,6 +84,7 @@ export default function GeneratePage() {
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState('')
+  const [activeTutorialStep, setActiveTutorialStep] = useState(0)
 
   const supabase = createClient()
 
@@ -501,6 +542,95 @@ export default function GeneratePage() {
     <div className="py-8">
       <h1 className="text-3xl md:text-4xl font-bold">Upload Your Insights</h1>
       <p className="mt-2 text-muted">Connect your YouTube Studio data to generate a verified rate card powered by AI.</p>
+
+      <div className="mt-8 rounded-[28px] border border-border bg-white p-5 shadow-sm md:p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">Tutorial</p>
+            <h2 className="mt-2 text-2xl font-semibold">How to get the right YouTube Studio files</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+              Follow these four steps in YouTube Studio, then upload the CSVs here. The required reports are <span className="font-medium text-foreground">Content</span> and <span className="font-medium text-foreground">Geography</span>.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3 text-sm text-muted">
+            Optional uploads that improve the report: Demographics, Audience Size &amp; Growth, and Traffic Sources.
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {TUTORIAL_STEPS.map((step, index) => {
+            const isActive = index === activeTutorialStep
+
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => setActiveTutorialStep(index)}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-border bg-white text-muted hover:text-foreground'
+                }`}
+              >
+                {step.label}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_320px]">
+          <div className="overflow-hidden rounded-[24px] border border-border bg-slate-950/95">
+            <Image
+              src={TUTORIAL_STEPS[activeTutorialStep].image}
+              alt={TUTORIAL_STEPS[activeTutorialStep].alt}
+              className="h-auto w-full"
+              priority={activeTutorialStep === 0}
+            />
+          </div>
+
+          <div className="rounded-[24px] border border-border bg-slate-50 p-5">
+            <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">
+              {TUTORIAL_STEPS[activeTutorialStep].label}
+            </p>
+            <h3 className="mt-3 text-xl font-semibold">{TUTORIAL_STEPS[activeTutorialStep].title}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              {TUTORIAL_STEPS[activeTutorialStep].description}
+            </p>
+
+            {activeTutorialStep === 3 && (
+              <div className="mt-5 space-y-4">
+                <div>
+                  <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">Required CSVs</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {CSV_TYPES.filter((csvType) => csvType.required).map((csvType) => (
+                      <span
+                        key={csvType.key}
+                        className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
+                      >
+                        {csvType.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">Optional but useful</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {CSV_TYPES.filter((csvType) => !csvType.required).map((csvType) => (
+                      <span
+                        key={csvType.key}
+                        className="rounded-full border border-border bg-white px-3 py-1 text-sm font-medium text-foreground"
+                      >
+                        {csvType.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="mt-8 grid lg:grid-cols-[1fr_340px] gap-8">
         {/* Main column */}
