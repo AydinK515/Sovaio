@@ -12,6 +12,7 @@ function renderMarkdown(text: string) {
   const lines = text.split('\n')
   const elements: React.ReactNode[] = []
   let i = 0
+  let key = 0
 
   while (i < lines.length) {
     const line = lines[i]
@@ -30,7 +31,7 @@ function renderMarkdown(text: string) {
         i++
       }
       elements.push(
-        <ul key={i} className="list-disc list-inside space-y-0.5 my-1">
+        <ul key={key++} className="list-disc list-inside space-y-0.5 my-1">
           {items.map((item, j) => (
             <li key={j} className="text-sm leading-relaxed">{inlineFormat(item)}</li>
           ))}
@@ -47,7 +48,7 @@ function renderMarkdown(text: string) {
         i++
       }
       elements.push(
-        <ol key={i} className="list-decimal list-inside space-y-0.5 my-1">
+        <ol key={key++} className="list-decimal list-inside space-y-0.5 my-1">
           {items.map((item, j) => (
             <li key={j} className="text-sm leading-relaxed">{inlineFormat(item)}</li>
           ))}
@@ -62,7 +63,7 @@ function renderMarkdown(text: string) {
       const level = headingMatch[1].length
       const content = headingMatch[2]
       elements.push(
-        <p key={i} className={`font-semibold leading-relaxed ${level === 1 ? 'text-base' : 'text-sm'} mt-2 mb-0.5`}>
+        <p key={key++} className={`font-semibold leading-relaxed ${level === 1 ? 'text-base' : 'text-sm'} mt-2 mb-0.5`}>
           {inlineFormat(content)}
         </p>
       )
@@ -72,7 +73,7 @@ function renderMarkdown(text: string) {
 
     // Normal paragraph
     elements.push(
-      <p key={i} className="text-sm leading-relaxed">
+      <p key={key++} className="text-sm leading-relaxed">
         {inlineFormat(line)}
       </p>
     )
