@@ -730,7 +730,7 @@ export default function DealClient({
   const currentSnapshot = snapshots.find(snapshot => snapshot.id === deal.analytics_snapshot_id) ?? null
 
   return (
-    <div className="flex flex-col py-8 lg:h-[calc(100vh-14rem)] lg:overflow-hidden">
+    <div className="flex flex-col py-8">
       {chatFullscreen && (
         <div
           className="fixed inset-0 z-30 bg-slate-950/20 backdrop-blur-[2px]"
@@ -855,7 +855,7 @@ export default function DealClient({
         <div className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-white ${
           chatFullscreen
             ? 'fixed inset-x-6 bottom-6 top-24 z-40 shadow-2xl lg:inset-x-10 lg:top-20'
-            : 'lg:min-h-0 lg:h-full'
+            : 'min-h-[36rem] lg:min-h-[calc(100dvh-14rem)]'
         }`}>
           <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">
