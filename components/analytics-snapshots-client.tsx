@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
 import type { AnalyticsSnapshot } from '@/lib/types'
 
 function formatDate(value: string) {
@@ -140,7 +141,29 @@ export default function AnalyticsSnapshotsClient({
                   </div>
                 ) : (
                   <>
-                    <h2 className="text-lg font-semibold">{snapshot.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold">{snapshot.name}</h2>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSnapshotId(snapshot.id)
+                          setDraftName(snapshot.name)
+                        }}
+                        aria-label={`Rename ${snapshot.name}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-muted-light hover:text-foreground"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteSnapshot(snapshot.id)}
+                        disabled={pendingSnapshotId === snapshot.id}
+                        aria-label={`Delete ${snapshot.name}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                     <span className="inline-flex rounded-full border border-border bg-muted-light px-2.5 py-1 text-xs text-muted">
                       {snapshot.report_confidence}% confidence
                     </span>
@@ -163,24 +186,6 @@ export default function AnalyticsSnapshotsClient({
               <Link href={`/deal/new?snapshot=${snapshot.id}`} className="inline-flex items-center justify-center rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover">
                 Create Deal
               </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingSnapshotId(snapshot.id)
-                  setDraftName(snapshot.name)
-                }}
-                className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light"
-              >
-                Rename
-              </button>
-              <button
-                type="button"
-                onClick={() => void deleteSnapshot(snapshot.id)}
-                disabled={pendingSnapshotId === snapshot.id}
-                className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary-light disabled:opacity-50"
-              >
-                Delete
-              </button>
             </div>
           </div>
         </div>
