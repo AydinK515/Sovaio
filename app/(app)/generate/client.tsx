@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BarChart3, ChevronDown, CircleHelp, FileText, Users } from 'lucide-react'
+import { BarChart3, CircleHelp, FileText, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { buildRateCardName } from '@/lib/analytics-context'
 import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload, NICHES } from '@/lib/types'
+import FancySelect from '@/components/fancy-select'
 
 const REPORT_TYPE_LABELS: Record<CsvUpload['upload_type'], string> = Object.fromEntries(
   CSV_TYPES.map(type => [type.key, type.label])
@@ -80,6 +81,17 @@ export default function GenerateRateCardClient({
               : 'Uploading a fuller analytics mix will help us generate a more reliable rate card.',
           }
     : null
+  const snapshotOptions = useMemo(
+    () => [
+      { value: '', label: 'Select an analytics snapshot' },
+      ...snapshots.map((item) => ({ value: item.id, label: item.name })),
+    ],
+    [snapshots]
+  )
+  const nicheOptions = useMemo(
+    () => NICHES.map((option) => ({ value: option, label: option })),
+    []
+  )
 
   async function handleGenerate() {
     if (!snapshotId || !niche || hasSponsorships === null || offersDedicatedVideos === null) {
@@ -197,19 +209,12 @@ export default function GenerateRateCardClient({
             <div className="flex h-full flex-col">
               <div>
                 <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot</label>
-                <div className="relative">
-                  <select
+                <FancySelect
                   value={snapshotId}
-                  onChange={(event) => setSnapshotId(event.target.value)}
-                  className="w-full appearance-none rounded-xl border border-border bg-white px-4 py-3 pr-11 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="">Select an analytics snapshot</option>
-                  {snapshots.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                </div>
+                  onChange={setSnapshotId}
+                  options={snapshotOptions}
+                  placeholder="Select an analytics snapshot"
+                />
               </div>
 
               {snapshot && confidenceTone && confidenceMessage && (
@@ -314,19 +319,12 @@ export default function GenerateRateCardClient({
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Niche</label>
-              <div className="relative">
-                <select
+              <FancySelect
                   value={niche}
-                  onChange={(event) => setNiche(event.target.value)}
-                  className="w-full appearance-none rounded-xl border border-border bg-white px-4 py-3 pr-11 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="" disabled>Select your primary niche</option>
-                  {NICHES.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-              </div>
+                  onChange={setNiche}
+                  options={nicheOptions}
+                  placeholder="Select your primary niche"
+                />
             </div>
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Sponsorship History</label>

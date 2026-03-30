@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight } from 'lucide-react'
+import FancySelect from '@/components/fancy-select'
 
 type AudienceSnapshot = {
   genderSplit: string
@@ -155,6 +156,14 @@ export default function RateCardClient({
 
   const selectedDealRange = getDealTypeRange(rateCard, dealType)
   const selectedDealRangeLabel = `${formatCurrency(selectedDealRange.low)} - ${formatCurrency(selectedDealRange.high)}`
+  const dealTypeOptions = visibleLiveRateTiers.map((tier) => ({
+    value: tier.id,
+    label: `${tier.title} (${tier.range})`,
+  }))
+  const analyticsContextOptions = availableSnapshots.map((snapshot) => ({
+    value: snapshot.id,
+    label: snapshot.name,
+  }))
 
   useEffect(() => {
     if (!availableDealTypes.includes(dealType)) {
@@ -701,29 +710,20 @@ export default function RateCardClient({
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Deal Type</label>
-                <select
+                <FancySelect
                   value={dealType}
-                  onChange={e => setDealType(e.target.value as typeof dealType)}
-                  className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                >
-                  {rateCard.offers_dedicated_videos && (
-                    <option value="dedicated_video">Dedicated Video ({formatCurrency(rateCard.dedicated_video_low)} - {formatCurrency(rateCard.dedicated_video_high)})</option>
-                  )}
-                  <option value="integration_60s">60-Second Integration ({formatCurrency(rateCard.integration_60s_low)} - {formatCurrency(rateCard.integration_60s_high)})</option>
-                  <option value="integration_30s">30-Second Integration ({formatCurrency(rateCard.integration_30s_low)} - {formatCurrency(rateCard.integration_30s_high)})</option>
-                </select>
+                  onChange={nextValue => setDealType(nextValue as typeof dealType)}
+                  options={dealTypeOptions}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Analytics Context</label>
-                <select
+                <FancySelect
                   value={rateCard.analytics_snapshot_id ?? ''}
+                  onChange={() => undefined}
                   disabled
-                  className="w-full px-4 py-3 rounded-xl border border-border text-sm bg-muted-light text-muted"
-                >
-                  {availableSnapshots.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                  ))}
-                </select>
+                  options={analyticsContextOptions}
+                />
                 <p className="mt-1.5 text-xs text-muted">This deal will start from the same analytics snapshot this rate card was generated from.</p>
               </div>
               <div>

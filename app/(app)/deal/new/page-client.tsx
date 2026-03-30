@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { DEAL_TYPE_LABELS, getOpeningMessage } from '@/lib/deal-chat'
 import type { AnalyticsSnapshot, Deal } from '@/lib/types'
+import FancySelect from '@/components/fancy-select'
 
 export default function NewDealClient({
   snapshots,
@@ -22,6 +23,14 @@ export default function NewDealClient({
   const [creatorAsk, setCreatorAsk] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const dealTypeOptions = useMemo(
+    () => Object.entries(DEAL_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+    []
+  )
+  const snapshotOptions = useMemo(
+    () => snapshots.map((snapshot) => ({ value: snapshot.id, label: snapshot.name })),
+    [snapshots]
+  )
 
   async function handleCreateDeal() {
     if (!brandName.trim() || !analyticsSnapshotId) {
@@ -121,27 +130,19 @@ export default function NewDealClient({
           </div>
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Deal Type</label>
-            <select
+            <FancySelect
               value={dealType}
-              onChange={(event) => setDealType(event.target.value as Deal['deal_type'])}
-              className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              {Object.entries(DEAL_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+              onChange={(nextValue) => setDealType(nextValue as Deal['deal_type'])}
+              options={dealTypeOptions}
+            />
           </div>
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Analytics Snapshot</label>
-            <select
+            <FancySelect
               value={analyticsSnapshotId}
-              onChange={(event) => setAnalyticsSnapshotId(event.target.value)}
-              className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              {snapshots.map((snapshot) => (
-                <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-              ))}
-            </select>
+              onChange={setAnalyticsSnapshotId}
+              options={snapshotOptions}
+            />
           </div>
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Your Ask (optional)</label>

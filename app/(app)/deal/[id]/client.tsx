@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
+import FancySelect from '@/components/fancy-select'
 
 function renderMarkdown(text: string) {
   const lines = text.split('\n')
@@ -728,6 +729,10 @@ export default function DealClient({
   const displayChat = currentChat ?? getDraftChat(deal)
   const showTemplateQuestions = currentChat === null && messages.length === 0 && deal.status === 'negotiating' && !aiTyping
   const currentSnapshot = snapshots.find(snapshot => snapshot.id === deal.analytics_snapshot_id) ?? null
+  const snapshotOptions = snapshots.map((snapshot) => ({
+    value: snapshot.id,
+    label: snapshot.name,
+  }))
 
   return (
     <div className="flex flex-col py-8">
@@ -827,16 +832,13 @@ export default function DealClient({
             <h3 className="text-sm font-semibold mb-3">Analytics Context</h3>
             {snapshots.length > 0 ? (
               <>
-                <select
+                <FancySelect
                   value={deal.analytics_snapshot_id ?? ''}
-                  onChange={(event) => void updateAnalyticsSnapshot(event.target.value)}
+                  onChange={(nextValue) => void updateAnalyticsSnapshot(nextValue)}
                   disabled={updatingSnapshot}
-                  className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-                >
-                  {snapshots.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                  ))}
-                </select>
+                  options={snapshotOptions}
+                  triggerClassName="disabled:opacity-60"
+                />
                 <p className="mt-3 text-xs leading-relaxed text-muted">
                   Future AI messages in this deal will use the selected snapshot.
                   {currentSnapshot ? ` Current snapshot: ${currentSnapshot.name} (${currentSnapshot.report_confidence}% confidence).` : ''}

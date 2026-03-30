@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
 import { Bot, Check, ChevronDown, MessageSquare, Plus, Send, Square, X } from 'lucide-react'
+import FancySelect from '@/components/fancy-select'
 
 function renderMarkdown(text: string) {
   const lines = text.split('\n')
@@ -483,6 +484,10 @@ export default function ChannelAiSidebar({
   const visibleMessages = getVisibleMessages()
   const showTemplateQuestions = currentChat === null && messages.length === 0 && !aiTyping
   const currentSnapshot = snapshots.find(snapshot => snapshot.id === (currentChat?.analytics_snapshot_id ?? selectedSnapshotId)) ?? null
+  const snapshotOptions = snapshots.map((snapshot) => ({
+    value: snapshot.id,
+    label: snapshot.name,
+  }))
 
   return (
     <aside
@@ -561,15 +566,12 @@ export default function ChannelAiSidebar({
                   </div>
                   {snapshots.length > 0 ? (
                     <div className="mt-3 space-y-2">
-                      <select
+                      <FancySelect
                         value={currentChat?.analytics_snapshot_id ?? selectedSnapshotId}
-                        onChange={(event) => void updateSnapshot(event.target.value)}
-                        className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      >
-                        {snapshots.map((snapshot) => (
-                          <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                        ))}
-                      </select>
+                        onChange={(nextValue) => void updateSnapshot(nextValue)}
+                        options={snapshotOptions}
+                        triggerClassName="px-3 py-2"
+                      />
                       <p className="text-xs text-muted">{channelName || 'Your channel'} | {currentSnapshot ? `${currentSnapshot.report_confidence}% confidence snapshot` : 'Select snapshot'}</p>
                     </div>
                   ) : (
