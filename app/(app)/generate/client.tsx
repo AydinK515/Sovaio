@@ -2,9 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BarChart3, ChevronDown, CircleHelp, FileText, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { buildRateCardName } from '@/lib/analytics-context'
-import type { AnalyticsSnapshot } from '@/lib/types'
+import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload, NICHES } from '@/lib/types'
+
+const REPORT_TYPE_LABELS: Record<CsvUpload['upload_type'], string> = Object.fromEntries(
+  CSV_TYPES.map(type => [type.key, type.label])
+) as Record<CsvUpload['upload_type'], string>
 
 export default function GenerateRateCardClient({
   snapshots,
@@ -29,6 +34,51 @@ export default function GenerateRateCardClient({
     () => snapshots.find(item => item.id === snapshotId) ?? null,
     [snapshotId, snapshots]
   )
+  const missingReports = useMemo(() => {
+    if (!snapshot) return []
+
+    const reportSet = new Set(snapshot.report_types)
+    return CSV_TYPES.filter(type => !reportSet.has(type.key))
+  }, [snapshot])
+  const confidenceTone = snapshot
+    ? snapshot.report_confidence < 40
+      ? {
+          badge: 'Needs more data',
+          accent: 'bg-primary',
+          accentSoft: 'bg-primary/10 text-primary',
+        }
+      : snapshot.report_confidence < 70
+        ? {
+            badge: 'Solid baseline',
+            accent: 'bg-warning',
+            accentSoft: 'bg-warning/15 text-amber-700',
+          }
+        : {
+            badge: 'High confidence',
+            accent: 'bg-success',
+            accentSoft: 'bg-success/10 text-success',
+          }
+    : null
+  const confidenceMessage = snapshot
+    ? snapshot.report_confidence >= 90
+      ? {
+          title: `Great, this analytics snapshot has ${snapshot.report_confidence}% confidence.`,
+          body: 'We have enough channel context to generate your most accurate rate card from this data.',
+        }
+      : snapshot.report_confidence >= 60
+        ? {
+            title: `This analytics snapshot has ${snapshot.report_confidence}% confidence.`,
+            body: missingReports.length > 0
+              ? `Your rate card should be solid, but adding ${missingReports.map(report => report.label).join(' and ')} would tighten the estimate even more.`
+              : 'Your rate card should be solid, and there is enough coverage here to price with confidence.',
+          }
+        : {
+            title: `This analytics snapshot has ${snapshot.report_confidence}% confidence, so pricing will be more conservative.`,
+            body: missingReports.length > 0
+              ? `For a stronger estimate, upload ${missingReports.map(report => report.label).join(' and ')} before generating your rate card.`
+              : 'Uploading a fuller analytics mix will help us generate a more reliable rate card.',
+          }
+    : null
 
   async function handleGenerate() {
     if (!snapshotId || !niche || hasSponsorships === null || offersDedicatedVideos === null) {
@@ -143,23 +193,110 @@ export default function GenerateRateCardClient({
           <h2 className="text-lg font-semibold">Analytics Snapshot</h2>
           <p className="mt-1 text-sm text-muted">This snapshot powers the channel context. We only send derived metrics and summaries to the model, never giant raw CSV blobs.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot</label>
-              <select
-                value={snapshotId}
-                onChange={(event) => setSnapshotId(event.target.value)}
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                {snapshots.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
-                ))}
-              </select>
+            <div className="flex h-full flex-col">
+              <div>
+                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot</label>
+                <div className="relative">
+                  <select
+                    value={snapshotId}
+                    onChange={(event) => setSnapshotId(event.target.value)}
+                    className="w-full appearance-none rounded-xl border border-border bg-white px-4 py-3 pr-11 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    {snapshots.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                </div>
+              </div>
+
+              {snapshot && confidenceTone && confidenceMessage && (
+                <div className="mt-4 flex-1 rounded-2xl border border-border bg-linear-to-br from-white via-slate-50 to-emerald-50/35 p-5">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${confidenceTone.accentSoft}`}>
+                    {confidenceTone.badge}
+                  </span>
+                  <h3 className="mt-3 text-lg font-semibold text-foreground">{confidenceMessage.title}</h3>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{confidenceMessage.body}</p>
+
+                  {missingReports.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {missingReports.map((report) => (
+                        <span
+                          key={report.key}
+                          className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted"
+                        >
+                          Add {report.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {missingReports.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => router.push('/analytics/new')}
+                      className="mt-5 inline-flex rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted-light"
+                    >
+                      Upload Missing Reports
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            {snapshot && (
-              <div className="rounded-xl border border-border bg-muted-light px-4 py-3 text-sm text-muted">
-                <p>{snapshot.report_confidence}% confidence</p>
-                <p className="mt-1">{snapshot.subscriber_count ? `${snapshot.subscriber_count.toLocaleString()} subscribers` : 'Subscriber count not available'}</p>
-                {snapshot.report_types.length > 0 && <p className="mt-1">Reports: {snapshot.report_types.join(', ')}</p>}
+            {snapshot && confidenceTone && (
+              <div className="rounded-2xl border border-border bg-linear-to-br from-slate-50 to-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Snapshot Health</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${confidenceTone.accentSoft}`}>
+                        {confidenceTone.badge}
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">{snapshot.report_confidence}% confidence</span>
+                    </div>
+                  </div>
+                  <BarChart3 className="h-5 w-5 text-muted" />
+                </div>
+
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-border">
+                  <div
+                    className={`${confidenceTone.accent} h-full rounded-full transition-all duration-500`}
+                    style={{ width: `${snapshot.report_confidence}%` }}
+                  />
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-border/80 bg-white px-3 py-3">
+                    <div className="flex items-center gap-2 text-muted">
+                      <Users className="h-4 w-4" />
+                      <span className="text-[11px] font-medium uppercase tracking-[0.16em]">Subscribers</span>
+                    </div>
+                    <p className="mt-2 text-lg font-semibold text-foreground">
+                      {snapshot.subscriber_count ? snapshot.subscriber_count.toLocaleString() : 'Unavailable'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-border/80 bg-white px-3 py-3">
+                    <div className="flex items-center gap-2 text-muted">
+                      <FileText className="h-4 w-4" />
+                      <span className="text-[11px] font-medium uppercase tracking-[0.16em]">Reports Included</span>
+                    </div>
+                    <p className="mt-2 text-lg font-semibold text-foreground">{snapshot.report_types.length}</p>
+                  </div>
+                </div>
+
+                {snapshot.report_types.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {snapshot.report_types.map((reportType) => (
+                      <span
+                        key={reportType}
+                        className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted"
+                      >
+                        {REPORT_TYPE_LABELS[reportType as CsvUpload['upload_type']] ?? reportType.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -170,12 +307,19 @@ export default function GenerateRateCardClient({
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Niche</label>
-              <input
-                value={niche}
-                onChange={(event) => setNiche(event.target.value)}
-                placeholder="e.g. Tech & Software"
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
+              <div className="relative">
+                <select
+                  value={niche}
+                  onChange={(event) => setNiche(event.target.value)}
+                  className="w-full appearance-none rounded-xl border border-border bg-white px-4 py-3 pr-11 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="" disabled>Select your primary niche</option>
+                  {NICHES.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              </div>
             </div>
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Sponsorship History</label>
@@ -185,7 +329,21 @@ export default function GenerateRateCardClient({
               </div>
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Dedicated Videos?</label>
+              <div className="mb-2 flex items-center gap-2">
+                <label className="block text-xs font-medium uppercase tracking-wider text-muted">Dedicated Videos</label>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    aria-label="What are dedicated videos?"
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
+                  >
+                    <CircleHelp className="h-4 w-4" />
+                  </button>
+                  <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-64 -translate-x-1/2 rounded-xl border border-border bg-white p-3 text-left text-xs leading-relaxed text-muted opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                    A dedicated video is a full upload centered on one sponsor, instead of a shorter in-video integration.
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setOffersDedicatedVideos(true)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${offersDedicatedVideos === true ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}>Yes</button>
                 <button type="button" onClick={() => setOffersDedicatedVideos(false)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${offersDedicatedVideos === false ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}>No</button>
