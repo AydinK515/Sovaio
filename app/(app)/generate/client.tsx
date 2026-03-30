@@ -212,9 +212,6 @@ export default function GenerateRateCardClient({
 
               {snapshot && confidenceTone && confidenceMessage && (
                 <div className="mt-4 flex-1 rounded-2xl border border-border bg-linear-to-br from-white via-slate-50 to-emerald-50/35 p-5">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${confidenceTone.accentSoft}`}>
-                    {confidenceTone.badge}
-                  </span>
                   <h3 className="mt-3 text-lg font-semibold text-foreground">{confidenceMessage.title}</h3>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{confidenceMessage.body}</p>
 
