@@ -43,8 +43,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <AppNav hasAnalytics={snapshots.length > 0} />
-      <div className="flex w-full items-start">
-        <div className="min-w-0 flex-1">
+      <div className="flex min-h-[calc(100dvh-65px)] w-full items-start">
+        <div className="flex min-w-0 flex-1 flex-col self-stretch">
           <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>

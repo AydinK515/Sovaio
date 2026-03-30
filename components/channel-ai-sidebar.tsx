@@ -486,7 +486,7 @@ export default function ChannelAiSidebar({
 
   return (
     <aside
-      className={`sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 border-l border-border bg-white transition-[width] duration-300 ease-out lg:flex ${
+      className={`sticky top-[65px] hidden h-[calc(100dvh-65px)] shrink-0 border-l border-border bg-white transition-[width] duration-300 ease-out lg:flex ${
         open ? 'w-[420px] xl:w-[460px]' : 'w-16'
       }`}
     >
