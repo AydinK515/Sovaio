@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import type { RateCard, Profile } from '@/lib/types'
+import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight } from 'lucide-react'
 
@@ -22,11 +22,15 @@ type PerformanceSnapshotItem = {
 export default function RateCardClient({
   rateCard,
   profile,
+  availableSnapshots,
+  snapshotName,
   audienceSnapshot,
   performanceSnapshot,
 }: {
   rateCard: RateCard
   profile: Profile | null
+  availableSnapshots: AnalyticsSnapshot[]
+  snapshotName: string | null
   audienceSnapshot: AudienceSnapshot
   performanceSnapshot: PerformanceSnapshotItem[]
 }) {
@@ -293,6 +297,7 @@ export default function RateCardClient({
     const { data: deal, error } = await supabase.from('deals').insert({
       user_id: user.id,
       rate_card_id: rateCard.id,
+      analytics_snapshot_id: rateCard.analytics_snapshot_id,
       brand_name: brandName.trim(),
       deal_type: dealType,
       creator_ask: askAmount,
@@ -369,6 +374,9 @@ export default function RateCardClient({
         <p className="mt-2 text-muted">
           Based on your latest channel performance, audience demographics, and current market demand for {rateCard.niche}.
         </p>
+        {snapshotName && (
+          <p className="mt-2 text-sm text-muted">Generated from analytics snapshot: <span className="font-medium text-foreground">{snapshotName}</span></p>
+        )}
 
         {/* Low-volume advisory — shown when 60s rate implies avg views are too small for real deals */}
         {rateCard.integration_60s_low <= 25 && (
@@ -620,6 +628,19 @@ export default function RateCardClient({
                   <option value="integration_60s">60-Second Integration ({formatCurrency(rateCard.integration_60s_low)} - {formatCurrency(rateCard.integration_60s_high)})</option>
                   <option value="integration_30s">30-Second Integration ({formatCurrency(rateCard.integration_30s_low)} - {formatCurrency(rateCard.integration_30s_high)})</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Analytics Context</label>
+                <select
+                  value={rateCard.analytics_snapshot_id ?? ''}
+                  disabled
+                  className="w-full px-4 py-3 rounded-xl border border-border text-sm bg-muted-light text-muted"
+                >
+                  {availableSnapshots.map((snapshot) => (
+                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-muted">This deal will start from the same analytics snapshot this rate card was generated from.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Your Ask (optional)</label>

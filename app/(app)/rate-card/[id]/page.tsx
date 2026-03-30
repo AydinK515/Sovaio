@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
+import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { redirect, notFound } from 'next/navigation'
-import type { RateCard, Profile } from '@/lib/types'
+import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
 import RateCardClient from './client'
 
 type AudienceSnapshot = {
@@ -258,20 +259,24 @@ export default async function RateCardPage({ params }: { params: Promise<{ id: s
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const [{ data: rateCard }, { data: profile }] = await Promise.all([
+  const [{ data: rateCard }, { data: profile }, { data: snapshots }] = await Promise.all([
     supabase.from('rate_cards').select('*').eq('id', id).eq('user_id', user.id).single(),
     supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('analytics_snapshots').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
   ])
 
   if (!rateCard) notFound()
 
-  const csvUploadIds = Array.isArray((rateCard as RateCard).csv_upload_ids) ? (rateCard as RateCard).csv_upload_ids : []
-  const { data: csvUploads } = csvUploadIds.length > 0
-    ? await supabase
-        .from('csv_uploads')
-        .select('upload_type, parsed_data')
-        .in('id', csvUploadIds)
-    : { data: [] }
+  const analyticsContext = await getAnalyticsSnapshotContext({
+    supabase,
+    snapshotId: (rateCard as RateCard).analytics_snapshot_id,
+    userId: user.id,
+  })
+  const snapshotItems = (snapshots || []) as AnalyticsSnapshot[]
+  const csvUploads = Object.entries(analyticsContext?.csvData || {}).flatMap(([uploadType, rows]) => ({
+    upload_type: uploadType,
+    parsed_data: rows,
+  }))
 
   const audienceSnapshot = buildAudienceSnapshot(csvUploads ?? null)
   const performanceSnapshot = buildPerformanceSnapshot(csvUploads ?? null)
@@ -280,6 +285,8 @@ export default async function RateCardPage({ params }: { params: Promise<{ id: s
     <RateCardClient
       rateCard={rateCard as RateCard}
       profile={(profile as Profile) ?? null}
+      availableSnapshots={snapshotItems}
+      snapshotName={analyticsContext?.snapshot.name ?? null}
       audienceSnapshot={audienceSnapshot}
       performanceSnapshot={performanceSnapshot}
     />

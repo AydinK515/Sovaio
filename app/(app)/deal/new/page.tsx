@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import type { AnalyticsSnapshot } from '@/lib/types'
-import GenerateRateCardClient from './client'
+import NewDealClient from './page-client'
 
-export default async function GeneratePage({
+export default async function NewDealPage({
   searchParams,
 }: {
   searchParams: Promise<{ snapshot?: string }>
@@ -20,7 +20,7 @@ export default async function GeneratePage({
     .order('created_at', { ascending: false })
 
   return (
-    <GenerateRateCardClient
+    <NewDealClient
       snapshots={(snapshots || []) as AnalyticsSnapshot[]}
       initialSnapshotId={snapshot ?? null}
     />

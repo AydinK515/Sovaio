@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
+import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
 
@@ -31,9 +31,9 @@ function renderMarkdown(text: string) {
         i++
       }
       elements.push(
-        <ul key={key++} className="list-disc list-inside space-y-0.5 my-1">
+        <ul key={key++} className="list-outside list-disc space-y-0.5 my-1 pl-5">
           {items.map((item, j) => (
-            <li key={j} className="text-sm leading-relaxed">{inlineFormat(item)}</li>
+            <li key={j} className="pl-1 text-sm leading-relaxed">{inlineFormat(item)}</li>
           ))}
         </ul>
       )
@@ -48,9 +48,9 @@ function renderMarkdown(text: string) {
         i++
       }
       elements.push(
-        <ol key={key++} className="list-decimal list-inside space-y-0.5 my-1">
+        <ol key={key++} className="list-outside list-decimal space-y-0.5 my-1 pl-5">
           {items.map((item, j) => (
-            <li key={j} className="text-sm leading-relaxed">{inlineFormat(item)}</li>
+            <li key={j} className="pl-1 text-sm leading-relaxed">{inlineFormat(item)}</li>
           ))}
         </ol>
       )
@@ -170,12 +170,14 @@ function getDraftChat(deal: Deal): DealChat {
 export default function DealClient({
   deal: initialDeal,
   rateCard,
+  snapshots,
   initialChats,
   initialChat,
   initialMessages,
 }: {
   deal: Deal
   rateCard: RateCard | null
+  snapshots: AnalyticsSnapshot[]
   initialChats: DealChat[]
   initialChat: DealChat | null
   initialMessages: DealMessage[]
@@ -201,6 +203,7 @@ export default function DealClient({
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const [chatFullscreen, setChatFullscreen] = useState(false)
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
+  const [updatingSnapshot, setUpdatingSnapshot] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -709,9 +712,22 @@ export default function DealClient({
     setShowCloseModal(false)
   }
 
+  async function updateAnalyticsSnapshot(nextSnapshotId: string) {
+    if (!nextSnapshotId || nextSnapshotId === deal.analytics_snapshot_id) return
+
+    setUpdatingSnapshot(true)
+    await supabase.from('deals').update({
+      analytics_snapshot_id: nextSnapshotId,
+      updated_at: new Date().toISOString(),
+    }).eq('id', deal.id)
+    setDeal(prev => ({ ...prev, analytics_snapshot_id: nextSnapshotId }))
+    setUpdatingSnapshot(false)
+  }
+
   const visibleMessages = getVisibleMessages()
   const displayChat = currentChat ?? getDraftChat(deal)
   const showTemplateQuestions = currentChat === null && messages.length === 0 && deal.status === 'negotiating' && !aiTyping
+  const currentSnapshot = snapshots.find(snapshot => snapshot.id === deal.analytics_snapshot_id) ?? null
 
   return (
     <div className="flex flex-col py-8 lg:h-[calc(100vh-14rem)] lg:overflow-hidden">
@@ -807,6 +823,32 @@ export default function DealClient({
             </div>
           </div>
 
+          <div className="bg-white rounded-2xl border border-border p-6">
+            <h3 className="text-sm font-semibold mb-3">Analytics Context</h3>
+            {snapshots.length > 0 ? (
+              <>
+                <select
+                  value={deal.analytics_snapshot_id ?? ''}
+                  onChange={(event) => void updateAnalyticsSnapshot(event.target.value)}
+                  disabled={updatingSnapshot}
+                  className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                >
+                  {snapshots.map((snapshot) => (
+                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                  ))}
+                </select>
+                <p className="mt-3 text-xs leading-relaxed text-muted">
+                  Future AI messages in this deal will use the selected snapshot.
+                  {currentSnapshot ? ` Current snapshot: ${currentSnapshot.name} (${currentSnapshot.report_confidence}% confidence).` : ''}
+                </p>
+              </>
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                This deal does not have analytics context yet. Upload analytics to give the AI real channel-size, audience, and performance context.
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* Chat Area */}
@@ -821,7 +863,7 @@ export default function DealClient({
                 <MessageSquare className="w-4 h-4 text-white" />
               </div>
               <div className="relative" ref={chatMenuRef}>
-                <h3 className="font-semibold text-sm">Negotiation Assistant</h3>
+                <h3 className="font-semibold text-sm">Deal Assistant</h3>
                 <button
                   type="button"
                   onClick={() => setChatMenuOpen(prev => !prev)}
@@ -919,7 +961,7 @@ export default function DealClient({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-muted">AI-powered advice</span>
+              <span className="text-xs text-muted">For live brand conversations, counters, and reply drafts</span>
               <button
                 type="button"
                 onClick={() => setChatFullscreen(prev => !prev)}

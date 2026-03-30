@@ -46,14 +46,14 @@ export function MarketingNav() {
   )
 }
 
-export function AppNav() {
+export function AppNav({ hasAnalytics }: { hasAnalytics: boolean }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/analytics', label: 'Analytics' },
     { href: '/rate-card', label: 'Rate Cards' },
-    { href: '/generate', label: 'New Rate Card' },
     { href: '/settings', label: 'Settings' },
   ]
 
@@ -75,6 +75,12 @@ export function AppNav() {
                 {l.label}
               </Link>
             ))}
+            <Link
+              href={hasAnalytics ? '/analytics/new' : '/analytics/new'}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+            >
+              {hasAnalytics ? 'Upload Analytics' : 'Upload Analytics'}
+            </Link>
           </div>
 
           <button className="md:hidden" onClick={() => setOpen(!open)}>
@@ -88,6 +94,7 @@ export function AppNav() {
           {links.map(l => (
             <Link key={l.href} href={l.href} className="block text-sm text-muted" onClick={() => setOpen(false)}>{l.label}</Link>
           ))}
+          <Link href="/analytics/new" className="block text-sm font-medium text-primary" onClick={() => setOpen(false)}>Upload Analytics</Link>
         </div>
       )}
     </nav>

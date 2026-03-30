@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
-import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
+import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 import DealClient from './client'
 
 export default async function DealPage({
@@ -34,12 +34,19 @@ export default async function DealPage({
       .single()
     : { data: null }
 
-  const { data: messages } = await supabase
-    .from('deal_chats')
-    .select('*')
-    .eq('deal_id', id)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
+  const [{ data: messages }, { data: snapshots }] = await Promise.all([
+    supabase
+      .from('deal_chats')
+      .select('*')
+      .eq('deal_id', id)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('analytics_snapshots')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+  ])
 
   const chats = (messages || []) as DealChat[]
   const selectedChat = chats.find(chat => chat.id === requestedChatId) ?? chats[0] ?? null
@@ -57,6 +64,7 @@ export default async function DealPage({
     <DealClient
       deal={deal as Deal}
       rateCard={(rateCard as RateCard | null) ?? null}
+      snapshots={(snapshots || []) as AnalyticsSnapshot[]}
       initialChats={chats}
       initialChat={selectedChat}
       initialMessages={(threadMessages || []) as DealMessage[]}

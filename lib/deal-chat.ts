@@ -40,7 +40,7 @@ export function formatDealTarget(
   }
 
   if (!rateCard) {
-    return 'the selected rate card range'
+    return 'your selected pricing context'
   }
 
   const range = getDealTypeRange(rateCard, deal.deal_type)
@@ -51,5 +51,5 @@ export function getOpeningMessage(
   deal: Pick<Deal, 'brand_name' | 'creator_ask' | 'deal_type'>,
   rateCard?: Pick<RateCard, 'dedicated_video_low' | 'dedicated_video_high' | 'integration_60s_low' | 'integration_60s_high' | 'integration_30s_low' | 'integration_30s_high'> | null
 ) {
-  return `This is a fresh negotiation thread for ${deal.brand_name}. You're targeting ${formatDealTarget(deal, rateCard)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
+  return `This is a fresh deal thread for ${deal.brand_name}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. You're targeting ${formatDealTarget(deal, rateCard)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
 }

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowRight, Plus, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase-server'
-import type { RateCard } from '@/lib/types'
+import type { AnalyticsSnapshot, RateCard } from '@/lib/types'
 
 function formatCurrency(n: number) {
   return `$${n.toLocaleString()}`
@@ -50,6 +50,36 @@ export default async function RateCardsPage() {
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+  const { data: snapshots } = await supabase
+    .from('analytics_snapshots')
+    .select('*')
+    .eq('user_id', user.id)
+
+  if (!snapshots?.length) {
+    return (
+      <div className="py-12">
+        <h1 className="text-3xl md:text-4xl font-bold">Your rate cards</h1>
+        <p className="mt-2 text-muted text-lg">Upload analytics first so you can generate your first rate card.</p>
+
+        <div className="mt-10 bg-white rounded-3xl border border-border p-8 md:p-10">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-7 h-7 text-primary" />
+          </div>
+          <h2 className="mt-6 text-xl font-semibold">No analytics snapshots yet</h2>
+          <p className="mt-2 text-sm text-muted max-w-xl">
+            Snapshots are the source context for every rate card. Upload your YouTube Studio exports first, then come back here to generate pricing artifacts from them.
+          </p>
+          <Link
+            href="/analytics/new"
+            className="mt-6 inline-flex items-center gap-2 bg-primary text-white font-medium px-6 py-3 rounded-xl hover:bg-primary-hover transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Upload Analytics
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (!rateCards?.length) {
     return (
@@ -66,7 +96,7 @@ export default async function RateCardsPage() {
             Upload your latest YouTube Studio exports and we&apos;ll turn them into a reusable sponsorship rate card you can come back to anytime.
           </p>
           <Link
-            href="/generate"
+            href={`/generate?snapshot=${snapshots[0].id}`}
             className="mt-6 inline-flex items-center gap-2 bg-primary text-white font-medium px-6 py-3 rounded-xl hover:bg-primary-hover transition-colors text-sm"
           >
             <Plus className="w-4 h-4" />
@@ -77,6 +107,7 @@ export default async function RateCardsPage() {
     )
   }
 
+  const snapshotById = new Map(((snapshots || []) as AnalyticsSnapshot[]).map(snapshot => [snapshot.id, snapshot]))
   const latestCard = rateCards[0] as RateCard
   const latestCardSummaries = getVisibleRateSummaries(latestCard)
 
@@ -88,7 +119,7 @@ export default async function RateCardsPage() {
           <p className="mt-2 text-muted">Every card you generate is saved here so you can revisit, compare, and start deals later.</p>
         </div>
         <Link
-          href="/generate"
+          href={`/generate?snapshot=${snapshots[0].id}`}
           className="inline-flex items-center gap-2 bg-primary text-white font-medium px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-colors text-sm"
         >
           <Plus className="w-4 h-4" />
@@ -100,9 +131,10 @@ export default async function RateCardsPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-white/60">Latest saved</p>
         <div className="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
-            <h2 className="text-2xl font-semibold">{latestCard.niche || 'Untitled niche'} rate card</h2>
+            <h2 className="text-2xl font-semibold">{latestCard.name || latestCard.niche || 'Untitled rate card'}</h2>
             <p className="mt-2 text-white/70">
               Generated on {formatDate(latestCard.created_at)} with {latestCard.report_confidence}% confidence.
+              {latestCard.analytics_snapshot_id ? ` Built from ${snapshotById.get(latestCard.analytics_snapshot_id)?.name || 'snapshot'}.` : ''}
             </p>
           </div>
           <div className={`grid grid-cols-1 gap-3 min-w-full ${latestCardSummaries.length === 3 ? 'sm:grid-cols-3 md:min-w-[520px]' : 'sm:grid-cols-2 md:min-w-[360px]'}`}>
@@ -125,13 +157,16 @@ export default async function RateCardsPage() {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-semibold">{rateCard.niche || 'Untitled niche'}</h2>
+                  <h2 className="text-lg font-semibold">{rateCard.name || rateCard.niche || 'Untitled rate card'}</h2>
                   <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${confidenceTone(rateCard.report_confidence)}`}>
                     {rateCard.report_confidence}% confidence
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-muted">
-                  {formatDate(rateCard.created_at)}{rateCard.subscriber_count ? ` - ${rateCard.subscriber_count.toLocaleString()} subscribers` : ''}{rateCard.has_sponsorships ? ' - Has sponsorship history' : ''}
+                  {formatDate(rateCard.created_at)}
+                  {rateCard.subscriber_count ? ` - ${rateCard.subscriber_count.toLocaleString()} subscribers` : ''}
+                  {rateCard.has_sponsorships ? ' - Has sponsorship history' : ''}
+                  {rateCard.analytics_snapshot_id ? ` - Built from ${snapshotById.get(rateCard.analytics_snapshot_id)?.name || 'snapshot'}` : ''}
                 </p>
                 <div className={`mt-4 grid gap-3 text-sm ${summaries.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                   {summaries.map((summary) => (

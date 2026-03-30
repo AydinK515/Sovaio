@@ -13,6 +13,18 @@ export interface Profile {
   updated_at: string
 }
 
+export interface AnalyticsSnapshot {
+  id: string
+  user_id: string
+  name: string
+  csv_upload_ids: string[]
+  report_confidence: number
+  subscriber_count: number | null
+  report_types: string[]
+  created_at: string
+  updated_at: string
+}
+
 export interface CsvUpload {
   id: string
   user_id: string
@@ -25,6 +37,8 @@ export interface CsvUpload {
 export interface RateCard {
   id: string
   user_id: string
+  name: string | null
+  analytics_snapshot_id: string | null
   niche: string | null
   subscriber_count: number | null
   has_sponsorships: boolean
@@ -47,6 +61,7 @@ export interface Deal {
   id: string
   user_id: string
   rate_card_id: string | null
+  analytics_snapshot_id: string | null
   brand_name: string
   brand_logo_url: string | null
   status: 'negotiating' | 'closed_won' | 'closed_lost' | 'stalled'
@@ -89,6 +104,7 @@ export interface ChannelAiChat {
   id: string
   user_id: string
   rate_card_id: string | null
+  analytics_snapshot_id: string | null
   title: string
   openai_conversation_id: string | null
   openai_last_response_id: string | null

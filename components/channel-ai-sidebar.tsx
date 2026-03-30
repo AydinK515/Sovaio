@@ -3,18 +3,89 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
-import type { ChannelAiChat, ChannelAiMessage, RateCard } from '@/lib/types'
+import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
 import { Bot, Check, ChevronDown, MessageSquare, Plus, Send, Square, X } from 'lucide-react'
 
 function renderMarkdown(text: string) {
-  return text.split('\n').filter(Boolean).map((line, index) => {
-    if (/^\d+\.\s/.test(line.trim())) {
-      return <p key={index} className="text-sm leading-relaxed font-medium">{line.trim()}</p>
+  const lines = text.split('\n')
+  const elements: React.ReactNode[] = []
+  let i = 0
+  let key = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (line.trim() === '') {
+      i++
+      continue
     }
+
     if (/^[-*]\s/.test(line.trim())) {
-      return <p key={index} className="text-sm leading-relaxed">{line.trim()}</p>
+      const items: string[] = []
+      while (i < lines.length && /^[-*]\s/.test(lines[i].trim())) {
+        items.push(lines[i].trim().replace(/^[-*]\s/, ''))
+        i++
+      }
+      elements.push(
+        <ul key={key++} className="list-outside list-disc space-y-0.5 my-1 pl-5">
+          {items.map((item, j) => (
+            <li key={j} className="pl-1 text-sm leading-relaxed">{inlineFormat(item)}</li>
+          ))}
+        </ul>
+      )
+      continue
     }
-    return <p key={index} className="text-sm leading-relaxed">{line}</p>
+
+    if (/^\d+\.\s/.test(line.trim())) {
+      const items: string[] = []
+      while (i < lines.length && /^\d+\.\s/.test(lines[i].trim())) {
+        items.push(lines[i].trim().replace(/^\d+\.\s/, ''))
+        i++
+      }
+      elements.push(
+        <ol key={key++} className="list-outside list-decimal space-y-0.5 my-1 pl-5">
+          {items.map((item, j) => (
+            <li key={j} className="pl-1 text-sm leading-relaxed">{inlineFormat(item)}</li>
+          ))}
+        </ol>
+      )
+      continue
+    }
+
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      const content = headingMatch[2]
+      elements.push(
+        <p key={key++} className={`font-semibold leading-relaxed ${level === 1 ? 'text-base' : 'text-sm'} mt-2 mb-0.5`}>
+          {inlineFormat(content)}
+        </p>
+      )
+      i++
+      continue
+    }
+
+    elements.push(
+      <p key={key++} className="text-sm leading-relaxed">
+        {inlineFormat(line)}
+      </p>
+    )
+    i++
+  }
+
+  return elements.length > 0 ? <div className="space-y-1">{elements}</div> : null
+}
+
+function inlineFormat(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={i}>{part.slice(1, -1)}</em>
+    }
+    return part
   })
 }
 
@@ -41,9 +112,13 @@ function ReasoningDropdown({ text }: { text: string }) {
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className="text-xs text-muted hover:text-foreground transition-colors"
+        className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors"
       >
-        {open ? 'Hide reasoning' : 'Thought for a couple seconds'}
+        <ChevronDown
+          className="h-3.5 w-3.5 transition-transform duration-200"
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+        Thought for a couple seconds
       </button>
       {open && (
         <p className="mt-2 border-l-2 border-border pl-3 text-sm leading-relaxed text-muted whitespace-pre-wrap">
@@ -60,20 +135,21 @@ const CHANNEL_TEMPLATE_QUESTIONS = [
 ]
 
 export default function ChannelAiSidebar({
+  initialSnapshots,
   initialChats,
   initialChat,
   initialMessages,
-  latestRateCard,
   channelName,
 }: {
+  initialSnapshots: AnalyticsSnapshot[]
   initialChats: ChannelAiChat[]
   initialChat: ChannelAiChat | null
   initialMessages: ChannelAiMessage[]
-  latestRateCard: RateCard | null
   channelName: string | null
 }) {
   const supabase = createClient()
   const [open, setOpen] = useState(false)
+  const [snapshots] = useState(initialSnapshots)
   const [chats, setChats] = useState(initialChats)
   const [currentChat, setCurrentChat] = useState(initialChat)
   const [messages, setMessages] = useState(initialMessages)
@@ -84,6 +160,7 @@ export default function ChannelAiSidebar({
   const [aiReasoningText, setAiReasoningText] = useState('')
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState(initialChat?.analytics_snapshot_id ?? initialSnapshots[0]?.id ?? '')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const aiTextRef = useRef('')
@@ -120,7 +197,8 @@ export default function ChannelAiSidebar({
   }
 
   function getVisibleMessages() {
-    const openingMessage = getChannelAssistantOpeningMessage(latestRateCard, channelName)
+    const activeSnapshot = snapshots.find(snapshot => snapshot.id === (currentChat?.analytics_snapshot_id ?? selectedSnapshotId)) ?? null
+    const openingMessage = getChannelAssistantOpeningMessage(activeSnapshot, channelName)
     if (messages.some(message => message.role === 'ai' && message.content === openingMessage)) {
       return messages
     }
@@ -146,6 +224,7 @@ export default function ChannelAiSidebar({
       .order('created_at', { ascending: true })
 
     setCurrentChat(chat)
+    setSelectedSnapshotId(chat.analytics_snapshot_id ?? snapshots[0]?.id ?? '')
     setMessages((data || []) as ChannelAiMessage[])
     setRateLimitType(null)
   }
@@ -155,6 +234,23 @@ export default function ChannelAiSidebar({
     setMessages([])
     setInput('')
     setRateLimitType(null)
+  }
+
+  async function updateSnapshot(nextSnapshotId: string) {
+    setSelectedSnapshotId(nextSnapshotId)
+
+    if (!currentChat) return
+
+    await supabase
+      .from('channel_ai_chats')
+      .update({
+        analytics_snapshot_id: nextSnapshotId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', currentChat.id)
+
+    setCurrentChat(prev => prev ? { ...prev, analytics_snapshot_id: nextSnapshotId } : prev)
+    setChats(prev => prev.map(chat => chat.id === currentChat.id ? { ...chat, analytics_snapshot_id: nextSnapshotId } : chat))
   }
 
   function stopGeneration() {
@@ -188,7 +284,7 @@ export default function ChannelAiSidebar({
         .from('channel_ai_chats')
         .insert({
           user_id: user.id,
-          rate_card_id: latestRateCard?.id ?? null,
+          analytics_snapshot_id: selectedSnapshotId || null,
           title: 'New Chat',
         })
         .select('*')
@@ -199,7 +295,8 @@ export default function ChannelAiSidebar({
         return
       }
 
-      const openingMessage = getChannelAssistantOpeningMessage(latestRateCard, channelName)
+      const openingSnapshot = snapshots.find(snapshot => snapshot.id === (selectedSnapshotId || newChat.analytics_snapshot_id)) ?? null
+      const openingMessage = getChannelAssistantOpeningMessage(openingSnapshot, channelName)
       const { data: openingAiMessage } = await supabase
         .from('channel_ai_messages')
         .insert({
@@ -385,11 +482,7 @@ export default function ChannelAiSidebar({
 
   const visibleMessages = getVisibleMessages()
   const showTemplateQuestions = currentChat === null && messages.length === 0 && !aiTyping
-  const primaryRate = latestRateCard
-    ? latestRateCard.offers_dedicated_videos
-      ? `Dedicated: $${latestRateCard.dedicated_video_low.toLocaleString()}-$${latestRateCard.dedicated_video_high.toLocaleString()}`
-      : `60s: $${latestRateCard.integration_60s_low.toLocaleString()}-$${latestRateCard.integration_60s_high.toLocaleString()}`
-    : 'No rate card yet'
+  const currentSnapshot = snapshots.find(snapshot => snapshot.id === (currentChat?.analytics_snapshot_id ?? selectedSnapshotId)) ?? null
 
   return (
     <aside
@@ -407,8 +500,8 @@ export default function ChannelAiSidebar({
                       <MessageSquare className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <h2 className="text-sm font-semibold">Channel AI</h2>
-                      <p className="text-xs text-muted">General questions about your channel and rates</p>
+                      <h2 className="text-sm font-semibold">Channel Advisor</h2>
+                      <p className="text-xs text-muted">For your channel stats, sponsorship positioning, and analytics-backed context</p>
                       <div className="relative mt-2" ref={chatMenuRef}>
                         <button
                           type="button"
@@ -466,7 +559,24 @@ export default function ChannelAiSidebar({
                       </div>
                     </div>
                   </div>
-                  <p className="mt-3 text-xs text-muted">{channelName || 'Your channel'} | {primaryRate}</p>
+                  {snapshots.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      <select
+                        value={currentChat?.analytics_snapshot_id ?? selectedSnapshotId}
+                        onChange={(event) => void updateSnapshot(event.target.value)}
+                        className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        {snapshots.map((snapshot) => (
+                          <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-muted">{channelName || 'Your channel'} | {currentSnapshot ? `${currentSnapshot.report_confidence}% confidence snapshot` : 'Select snapshot'}</p>
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-relaxed text-amber-800">
+                      Upload analytics first so Channel Advisor can ground its answers in your real channel data.
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -563,8 +673,8 @@ export default function ChannelAiSidebar({
                           sendMessage()
                         }
                       }}
-                      placeholder="Ask about your channel, audience, or rates..."
-                      disabled={sending}
+                      placeholder={snapshots.length > 0 ? 'Ask about your channel, audience, or positioning...' : 'Upload analytics first to use Channel Advisor'}
+                      disabled={sending || snapshots.length === 0}
                       rows={1}
                       className="flex-1 resize-none overflow-hidden rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                       style={{ minHeight: '44px', maxHeight: '160px' }}
@@ -586,7 +696,7 @@ export default function ChannelAiSidebar({
                     ) : (
                       <button
                         type="submit"
-                        disabled={!input.trim() || sending}
+                        disabled={!input.trim() || sending || snapshots.length === 0}
                         className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                       >
                         <Send className="h-4 w-4" />
@@ -603,7 +713,7 @@ export default function ChannelAiSidebar({
             type="button"
             onClick={() => setOpen(true)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-sm transition-colors hover:bg-primary-hover"
-            aria-label="Open Channel AI"
+            aria-label="Open Channel Advisor"
           >
             <Bot className="h-4 w-4" />
           </button>
@@ -612,7 +722,7 @@ export default function ChannelAiSidebar({
             onClick={() => setOpen(true)}
             className="[writing-mode:vertical-rl] rotate-180 text-xs font-semibold uppercase tracking-[0.3em] text-muted"
           >
-            Channel AI
+            Channel Advisor
           </button>
           <div className="h-11 w-11" />
         </div>

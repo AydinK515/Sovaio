@@ -1,7 +1,8 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import { buildCsvSummary, toNumber } from '@/lib/csv-summary'
+import { buildRateCardName, getAnalyticsSnapshotContext } from '@/lib/analytics-context'
+import { toNumber } from '@/lib/csv-summary'
 import { createClient } from '@/lib/supabase-server'
 
 const RateCardSchema = z.object({
@@ -142,7 +143,7 @@ function buildPitchEmailContext(input: {
 }
 
 export async function POST(req: Request) {
-  const { niche, subscriberCount, hasSponsorships, offersDedicatedVideos, sponsorshipCount, avgDealAmount, csvData, confidence } = await req.json()
+  const { analyticsSnapshotId, niche, hasSponsorships, offersDedicatedVideos, sponsorshipCount, avgDealAmount } = await req.json()
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
@@ -163,7 +164,20 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single()
 
-  const csvSummary = buildCsvSummary(csvData)
+  const analyticsContext = await getAnalyticsSnapshotContext({
+    supabase,
+    snapshotId: analyticsSnapshotId,
+    userId: user.id,
+  })
+
+  if (!analyticsContext) {
+    return new Response('Analytics snapshot not found.', { status: 404 })
+  }
+
+  const subscriberCount = analyticsContext.snapshot.subscriber_count ?? 0
+  const confidence = analyticsContext.snapshot.report_confidence
+  const csvData = analyticsContext.csvData
+  const csvSummary = analyticsContext.csvSummary
   const medianViews = getMedianViews(csvData)
   const accessibleCpmBand = getAccessibleCpmBand(niche, medianViews)
   const pitchEmailContext = buildPitchEmailContext({
@@ -298,5 +312,8 @@ For pitch_email:
 
   console.log('\n=== generate-rate-card RESPONSE ===\n', JSON.stringify(object, null, 2), '\n===================================\n')
 
-  return Response.json(object)
+  return Response.json({
+    ...object,
+    name: buildRateCardName({ niche }),
+  })
 }
