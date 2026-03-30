@@ -821,10 +821,6 @@ export default function DealClient({
                 <span className="text-muted">Type:</span>
                 <span className="font-medium">{DEAL_TYPE_LABELS[deal.deal_type]}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Timeline:</span>
-                <span className="font-medium">{deal.timeline || 'Not set'}</span>
-              </div>
             </div>
           </div>
 
@@ -857,7 +853,7 @@ export default function DealClient({
         <div className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-white ${
           chatFullscreen
             ? 'fixed inset-x-6 bottom-6 top-24 z-40 shadow-2xl lg:inset-x-10 lg:top-20'
-            : 'min-h-[36rem] lg:min-h-[calc(100dvh-14rem)]'
+            : 'h-[36rem] lg:h-[calc(100dvh-14rem)]'
         }`}>
           <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div className="flex items-center gap-2">

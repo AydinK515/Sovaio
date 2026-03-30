@@ -162,6 +162,7 @@ export default function ChannelAiSidebar({
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const [selectedSnapshotId, setSelectedSnapshotId] = useState(initialChat?.analytics_snapshot_id ?? initialSnapshots[0]?.id ?? '')
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const aiTextRef = useRef('')
@@ -180,7 +181,13 @@ export default function ChannelAiSidebar({
 
   useEffect(() => {
     if (open) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      const container = messagesContainerRef.current
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth',
+        })
+      }
     }
   }, [open, messages, aiTyping, aiText, aiReasoningText])
 
@@ -590,7 +597,7 @@ export default function ChannelAiSidebar({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+            <div ref={messagesContainerRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
               {visibleMessages.map(message => (
                 <div key={message.id} className={`flex ${message.role === 'creator' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[88%] rounded-2xl px-4 py-3 ${
