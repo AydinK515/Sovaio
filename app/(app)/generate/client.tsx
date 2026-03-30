@@ -21,8 +21,9 @@ export default function GenerateRateCardClient({
   const router = useRouter()
   const supabase = createClient()
 
-  const [snapshotId, setSnapshotId] = useState(initialSnapshotId ?? snapshots[0]?.id ?? '')
+  const [snapshotId, setSnapshotId] = useState(initialSnapshotId ?? '')
   const [niche, setNiche] = useState('')
+  const [rateCardName, setRateCardName] = useState('')
   const [hasSponsorships, setHasSponsorships] = useState<boolean | null>(null)
   const [offersDedicatedVideos, setOffersDedicatedVideos] = useState<boolean | null>(null)
   const [sponsorshipCount, setSponsorshipCount] = useState('')
@@ -116,13 +117,13 @@ export default function GenerateRateCardClient({
       }
 
       const aiRates = await response.json()
-      const rateCardName = buildRateCardName({ niche })
+      const nextRateCardName = rateCardName.trim() || buildRateCardName({ niche })
 
       const { data: rateCard, error: saveError } = await supabase
         .from('rate_cards')
         .insert({
           user_id: user.id,
-          name: rateCardName,
+          name: nextRateCardName,
           analytics_snapshot_id: snapshotId,
           niche,
           subscriber_count: snapshot?.subscriber_count ?? null,
@@ -198,21 +199,22 @@ export default function GenerateRateCardClient({
                 <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot</label>
                 <div className="relative">
                   <select
-                    value={snapshotId}
-                    onChange={(event) => setSnapshotId(event.target.value)}
-                    className="w-full appearance-none rounded-xl border border-border bg-white px-4 py-3 pr-11 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    {snapshots.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                  value={snapshotId}
+                  onChange={(event) => setSnapshotId(event.target.value)}
+                  className="w-full appearance-none rounded-xl border border-border bg-white px-4 py-3 pr-11 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Select an analytics snapshot</option>
+                  {snapshots.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 </div>
               </div>
 
               {snapshot && confidenceTone && confidenceMessage && (
                 <div className="mt-4 flex-1 rounded-2xl border border-border bg-linear-to-br from-white via-slate-50 to-emerald-50/35 p-5">
-                  <h3 className="mt-3 text-lg font-semibold text-foreground">{confidenceMessage.title}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{confidenceMessage.title}</h3>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{confidenceMessage.body}</p>
 
                   {missingReports.length > 0 && (
@@ -232,7 +234,7 @@ export default function GenerateRateCardClient({
                     <button
                       type="button"
                       onClick={() => router.push('/analytics/new')}
-                      className="mt-5 inline-flex rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted-light"
+                      className="mt-5 inline-flex rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
                     >
                       Upload Missing Reports
                     </button>
@@ -246,9 +248,6 @@ export default function GenerateRateCardClient({
                   <div>
                     <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Snapshot Health</p>
                     <div className="mt-2 flex items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${confidenceTone.accentSoft}`}>
-                        {confidenceTone.badge}
-                      </span>
                       <span className="text-sm font-semibold text-foreground">{snapshot.report_confidence}% confidence</span>
                     </div>
                   </div>
@@ -301,6 +300,17 @@ export default function GenerateRateCardClient({
 
         <div className="rounded-2xl border border-border bg-white p-6">
           <h2 className="text-lg font-semibold">Pricing Inputs</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Rate Card Name</label>
+              <input
+                value={rateCardName}
+                onChange={(event) => setRateCardName(event.target.value)}
+                placeholder={buildRateCardName({ niche })}
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+          </div>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Niche</label>

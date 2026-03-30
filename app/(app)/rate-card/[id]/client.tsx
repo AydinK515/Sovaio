@@ -52,6 +52,11 @@ export default function RateCardClient({
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [previewScale, setPreviewScale] = useState(1)
   const [previewHeight, setPreviewHeight] = useState(0)
+  const [cardName, setCardName] = useState(rateCard.name || rateCard.niche || 'Untitled rate card')
+  const [editingCardName, setEditingCardName] = useState(false)
+  const [draftCardName, setDraftCardName] = useState(rateCard.name || rateCard.niche || 'Untitled rate card')
+  const [savingCardName, setSavingCardName] = useState(false)
+  const [cardNameError, setCardNameError] = useState('')
 
   const [supabase] = useState(() => createClient())
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -336,6 +341,37 @@ export default function RateCardClient({
     router.push(`/deal/${deal.id}?chat=${chat.id}`)
   }
 
+  async function saveCardName() {
+    const nextName = draftCardName.trim()
+    if (!nextName) {
+      setCardNameError('Rate card name cannot be empty.')
+      return
+    }
+
+    setSavingCardName(true)
+    setCardNameError('')
+
+    try {
+      const response = await fetch(`/api/rate-cards/${rateCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nextName }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      setCardName(nextName)
+      setEditingCardName(false)
+      router.refresh()
+    } catch (err: unknown) {
+      setCardNameError(err instanceof Error ? err.message : 'Failed to rename rate card.')
+    } finally {
+      setSavingCardName(false)
+    }
+  }
+
   const tips = rateCard.improvement_tips as { title: string; description: string }[] | null
   const exportAddOns = [
     { label: 'Organic usage rights (30 days)', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.2)) },
@@ -366,11 +402,59 @@ export default function RateCardClient({
           All Rate Cards
         </Link>
         <span className="text-muted">/</span>
-        <span className="text-muted">{new Date(rateCard.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        <span className="text-muted">{cardName}</span>
       </div>
 
       <div id="rate-card-content">
         <h1 className="text-3xl md:text-4xl font-bold">Your sponsorship rates are ready.</h1>
+        <div className="mt-4 rounded-2xl border border-border bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Rate Card Name</p>
+          {editingCardName ? (
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+              <input
+                value={draftCardName}
+                onChange={(event) => setDraftCardName(event.target.value)}
+                className="min-w-0 flex-1 rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveCardName()}
+                  disabled={savingCardName}
+                  className="rounded-xl bg-secondary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-secondary-hover disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCardName(false)
+                    setDraftCardName(cardName)
+                    setCardNameError('')
+                  }}
+                  className="rounded-xl border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-lg font-semibold text-foreground">{cardName}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftCardName(cardName)
+                  setEditingCardName(true)
+                }}
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light"
+              >
+                Edit Name
+              </button>
+            </div>
+          )}
+          {cardNameError && <p className="mt-3 text-sm text-primary">{cardNameError}</p>}
+        </div>
         <p className="mt-2 text-muted">
           Based on your latest channel performance, audience demographics, and current market demand for {rateCard.niche}.
         </p>

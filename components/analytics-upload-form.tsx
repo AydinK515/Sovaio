@@ -63,6 +63,7 @@ export default function AnalyticsUploadForm() {
   const supabase = createClient()
 
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([])
+  const [snapshotName, setSnapshotName] = useState(buildAnalyticsSnapshotName())
   const [subscriberCount, setSubscriberCount] = useState('')
   const [dragActive, setDragActive] = useState(false)
   const [activeTutorialStep, setActiveTutorialStep] = useState(0)
@@ -269,7 +270,7 @@ export default function AnalyticsUploadForm() {
         uploadIds.push(data.id)
       }
 
-      const snapshotName = buildAnalyticsSnapshotName()
+      const nextSnapshotName = snapshotName.trim() || buildAnalyticsSnapshotName()
       const snapshotSubscriberCount = subscriberCount ? parseInt(subscriberCount.replace(/,/g, '')) : null
       const reportTypes = parsedFiles.map(file => file.type)
 
@@ -277,7 +278,7 @@ export default function AnalyticsUploadForm() {
         .from('analytics_snapshots')
         .insert({
           user_id: user.id,
-          name: snapshotName,
+          name: nextSnapshotName,
           csv_upload_ids: uploadIds,
           report_confidence: confidence,
           subscriber_count: snapshotSubscriberCount,
@@ -408,6 +409,16 @@ export default function AnalyticsUploadForm() {
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot Name</label>
+              <input
+                type="text"
+                value={snapshotName}
+                onChange={event => setSnapshotName(event.target.value)}
+                placeholder={buildAnalyticsSnapshotName()}
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Subscriber Count</label>
               <input

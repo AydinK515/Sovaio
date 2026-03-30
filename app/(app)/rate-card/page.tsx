@@ -96,7 +96,7 @@ export default async function RateCardsPage() {
             Upload your latest YouTube Studio exports and we&apos;ll turn them into a reusable sponsorship rate card you can come back to anytime.
           </p>
           <Link
-            href={`/generate?snapshot=${snapshots[0].id}`}
+            href="/generate"
             className="mt-6 inline-flex items-center gap-2 bg-primary text-white font-medium px-6 py-3 rounded-xl hover:bg-primary-hover transition-colors text-sm"
           >
             <Plus className="w-4 h-4" />
@@ -119,7 +119,7 @@ export default async function RateCardsPage() {
           <p className="mt-2 text-muted">Every card you generate is saved here so you can revisit, compare, and start deals later.</p>
         </div>
         <Link
-          href={`/generate?snapshot=${snapshots[0].id}`}
+          href="/generate"
           className="inline-flex items-center gap-2 bg-primary text-white font-medium px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-colors text-sm"
         >
           <Plus className="w-4 h-4" />
