@@ -1,11 +1,40 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, User, X } from 'lucide-react'
 
-export function MarketingNav() {
+interface MarketingNavProps {
+  isLoggedIn?: boolean
+  avatarUrl?: string | null
+  channelName?: string | null
+}
+
+function AvatarBadge({ avatarUrl, channelName }: Pick<MarketingNavProps, 'avatarUrl' | 'channelName'>) {
+  if (avatarUrl) {
+    return (
+      <div className="relative h-9 w-9 overflow-hidden rounded-full border border-border bg-muted-light">
+        <Image
+          src={avatarUrl}
+          alt={channelName ? `${channelName} avatar` : 'Profile avatar'}
+          fill
+          sizes="36px"
+          className="object-cover"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted-light text-muted">
+      <User className="h-4 w-4" />
+    </div>
+  )
+}
+
+export function MarketingNav({ isLoggedIn = false, avatarUrl = null, channelName = null }: MarketingNavProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -19,13 +48,27 @@ export function MarketingNav() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted hover:text-foreground transition-colors">Features</a>
             <a href="#pricing" className="text-sm text-muted hover:text-foreground transition-colors">Pricing</a>
-            <Link href="/auth/login" className="text-sm text-muted hover:text-foreground transition-colors">Log In</Link>
-            <Link
-              href="/auth/signup"
-              className="inline-flex items-center gap-2 bg-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-primary-hover transition-colors"
-            >
-              Get My Rate
-            </Link>
+            {isLoggedIn ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-2 bg-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-primary-hover transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <AvatarBadge avatarUrl={avatarUrl} channelName={channelName} />
+              </div>
+            ) : (
+              <>
+                <Link href="/auth/login" className="text-sm text-muted hover:text-foreground transition-colors">Log In</Link>
+                <Link
+                  href="/auth/signup"
+                  className="inline-flex items-center gap-2 bg-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-primary-hover transition-colors"
+                >
+                  Get My Rate
+                </Link>
+              </>
+            )}
           </div>
 
           <button className="md:hidden" onClick={() => setOpen(!open)}>
@@ -38,8 +81,17 @@ export function MarketingNav() {
         <div className="md:hidden border-t border-border bg-white px-4 py-4 space-y-3">
           <a href="#features" className="block text-sm text-muted" onClick={() => setOpen(false)}>Features</a>
           <a href="#pricing" className="block text-sm text-muted" onClick={() => setOpen(false)}>Pricing</a>
-          <Link href="/auth/login" className="block text-sm text-muted" onClick={() => setOpen(false)}>Log In</Link>
-          <Link href="/auth/signup" className="block text-sm font-medium text-primary" onClick={() => setOpen(false)}>Get My Rate</Link>
+          {isLoggedIn ? (
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/dashboard" className="block text-sm font-medium text-primary" onClick={() => setOpen(false)}>Dashboard</Link>
+              <AvatarBadge avatarUrl={avatarUrl} channelName={channelName} />
+            </div>
+          ) : (
+            <>
+              <Link href="/auth/login" className="block text-sm text-muted" onClick={() => setOpen(false)}>Log In</Link>
+              <Link href="/auth/signup" className="block text-sm font-medium text-primary" onClick={() => setOpen(false)}>Get My Rate</Link>
+            </>
+          )}
         </div>
       )}
     </nav>

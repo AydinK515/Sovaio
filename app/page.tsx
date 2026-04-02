@@ -1,11 +1,36 @@
 import Link from 'next/link'
 import { MarketingNav, Footer } from '@/components/navbar'
+import { createClient } from '@/lib/supabase-server'
 import { ArrowRight, Upload, BarChart3, MessageSquare, Check, ChevronDown, Shield, Zap, TrendingUp } from 'lucide-react'
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  let avatarUrl: string | null = null
+  let channelName: string | null = null
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('channel_name, avatar_path')
+      .eq('id', user.id)
+      .single()
+
+    channelName = profile?.channel_name ?? null
+
+    if (profile?.avatar_path) {
+      const { data: signedAvatar } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(profile.avatar_path, 60 * 60)
+
+      avatarUrl = signedAvatar?.signedUrl ?? null
+    }
+  }
+
   return (
     <>
-      <MarketingNav />
+      <MarketingNav isLoggedIn={Boolean(user)} avatarUrl={avatarUrl} channelName={channelName} />
       <main className="flex-1">
         {/* Hero */}
         <section className="relative overflow-hidden">
