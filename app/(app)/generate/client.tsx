@@ -223,13 +223,12 @@ export default function GenerateRateCardClient({
 
       router.push(`/rate-card/${rateCard.id}`)
       router.refresh()
+      return
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
       return
     }
-
-    setLoading(false)
   }
 
   if (snapshots.length === 0) {
