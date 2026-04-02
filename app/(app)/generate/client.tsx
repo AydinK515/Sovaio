@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BarChart3, CircleHelp, FileText, Users } from 'lucide-react'
+import { BarChart3, CircleHelp, FileText, Sparkles, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { buildRateCardName } from '@/lib/analytics-context'
 import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload, NICHES } from '@/lib/types'
@@ -11,6 +11,27 @@ import FancySelect from '@/components/fancy-select'
 const REPORT_TYPE_LABELS: Record<CsvUpload['upload_type'], string> = Object.fromEntries(
   CSV_TYPES.map(type => [type.key, type.label])
 ) as Record<CsvUpload['upload_type'], string>
+
+const GENERATION_PHASES = [
+  {
+    label: 'Phase 1',
+    title: 'Reading your analytics',
+    body: 'We pull the strongest signals from your saved YouTube snapshot.',
+    icon: BarChart3,
+  },
+  {
+    label: 'Phase 2',
+    title: 'Pricing your inventory',
+    body: 'We estimate dedicated and integration ranges based on your channel context.',
+    icon: Sparkles,
+  },
+  {
+    label: 'Phase 3',
+    title: 'Drafting your pitch',
+    body: 'We package the numbers into a usable rate card with explanation and email copy.',
+    icon: FileText,
+  },
+] as const
 
 export default function GenerateRateCardClient({
   snapshots,
@@ -30,6 +51,7 @@ export default function GenerateRateCardClient({
   const [sponsorshipCount, setSponsorshipCount] = useState('')
   const [avgDealAmount, setAvgDealAmount] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState('')
 
   const snapshot = useMemo(
@@ -92,6 +114,39 @@ export default function GenerateRateCardClient({
     () => NICHES.map((option) => ({ value: option, label: option })),
     []
   )
+  const activePhaseIndex = loadingProgress < 33 ? 0 : loadingProgress < 66 ? 1 : 2
+  const activePhase = GENERATION_PHASES[activePhaseIndex]
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingProgress(0)
+      return
+    }
+
+    const freezeTarget = 93 + Math.floor(Math.random() * 8)
+
+    const startedAt = Date.now()
+    const interval = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt
+      let nextProgress = 0
+
+      if (elapsed <= 5000) {
+        const t = elapsed / 5000
+        nextProgress = 40 * (1 - Math.pow(1 - t, 2.5))
+      } else {
+        const t = Math.min((elapsed - 5000) / 55000, 1)
+        nextProgress = 40 + (freezeTarget - 40) * (1 - Math.pow(1 - t, 4.2))
+      }
+
+      setLoadingProgress(Math.min(nextProgress, freezeTarget))
+
+      if (elapsed >= 60000) {
+        window.clearInterval(interval)
+      }
+    }, 120)
+
+    return () => window.clearInterval(interval)
+  }, [loading])
 
   async function handleGenerate() {
     if (!snapshotId || !niche || hasSponsorships === null || offersDedicatedVideos === null) {
@@ -191,6 +246,90 @@ export default function GenerateRateCardClient({
           >
             Upload Analytics
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[calc(100dvh-16rem)] items-center justify-center py-8">
+        <div className="mx-auto w-full max-w-3xl rounded-[2rem] border border-border bg-white p-8 shadow-sm md:p-12">
+          <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+            <div className="relative h-28 w-36">
+              <div className="absolute inset-x-3 bottom-0 top-3 rounded-[1.6rem] border border-slate-200 bg-linear-to-b from-white via-white to-slate-50 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)]" />
+              <div className="absolute left-9 right-9 top-10 h-1.5 rounded-full bg-slate-200" />
+              <div className="absolute left-9 right-11 top-15 h-1.5 rounded-full bg-slate-200" />
+              <div className="absolute left-9 right-14 top-20 h-1.5 rounded-full bg-slate-200" />
+              <div
+                className="absolute left-10 top-7 h-14 w-4 rounded-full bg-primary shadow-[0_10px_20px_-12px_rgba(239,68,68,0.9)] transition-transform duration-150"
+                style={{
+                  transform: `translateX(${loadingProgress * 0.72}px) translateY(${Math.sin(loadingProgress / 8) * 3}px) rotate(32deg)`,
+                }}
+              >
+                <div className="absolute left-1/2 top-[-6px] h-3 w-3 -translate-x-1/2 rounded-t-full bg-amber-200" />
+                <div className="absolute bottom-[-8px] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[10px] border-x-transparent border-t-slate-700" />
+              </div>
+              <div
+                className="absolute left-11 top-22 h-0.5 rounded-full bg-primary/35 transition-all duration-150"
+                style={{ width: `${18 + loadingProgress * 0.7}px` }}
+              />
+              <div
+                className="absolute left-11 top-17 h-0.5 rounded-full bg-primary/20 transition-all duration-150"
+                style={{ width: `${10 + loadingProgress * 0.45}px` }}
+              />
+            </div>
+
+            <h1 className="mt-7 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+              Generating your rate card
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted md:text-base">
+              {activePhase.title}. We&apos;re turning your analytics and sponsorship inputs into a tailored creator rate card.
+            </p>
+
+            <div className="mt-8 grid w-full gap-3 text-left md:grid-cols-3">
+              {GENERATION_PHASES.map((item, index) => (
+                <div
+                  key={item.title}
+                  className={`rounded-2xl border p-4 transition-all duration-300 ${
+                    index === activePhaseIndex
+                      ? 'border-primary/30 bg-primary-light/60 shadow-[0_18px_38px_-30px_rgba(239,68,68,0.9)]'
+                      : index < activePhaseIndex
+                        ? 'border-emerald-200 bg-emerald-50/70'
+                        : 'border-border bg-linear-to-br from-white to-slate-50'
+                  }`}
+                >
+                  <item.icon className="h-5 w-5 text-primary" />
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-foreground">{item.title}</h2>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-white text-xs font-semibold text-muted">
+                      {index + 1}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">{item.body}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 w-full">
+              <div className="mb-2 flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                <span>{activePhase.title}</span>
+                <span>{Math.floor(loadingProgress)}%</span>
+              </div>
+              <div className="relative h-3 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-primary via-rose-400 to-orange-300 transition-[width] duration-150"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+                <div
+                  className="absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full border border-white/80 bg-white/70 shadow-[0_10px_24px_-16px_rgba(239,68,68,0.95)] backdrop-blur-sm transition-[left] duration-150"
+                  style={{ left: `calc(${loadingProgress}% - 12px)` }}
+                >
+                  <div className="absolute inset-1 rounded-full bg-primary/75" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
