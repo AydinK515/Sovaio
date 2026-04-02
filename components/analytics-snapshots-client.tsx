@@ -180,6 +180,9 @@ export default function AnalyticsSnapshotsClient({
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <Link href={`/analytics/${snapshot.id}`} className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light">
+                View Snapshot
+              </Link>
               <Link href={`/generate?snapshot=${snapshot.id}`} className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light">
                 Generate Rate Card
               </Link>

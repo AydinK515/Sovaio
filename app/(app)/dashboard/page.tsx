@@ -151,6 +151,7 @@ export default async function DashboardPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-3">
+                  <Link href={`/analytics/${snapshot.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">View Snapshot <ArrowRight className="h-3.5 w-3.5" /></Link>
                   <Link href={`/generate?snapshot=${snapshot.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">Generate Rate Card <ArrowRight className="h-3.5 w-3.5" /></Link>
                   <Link href={`/deal/new?snapshot=${snapshot.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">Create Deal <ArrowRight className="h-3.5 w-3.5" /></Link>
                 </div>

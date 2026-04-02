@@ -295,7 +295,7 @@ export default function AnalyticsUploadForm() {
         }).eq('id', user.id)
       }
 
-      router.push(`/generate?snapshot=${snapshot.id}`)
+      router.push(`/analytics/${snapshot.id}`)
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
