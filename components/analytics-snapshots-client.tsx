@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import type { AnalyticsSnapshot } from '@/lib/types'
 
 function formatDate(value: string) {
@@ -222,8 +222,12 @@ export default function AnalyticsSnapshotsClient({
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <Link href={`/analytics/${snapshot.id}`} className="inline-flex items-center justify-center rounded-xl bg-foreground px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90">
+                <Link
+                  href={`/analytics/${snapshot.id}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-medium text-white transition-colors hover:opacity-90"
+                >
                   View Snapshot
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>

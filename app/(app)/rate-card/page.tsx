@@ -190,7 +190,7 @@ export default async function RateCardsPage() {
               <div className="flex lg:shrink-0">
                 <Link
                   href={`/rate-card/${rateCard.id}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-white px-5 py-3 text-sm font-medium hover:bg-primary-hover transition-colors"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-medium text-white transition-colors hover:opacity-90"
                 >
                   Open Rate Card
                   <ArrowRight className="w-4 h-4" />
