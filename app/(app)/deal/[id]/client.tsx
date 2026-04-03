@@ -805,13 +805,13 @@ export default function DealClient({
                 <p className="text-2xl font-bold">{formatDealTarget(deal, rateCard)}</p>
               </div>
               {deal.brand_last_offer && (
-                <div className="border-t border-border pt-3">
+                <div className="border-t-2 border-border pt-3">
                   <p className="text-xs text-muted uppercase tracking-wider mb-1">Their Last Offer</p>
                   <p className="text-2xl font-bold text-primary">{formatCurrency(deal.brand_last_offer)}</p>
                 </div>
               )}
               {deal.final_price && (
-                <div className="border-t border-border pt-3">
+                <div className="border-t-2 border-border pt-3">
                   <p className="text-xs text-muted uppercase tracking-wider mb-1">Final Price</p>
                   <p className="text-2xl font-bold text-success">{formatCurrency(deal.final_price)}</p>
                 </div>

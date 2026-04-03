@@ -164,9 +164,17 @@ export default function ChannelAiSidebar({
   const [selectedSnapshotId, setSelectedSnapshotId] = useState(initialChat?.analytics_snapshot_id ?? initialSnapshots[0]?.id ?? '')
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const aiTextRef = useRef('')
   const chatMenuRef = useRef<HTMLDivElement | null>(null)
+
+  function resizeTextarea() {
+    const element = textareaRef.current
+    if (!element) return
+    element.style.height = '44px'
+    element.style.height = Math.min(element.scrollHeight, 160) + 'px'
+  }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -190,6 +198,20 @@ export default function ChannelAiSidebar({
       }
     }
   }, [open, messages, aiTyping, aiText, aiReasoningText])
+
+  useEffect(() => {
+    resizeTextarea()
+  }, [input, currentChat, open])
+
+  useEffect(() => {
+    if (!open) return
+
+    const frame = requestAnimationFrame(() => {
+      resizeTextarea()
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [open, currentChat])
 
   function sortChats(nextChats: ChannelAiChat[]) {
     return [...nextChats].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
@@ -674,6 +696,7 @@ export default function ChannelAiSidebar({
                   )}
                   <form onSubmit={event => { event.preventDefault(); sendMessage() }} className="flex items-end gap-3">
                     <textarea
+                      ref={textareaRef}
                       value={input}
                       onChange={event => setInput(event.target.value)}
                       onKeyDown={event => {
@@ -687,12 +710,6 @@ export default function ChannelAiSidebar({
                       rows={1}
                       className="flex-1 resize-none overflow-hidden rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                       style={{ minHeight: '44px', maxHeight: '160px' }}
-                      ref={element => {
-                        if (element) {
-                          element.style.height = 'auto'
-                          element.style.height = Math.min(element.scrollHeight, 160) + 'px'
-                        }
-                      }}
                     />
                     {aiTyping ? (
                       <button

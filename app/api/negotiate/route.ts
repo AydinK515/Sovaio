@@ -3,6 +3,7 @@ import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { createClient } from '@/lib/supabase-server'
 import { buildCsvSummary } from '@/lib/csv-summary'
+import type { AnalyticsContext } from '@/lib/analytics-context'
 import type { Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 
 const OPENAI_API_BASE_URL = 'https://api.openai.com/v1'
@@ -69,7 +70,73 @@ function formatSseEvent(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`
 }
 
-function buildSystemPrompt(deal: Deal, generateTitle: boolean, channelContext: string | null, channelName: string | null) {
+function toNumber(value: unknown) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value !== 'string') return 0
+
+  const normalized = value.replace(/[$,%\s]/g, '').replace(/,/g, '')
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getMedianViews(context: AnalyticsContext | null) {
+  const rows = context?.csvData.content
+    ?.filter(row => String(row['Video title'] ?? '').trim() !== '')
+    .slice(0, 10) ?? []
+
+  if (rows.length === 0) return null
+
+  const sorted = rows
+    .map(row => toNumber(row['Views'] ?? row['views']))
+    .sort((a, b) => a - b)
+
+  if (sorted.length === 0) return null
+
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0
+    ? sorted[mid]
+    : Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+}
+
+function buildPricingRealityCheck(context: AnalyticsContext | null) {
+  if (!context) return null
+
+  const subscriberCount = context.snapshot.subscriber_count
+  const medianViews = getMedianViews(context)
+  const lines: string[] = []
+
+  if (medianViews != null) {
+    lines.push(`- Median views/video from analytics: ${medianViews.toLocaleString()}.`)
+  }
+
+  if (subscriberCount != null) {
+    lines.push(`- Subscriber count on this snapshot: ${subscriberCount.toLocaleString()}.`)
+  }
+
+  lines.push(`- The creator's current ask is an opening anchor, not evidence that the market supports that number.`)
+
+  if ((medianViews ?? Infinity) < 1_000) {
+    lines.push(`- If median views/video are under 1,000, keep cash expectations conservative. Do not describe four-figure integrations as standard, low-end, or casually reasonable unless exceptional deliverables or proven performance are explicitly stated.`)
+  }
+
+  if ((medianViews ?? Infinity) < 250 || (subscriberCount ?? Infinity) < 100) {
+    lines.push(`- If the channel is under 250 median views/video or under 100 subscribers, a $1,000 cash integration is usually not commercially reasonable from channel size alone.`)
+  }
+
+  if ((medianViews ?? Infinity) < 100 || (subscriberCount ?? Infinity) <= 10) {
+    lines.push(`- For near-zero traction channels, assume product exchange or very low hundreds at most unless the user explicitly provides unusual off-platform value, guaranteed deliverables, or strong prior conversion proof.`)
+  }
+
+  return `Pricing reality checks:\n${lines.join('\n')}`
+}
+
+function buildSystemPrompt(
+  deal: Deal,
+  generateTitle: boolean,
+  channelContext: string | null,
+  channelName: string | null,
+  pricingRealityCheck: string | null
+) {
   return `You are RateProof AI, the Deal Assistant for YouTube creators.
 
 Your role is live negotiation execution for the active brand conversation.
@@ -84,6 +151,7 @@ ${deal.brand_last_offer ? `- Brand's last known offer: $${deal.brand_last_offer.
 ${deal.timeline ? `- Timeline: ${deal.timeline}` : ''}
 ${deal.notes ? `- Additional notes: ${deal.notes}` : ''}
 ${channelContext ? `\n${channelContext}` : ''}
+${pricingRealityCheck ? `\n\n${pricingRealityCheck}` : ''}
 
 What this assistant is for:
 - evaluating the current brand conversation
@@ -117,6 +185,8 @@ Behavior rules:
 - For brand_update and strategy_request: give clear, commercially realistic negotiation help.
 - Keep the center of gravity on the live deal: what the brand said, what the creator wants, and what should happen next.
 - When negotiating or drafting a reply, actively use the creator's real channel numbers as supporting justification when they strengthen the argument.
+- When the creator asks whether a number is reasonable, judge it against the analytics context first. Do not treat the creator's own ask as proof the market supports it.
+- If the channel metrics are tiny, say that plainly. Do not soften it by calling a clearly inflated number "commercially reasonable", "acceptable", or "low-end".
 - Never invent campaign details, exact brand wording, deadlines, usage rights, payment terms, or internal facts that were not provided.
 - Do not aggressively ask for missing details unless the user is actually trying to analyze a negotiation step.
 - If you decide to ask the creator questions, write the full numbered list of questions immediately in the advice field. Never announce that you "will ask questions" or "have questions ready" without actually writing them out. Do it now, in this response.
@@ -408,6 +478,8 @@ export async function POST(req: Request) {
       channelContext = analyticsContext.promptContext
     }
 
+    const pricingRealityCheck = buildPricingRealityCheck(analyticsContext)
+
     if (false) {
       /*
         const { data: fetchedRateCard } = await supabase
@@ -521,7 +593,13 @@ export async function POST(req: Request) {
       supabase,
     })
 
-    const systemPrompt = buildSystemPrompt(deal as Deal, Boolean(generateTitle), channelContext, channelName)
+    const systemPrompt = buildSystemPrompt(
+      deal as Deal,
+      Boolean(generateTitle),
+      channelContext,
+      channelName,
+      pricingRealityCheck
+    )
     console.log('\n=== negotiate SYSTEM PROMPT ===\n', systemPrompt, '\n=== USER MESSAGE ===\n', latestUserMessage, '\n==============================\n')
 
     const openaiRequestBody = JSON.stringify({
