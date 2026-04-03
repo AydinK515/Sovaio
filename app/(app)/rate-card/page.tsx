@@ -146,6 +146,15 @@ export default async function RateCardsPage() {
             ))}
           </div>
         </div>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            href={`/rate-card/${latestCard.id}`}
+            className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-secondary transition-colors hover:bg-white/90"
+          >
+            View Rate Card
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-4">
