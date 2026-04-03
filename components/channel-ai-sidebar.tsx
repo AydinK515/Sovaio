@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
-import { Bot, Check, ChevronDown, MessageSquare, Plus, Send, Square, X } from 'lucide-react'
+import { Bot, Check, ChevronDown, MessageSquare, Pencil, Plus, Send, Square, Trash2, X } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
 
 function renderMarkdown(text: string) {
@@ -161,6 +161,9 @@ export default function ChannelAiSidebar({
   const [aiReasoningText, setAiReasoningText] = useState('')
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [selectedSnapshotId, setSelectedSnapshotId] = useState(initialChat?.analytics_snapshot_id ?? initialSnapshots[0]?.id ?? '')
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
@@ -264,6 +267,65 @@ export default function ChannelAiSidebar({
     setMessages([])
     setInput('')
     setRateLimitType(null)
+  }
+
+  async function submitRename(chatId: string) {
+    const trimmed = renameValue.trim()
+    setRenamingChatId(null)
+    if (!trimmed) return
+    const original = chats.find(chat => chat.id === chatId)?.title
+    if (trimmed === original) return
+
+    renameChatLocally(chatId, trimmed)
+    await supabase
+      .from('channel_ai_chats')
+      .update({ title: trimmed })
+      .eq('id', chatId)
+  }
+
+  async function deleteChat(chatId: string) {
+    if (deletingChatId) return
+
+    const remainingChats = chats.filter(chat => chat.id !== chatId)
+    const nextChat = currentChat?.id === chatId ? remainingChats[0] ?? null : currentChat
+
+    setDeletingChatId(chatId)
+
+    const { error: messagesError } = await supabase
+      .from('channel_ai_messages')
+      .delete()
+      .eq('chat_id', chatId)
+
+    if (messagesError) {
+      setDeletingChatId(null)
+      return
+    }
+
+    const { error: chatError } = await supabase
+      .from('channel_ai_chats')
+      .delete()
+      .eq('id', chatId)
+
+    if (chatError) {
+      setDeletingChatId(null)
+      return
+    }
+
+    setChats(remainingChats)
+
+    if (currentChat?.id === chatId) {
+      setCurrentChat(nextChat)
+      setMessages([])
+      setAiText('')
+      setAiReasoningText('')
+      setInput('')
+      setRateLimitType(null)
+      if (nextChat) {
+        await loadChat(nextChat)
+      }
+    }
+
+    setDeletingChatId(null)
   }
 
   async function updateSnapshot(nextSnapshotId: string) {
@@ -558,20 +620,64 @@ export default function ChannelAiSidebar({
                                 </div>
                               )}
                               {chats.map(chat => (
-                                <button
+                                <div
                                   key={chat.id}
-                                  type="button"
-                                  onClick={() => {
-                                    void loadChat(chat)
-                                    setChatMenuOpen(false)
-                                  }}
-                                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                                  className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
                                     chat.id === currentChat?.id ? 'bg-primary/8 text-foreground' : 'hover:bg-muted-light'
                                   }`}
                                 >
-                                  <span className="truncate">{chat.title}</span>
-                                  {chat.id === currentChat?.id && <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />}
-                                </button>
+                                  {renamingChatId === chat.id ? (
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={renameValue}
+                                      onChange={event => setRenameValue(event.target.value)}
+                                      onBlur={() => void submitRename(chat.id)}
+                                      onKeyDown={event => {
+                                        if (event.key === 'Enter') { event.preventDefault(); void submitRename(chat.id) }
+                                        if (event.key === 'Escape') { event.preventDefault(); setRenamingChatId(null) }
+                                      }}
+                                      onClick={event => event.stopPropagation()}
+                                      className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
+                                    />
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        void loadChat(chat)
+                                        setChatMenuOpen(false)
+                                      }}
+                                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                                    >
+                                      <span className="truncate font-medium">{chat.title}</span>
+                                      {chat.id === currentChat?.id && <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={event => {
+                                      event.stopPropagation()
+                                      setRenameValue(chat.title)
+                                      setRenamingChatId(chat.id)
+                                    }}
+                                    aria-label={`Rename ${chat.title}`}
+                                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={event => {
+                                      event.stopPropagation()
+                                      void deleteChat(chat.id)
+                                    }}
+                                    disabled={deletingChatId === chat.id}
+                                    aria-label={`Delete ${chat.title}`}
+                                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               ))}
                             </div>
 
@@ -582,7 +688,8 @@ export default function ChannelAiSidebar({
                                   createChat()
                                   setChatMenuOpen(false)
                                 }}
-                                className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-sm font-medium text-muted transition-colors hover:bg-muted-light hover:text-foreground"
+                                disabled={currentChat === null}
+                                className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-sm font-medium text-muted transition-colors hover:bg-muted-light hover:text-foreground disabled:opacity-50"
                               >
                                 <Plus className="h-4 w-4" />
                                 Start a new chat
