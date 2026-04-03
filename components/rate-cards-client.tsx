@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import type { AnalyticsSnapshot, RateCard } from '@/lib/types'
 
@@ -55,6 +55,10 @@ export default function RateCardsClient({
   const [draftName, setDraftName] = useState('')
   const [pendingRateCardId, setPendingRateCardId] = useState<string | null>(null)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setRateCards(initialRateCards)
+  }, [initialRateCards])
 
   const snapshotById = new Map(snapshots.map(snapshot => [snapshot.id, snapshot]))
   const latestCard = rateCards[0] ?? null

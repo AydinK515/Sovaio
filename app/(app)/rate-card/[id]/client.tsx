@@ -68,6 +68,12 @@ export default function RateCardClient({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
+    const nextCardName = rateCard.name || rateCard.niche || 'Untitled rate card'
+    setCardName(nextCardName)
+    setDraftCardName(nextCardName)
+  }, [rateCard.name, rateCard.niche])
+
+  useEffect(() => {
     if (!profile?.avatar_path) return
     let cancelled = false
 

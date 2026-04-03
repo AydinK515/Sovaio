@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 
 async function getAuthedRateCard(id: string) {
@@ -49,6 +50,10 @@ export async function PATCH(
   if (error) {
     return new Response(error.message, { status: 500 })
   }
+
+  revalidatePath('/rate-card')
+  revalidatePath(`/rate-card/${id}`)
+  revalidatePath('/dashboard')
 
   return Response.json({ ok: true, name: nextName })
 }

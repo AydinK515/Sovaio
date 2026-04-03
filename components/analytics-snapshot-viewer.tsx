@@ -73,6 +73,11 @@ export default function AnalyticsSnapshotViewer({
   const [pendingAction, setPendingAction] = useState<'rename' | 'delete' | null>(null)
   const [actionError, setActionError] = useState('')
 
+  useEffect(() => {
+    setSnapshotName(snapshot.name)
+    setDraftName(snapshot.name)
+  }, [snapshot.name])
+
   const selectedRows = selectedReportType ? (csvData[selectedReportType] ?? []) : []
   const selectedColumns = collectColumns(selectedRows)
   const totalPages = Math.max(1, Math.ceil(selectedRows.length / rowsPerPage))

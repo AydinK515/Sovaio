@@ -154,7 +154,7 @@ export default function ChannelAiSidebar({
 }) {
   const supabase = createClient()
   const [open, setOpen] = useState(false)
-  const [snapshots] = useState(initialSnapshots)
+  const [snapshots, setSnapshots] = useState(initialSnapshots)
   const [chats, setChats] = useState(initialChats)
   const [currentChat, setCurrentChat] = useState(initialChat)
   const [messages, setMessages] = useState(initialMessages)
@@ -182,6 +182,10 @@ export default function ChannelAiSidebar({
     element.style.height = '44px'
     element.style.height = Math.min(element.scrollHeight, 160) + 'px'
   }
+
+  useEffect(() => {
+    setSnapshots(initialSnapshots)
+  }, [initialSnapshots])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

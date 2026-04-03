@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import type { AnalyticsSnapshot } from '@/lib/types'
 
@@ -22,6 +22,10 @@ export default function AnalyticsSnapshotsClient({
   const [pendingSnapshotId, setPendingSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const latestSnapshot = snapshots[0] ?? null
+
+  useEffect(() => {
+    setSnapshots(initialSnapshots)
+  }, [initialSnapshots])
 
   async function saveSnapshotName(snapshotId: string) {
     const nextName = draftName.trim()

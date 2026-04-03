@@ -5,6 +5,11 @@ import { requireAiEnabled } from '@/lib/ai-access'
 import { formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { captureAiGeneration, captureServerEvent, createPostHogServerClient, shutdownPostHog } from '@/lib/posthog-server'
+import {
+  getNegotiationChannelNameCache,
+  hasNegotiationChannelNameCache,
+  setNegotiationChannelNameCache,
+} from '@/lib/negotiation-cache'
 import { createClient } from '@/lib/supabase-server'
 import { buildCsvSummary } from '@/lib/csv-summary'
 import type { AnalyticsContext } from '@/lib/analytics-context'
@@ -15,8 +20,6 @@ const OPENAI_API_BASE_URL = 'https://api.openai.com/v1'
 // In-memory cache for channel context strings keyed by rate_card_id.
 // This is per-process and intentionally not persistent — it avoids redundant
 // DB fetches and buildCsvSummary calls within the same server instance.
-const channelNameCache = new Map<string, string | null>()
-
 const negotiationResponseSchema = {
   type: 'object',
   properties: {
@@ -477,8 +480,8 @@ export async function POST(req: Request) {
     })
 
     let channelName: string | null = null
-    if (channelNameCache.has(user.id)) {
-      channelName = channelNameCache.get(user.id) ?? null
+    if (hasNegotiationChannelNameCache(user.id)) {
+      channelName = getNegotiationChannelNameCache(user.id) ?? null
     } else {
       const { data: profile } = await supabase
         .from('profiles')
@@ -486,7 +489,7 @@ export async function POST(req: Request) {
         .eq('id', user.id)
         .single()
       channelName = profile?.channel_name ?? null
-      channelNameCache.set(user.id, channelName)
+      setNegotiationChannelNameCache(user.id, channelName)
     }
 
     // Fetch channel context from rate card + CSV uploads (if deal was created from a rate card).

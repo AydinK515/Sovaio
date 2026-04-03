@@ -14,6 +14,10 @@ export type AnalyticsContext = {
 
 const analyticsContextCache = new Map<string, AnalyticsContext | null>()
 
+export function invalidateAnalyticsSnapshotContext(snapshotId: string) {
+  analyticsContextCache.delete(snapshotId)
+}
+
 function buildCompactFacts(snapshot: AnalyticsSnapshot, csvSummary: string) {
   const facts = [
     `Selected analytics snapshot: ${snapshot.name}`,

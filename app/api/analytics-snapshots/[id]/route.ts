@@ -1,3 +1,6 @@
+import { revalidatePath } from 'next/cache'
+import { invalidateAnalyticsSnapshotContext } from '@/lib/analytics-context'
+import { invalidateNegotiationChannelNameCache } from '@/lib/negotiation-cache'
 import { createClient } from '@/lib/supabase-server'
 
 async function getAuthedSnapshot(id: string) {
@@ -49,6 +52,15 @@ export async function PATCH(
   if (error) {
     return new Response(error.message, { status: 500 })
   }
+
+  invalidateAnalyticsSnapshotContext(id)
+  invalidateNegotiationChannelNameCache(user.id)
+  revalidatePath('/analytics')
+  revalidatePath(`/analytics/${id}`)
+  revalidatePath('/dashboard')
+  revalidatePath('/generate')
+  revalidatePath('/deal/new')
+  revalidatePath('/rate-card')
 
   return Response.json({ ok: true, name: nextName })
 }
