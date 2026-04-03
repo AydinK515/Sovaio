@@ -120,11 +120,11 @@ function buildPricingRealityCheck(context: AnalyticsContext | null) {
   }
 
   if ((medianViews ?? Infinity) < 250 || (subscriberCount ?? Infinity) < 100) {
-    lines.push(`- If the channel is under 250 median views/video or under 100 subscribers, a $1,000 cash integration is usually not commercially reasonable from channel size alone.`)
+    lines.push(`- If the channel is under 250 median views/video or under 100 subscribers, assume most brands would never make an offer unless the user explicitly provides unusual off-platform value, guaranteed deliverables, or strong prior conversion proof.`)
   }
 
   if ((medianViews ?? Infinity) < 100 || (subscriberCount ?? Infinity) <= 10) {
-    lines.push(`- For near-zero traction channels, assume product exchange or very low hundreds at most unless the user explicitly provides unusual off-platform value, guaranteed deliverables, or strong prior conversion proof.`)
+    lines.push(`- For near-zero traction channels, assume most brands would never make an offer unless the user explicitly provides unusual off-platform value, guaranteed deliverables, or strong prior conversion proof.`)
   }
 
   return `Pricing reality checks:\n${lines.join('\n')}`
@@ -137,6 +137,10 @@ function buildSystemPrompt(
   channelName: string | null,
   pricingRealityCheck: string | null
 ) {
+  const titleInstruction = generateTitle
+    ? '\n- The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.'
+    : ''
+
   return `You are RateProof AI, the Deal Assistant for YouTube creators.
 
 Your role is live negotiation execution for the active brand conversation.
@@ -214,8 +218,7 @@ Additional script formatting rules:
 - Preserve paragraph breaks and list formatting inside the script body when useful.
 - The advice should fit the detected intent instead of forcing everything into negotiation triage.
 - When the user asks for stats you know, prefer concrete numbers over vague categories. Quote the figures first, then briefly explain what they imply.
-- The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.
-${generateTitle ? '' : '\n- Keep the title stable if the existing chat title is already good.'}`
+${titleInstruction}`
 }
 
 function isNegotiationPayload(value: unknown): value is NegotiationPayload {
