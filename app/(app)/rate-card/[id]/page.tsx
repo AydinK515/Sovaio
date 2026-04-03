@@ -1,3 +1,4 @@
+import { isAiEnabledForUser } from '@/lib/ai-access'
 import { createClient } from '@/lib/supabase-server'
 import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { redirect, notFound } from 'next/navigation'
@@ -280,9 +281,11 @@ export default async function RateCardPage({ params }: { params: Promise<{ id: s
 
   const audienceSnapshot = buildAudienceSnapshot(csvUploads ?? null)
   const performanceSnapshot = buildPerformanceSnapshot(csvUploads ?? null)
+  const aiEnabled = await isAiEnabledForUser(supabase, user.id)
 
   return (
     <RateCardClient
+      aiEnabled={aiEnabled}
       rateCard={rateCard as RateCard}
       profile={(profile as Profile) ?? null}
       availableSnapshots={snapshotItems}

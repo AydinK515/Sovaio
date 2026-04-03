@@ -1,5 +1,6 @@
 import { AppNav, Footer } from '@/components/navbar'
 import ChannelAiSidebar from '@/components/channel-ai-sidebar'
+import { isAiEnabledForUser } from '@/lib/ai-access'
 import { createClient } from '@/lib/supabase-server'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
 
@@ -12,22 +13,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   let chats: ChannelAiChat[] = []
   let selectedChat: ChannelAiChat | null = null
   let messages: ChannelAiMessage[] = []
+  let aiEnabled = true
 
   if (user) {
     const [
       profileResponse,
       snapshotsResponse,
       chatsResponse,
+      nextAiEnabled,
     ] = await Promise.all([
       supabase.from('profiles').select('channel_name').eq('id', user.id).single(),
       supabase.from('analytics_snapshots').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('channel_ai_chats').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }),
+      isAiEnabledForUser(supabase, user.id),
     ])
 
     channelName = profileResponse.data?.channel_name ?? null
     snapshots = (snapshotsResponse.data || []) as AnalyticsSnapshot[]
     chats = (chatsResponse.data || []) as ChannelAiChat[]
     selectedChat = chats[0] ?? null
+    aiEnabled = nextAiEnabled
 
     if (selectedChat) {
       const { data: chatMessages } = await supabase
@@ -51,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Footer />
         </div>
         <ChannelAiSidebar
+          aiEnabled={aiEnabled}
           initialSnapshots={snapshots}
           initialChats={chats}
           initialChat={selectedChat}

@@ -21,6 +21,7 @@ type PerformanceSnapshotItem = {
 }
 
 export default function RateCardClient({
+  aiEnabled,
   rateCard,
   profile,
   availableSnapshots,
@@ -28,6 +29,7 @@ export default function RateCardClient({
   audienceSnapshot,
   performanceSnapshot,
 }: {
+  aiEnabled: boolean
   rateCard: RateCard
   profile: Profile | null
   availableSnapshots: AnalyticsSnapshot[]
@@ -321,6 +323,11 @@ export default function RateCardClient({
 
     if (error) {
       setCreatingDeal(false)
+      return
+    }
+
+    if (!aiEnabled) {
+      router.push(`/deal/${deal.id}`)
       return
     }
 
@@ -785,9 +792,14 @@ export default function RateCardClient({
                 disabled={!brandName.trim() || creatingDeal}
                 className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
               >
-                {creatingDeal ? 'Creating...' : 'Start Deal'}
+                {creatingDeal ? 'Creating...' : aiEnabled ? 'Start Deal' : 'Start Deal Without AI'}
               </button>
             </div>
+            {!aiEnabled && (
+              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                Deal Assistant is disabled for this account. We&apos;ll still create the deal, but no AI chat will be started.
+              </p>
+            )}
           </div>
         </div>
       )}

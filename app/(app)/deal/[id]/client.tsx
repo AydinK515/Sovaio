@@ -169,6 +169,7 @@ function getDraftChat(deal: Deal): DealChat {
 }
 
 export default function DealClient({
+  aiEnabled,
   deal: initialDeal,
   rateCard,
   snapshots,
@@ -176,6 +177,7 @@ export default function DealClient({
   initialChat,
   initialMessages,
 }: {
+  aiEnabled: boolean
   deal: Deal
   rateCard: RateCard | null
   snapshots: AnalyticsSnapshot[]
@@ -296,6 +298,10 @@ export default function DealClient({
   }
 
   function getVisibleMessages() {
+    if (!aiEnabled) {
+      return messages
+    }
+
     const activeChat = currentChat ?? getDraftChat(deal)
     const openingMessage = getOpeningMessage(deal, rateCard)
     const hasOpeningMessage = messages.some(msg => msg.role === 'ai' && msg.content === openingMessage)
@@ -331,7 +337,7 @@ export default function DealClient({
 
   async function sendMessage(prefilledText?: string) {
     const trimmedInput = (prefilledText ?? input).trim()
-    if (!trimmedInput || sending) return
+    if (!aiEnabled || !trimmedInput || sending) return
 
     // Frontend guard: check per-chat creator message count before hitting the server.
     const creatorCount = messages.filter(m => m.role === 'creator').length
@@ -920,78 +926,80 @@ export default function DealClient({
                 </button>
 
                 {chatMenuOpen && (
-                  <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border border-border bg-white p-2 shadow-xl">
-                    <div className="max-h-72 overflow-y-auto">
-                      {currentChat === null && (
-                        <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm bg-primary/8 text-foreground">
-                          <span className="flex min-w-0 flex-1 items-center justify-between">
-                            <span className="truncate font-medium">New Chat</span>
-                            <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />
-                          </span>
-                        </div>
-                      )}
-                      {chats.map(chat => (
-                        <div
-                          key={chat.id}
-                          className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
-                            chat.id === currentChat?.id
-                              ? 'bg-primary/8 text-foreground'
-                              : 'hover:bg-muted-light'
-                          }`}
-                        >
-                          {renamingChatId === chat.id ? (
-                            <input
-                              autoFocus
-                              type="text"
-                              value={renameValue}
-                              onChange={e => setRenameValue(e.target.value)}
-                              onBlur={() => submitRename(chat.id)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') { e.preventDefault(); submitRename(chat.id) }
-                                if (e.key === 'Escape') { e.preventDefault(); setRenamingChatId(null) }
-                              }}
-                              onClick={e => e.stopPropagation()}
-                              className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
-                            />
-                          ) : (
+                  <div className="absolute left-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-2xl border border-border bg-white shadow-xl">
+                    <div className="max-h-72 overflow-y-auto py-2">
+                      <div className="px-2">
+                        {currentChat === null && (
+                          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm bg-primary/8 text-foreground">
+                            <span className="flex min-w-0 flex-1 items-center justify-between">
+                              <span className="truncate font-medium">New Chat</span>
+                              <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />
+                            </span>
+                          </div>
+                        )}
+                        {chats.map(chat => (
+                          <div
+                            key={chat.id}
+                            className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
+                              chat.id === currentChat?.id
+                                ? 'bg-primary/8 text-foreground'
+                                : 'hover:bg-muted-light'
+                            }`}
+                          >
+                            {renamingChatId === chat.id ? (
+                              <input
+                                autoFocus
+                                type="text"
+                                value={renameValue}
+                                onChange={e => setRenameValue(e.target.value)}
+                                onBlur={() => submitRename(chat.id)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') { e.preventDefault(); submitRename(chat.id) }
+                                  if (e.key === 'Escape') { e.preventDefault(); setRenamingChatId(null) }
+                                }}
+                                onClick={e => e.stopPropagation()}
+                                className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openChat(chat.id)}
+                                className="flex min-w-0 flex-1 items-center justify-between text-left"
+                              >
+                                <span className="truncate font-medium">{chat.title}</span>
+                                {chat.id === currentChat?.id && <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />}
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => openChat(chat.id)}
-                              className="flex min-w-0 flex-1 items-center justify-between text-left"
+                              onClick={e => {
+                                e.stopPropagation()
+                                setRenameValue(chat.title)
+                                setRenamingChatId(chat.id)
+                              }}
+                              aria-label={`Rename ${chat.title}`}
+                              className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
                             >
-                              <span className="truncate font-medium">{chat.title}</span>
-                              {chat.id === currentChat?.id && <Check className="ml-3 w-4 h-4 shrink-0 text-primary" />}
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.stopPropagation()
-                              setRenameValue(chat.title)
-                              setRenamingChatId(chat.id)
-                            }}
-                            aria-label={`Rename ${chat.title}`}
-                            className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.stopPropagation()
-                              deleteChat(chat.id)
-                            }}
-                            disabled={deletingChatId === chat.id}
-                            aria-label={`Delete ${chat.title}`}
-                            className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation()
+                                deleteChat(chat.id)
+                              }}
+                              disabled={deletingChatId === chat.id}
+                              aria-label={`Delete ${chat.title}`}
+                              className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="mt-2 border-t border-border pt-2">
+                    <div className="border-t border-border p-2">
                       <button
                         type="button"
                         onClick={createChat}
@@ -1122,6 +1130,11 @@ export default function DealClient({
                   <p className="text-sm font-medium text-red-800">You&apos;ve reached your 100-message daily limit.</p>
                   <p className="mt-0.5 text-sm text-red-700">Come back tomorrow and your limit will reset.</p>
                 </div>
+              ) : !aiEnabled ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center">
+                  <p className="text-sm font-medium text-red-800">Deal Assistant is disabled for this account.</p>
+                  <p className="mt-0.5 text-sm text-red-700">You can still track the deal here, but AI responses and drafts are turned off.</p>
+                </div>
               ) : (
                 <>
                   {showTemplateQuestions && (
@@ -1150,7 +1163,7 @@ export default function DealClient({
                         }
                       }}
                       placeholder="Tell me what happened in the negotiation..."
-                      disabled={sending}
+                      disabled={!aiEnabled || sending}
                       rows={1}
                       className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 resize-none overflow-hidden"
                       style={{ minHeight: '44px', maxHeight: '160px' }}
@@ -1172,7 +1185,7 @@ export default function DealClient({
                     ) : (
                       <button
                         type="submit"
-                        disabled={!input.trim() || sending}
+                        disabled={!aiEnabled || !input.trim() || sending}
                         className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
                       >
                         <Send className="w-4 h-4" />

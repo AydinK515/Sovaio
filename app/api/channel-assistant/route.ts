@@ -1,5 +1,6 @@
 import { parsePartialJson } from 'ai'
 import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
+import { requireAiEnabled } from '@/lib/ai-access'
 import { createClient } from '@/lib/supabase-server'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
@@ -291,6 +292,11 @@ export async function POST(req: Request) {
 
     if (!user) {
       return new Response('Unauthorized.', { status: 401 })
+    }
+
+    const aiDisabledResponse = await requireAiEnabled(supabase, user.id)
+    if (aiDisabledResponse) {
+      return aiDisabledResponse
     }
 
     const { data: chat } = await supabase

@@ -136,12 +136,14 @@ const CHANNEL_TEMPLATE_QUESTIONS = [
 ]
 
 export default function ChannelAiSidebar({
+  aiEnabled,
   initialSnapshots,
   initialChats,
   initialChat,
   initialMessages,
   channelName,
 }: {
+  aiEnabled: boolean
   initialSnapshots: AnalyticsSnapshot[]
   initialChats: ChannelAiChat[]
   initialChat: ChannelAiChat | null
@@ -351,7 +353,7 @@ export default function ChannelAiSidebar({
 
   async function sendMessage(prefilledText?: string) {
     const trimmedInput = (prefilledText ?? input).trim()
-    if (!trimmedInput || sending) return
+    if (!aiEnabled || !trimmedInput || sending) return
 
     const creatorCount = messages.filter(message => message.role === 'creator').length
     if (creatorCount >= 30) {
@@ -609,79 +611,81 @@ export default function ChannelAiSidebar({
                         </button>
 
                         {chatMenuOpen && (
-                          <div className="absolute left-0 top-full z-20 mt-2 w-80 rounded-2xl border border-border bg-white p-2 shadow-xl">
-                            <div className="max-h-80 overflow-y-auto">
-                              {currentChat === null && (
-                                <div className="flex items-center gap-2 rounded-xl bg-primary/8 px-3 py-2 text-sm text-foreground">
-                                  <span className="flex min-w-0 flex-1 items-center justify-between">
-                                    <span className="truncate font-medium">New Chat</span>
-                                    <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />
-                                  </span>
-                                </div>
-                              )}
-                              {chats.map(chat => (
-                                <div
-                                  key={chat.id}
-                                  className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
-                                    chat.id === currentChat?.id ? 'bg-primary/8 text-foreground' : 'hover:bg-muted-light'
-                                  }`}
-                                >
-                                  {renamingChatId === chat.id ? (
-                                    <input
-                                      autoFocus
-                                      type="text"
-                                      value={renameValue}
-                                      onChange={event => setRenameValue(event.target.value)}
-                                      onBlur={() => void submitRename(chat.id)}
-                                      onKeyDown={event => {
-                                        if (event.key === 'Enter') { event.preventDefault(); void submitRename(chat.id) }
-                                        if (event.key === 'Escape') { event.preventDefault(); setRenamingChatId(null) }
-                                      }}
-                                      onClick={event => event.stopPropagation()}
-                                      className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
-                                    />
-                                  ) : (
+                          <div className="absolute left-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-white shadow-xl">
+                            <div className="max-h-80 overflow-y-auto py-2">
+                              <div className="px-2">
+                                {currentChat === null && (
+                                  <div className="flex items-center gap-2 rounded-xl bg-primary/8 px-3 py-2 text-sm text-foreground">
+                                    <span className="flex min-w-0 flex-1 items-center justify-between">
+                                      <span className="truncate font-medium">New Chat</span>
+                                      <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />
+                                    </span>
+                                  </div>
+                                )}
+                                {chats.map(chat => (
+                                  <div
+                                    key={chat.id}
+                                    className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                      chat.id === currentChat?.id ? 'bg-primary/8 text-foreground' : 'hover:bg-muted-light'
+                                    }`}
+                                  >
+                                    {renamingChatId === chat.id ? (
+                                      <input
+                                        autoFocus
+                                        type="text"
+                                        value={renameValue}
+                                        onChange={event => setRenameValue(event.target.value)}
+                                        onBlur={() => void submitRename(chat.id)}
+                                        onKeyDown={event => {
+                                          if (event.key === 'Enter') { event.preventDefault(); void submitRename(chat.id) }
+                                          if (event.key === 'Escape') { event.preventDefault(); setRenamingChatId(null) }
+                                        }}
+                                        onClick={event => event.stopPropagation()}
+                                        className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
+                                      />
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          void loadChat(chat)
+                                          setChatMenuOpen(false)
+                                        }}
+                                        className="flex min-w-0 flex-1 items-center justify-between text-left"
+                                      >
+                                        <span className="truncate font-medium">{chat.title}</span>
+                                        {chat.id === currentChat?.id && <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />}
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        void loadChat(chat)
-                                        setChatMenuOpen(false)
+                                      onClick={event => {
+                                        event.stopPropagation()
+                                        setRenameValue(chat.title)
+                                        setRenamingChatId(chat.id)
                                       }}
-                                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                                      aria-label={`Rename ${chat.title}`}
+                                      className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
                                     >
-                                      <span className="truncate font-medium">{chat.title}</span>
-                                      {chat.id === currentChat?.id && <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />}
+                                      <Pencil className="h-3.5 w-3.5" />
                                     </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={event => {
-                                      event.stopPropagation()
-                                      setRenameValue(chat.title)
-                                      setRenamingChatId(chat.id)
-                                    }}
-                                    aria-label={`Rename ${chat.title}`}
-                                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={event => {
-                                      event.stopPropagation()
-                                      void deleteChat(chat.id)
-                                    }}
-                                    disabled={deletingChatId === chat.id}
-                                    aria-label={`Delete ${chat.title}`}
-                                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              ))}
+                                    <button
+                                      type="button"
+                                      onClick={event => {
+                                        event.stopPropagation()
+                                        void deleteChat(chat.id)
+                                      }}
+                                      disabled={deletingChatId === chat.id}
+                                      aria-label={`Delete ${chat.title}`}
+                                      className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
 
-                            <div className="mt-2 border-t border-border pt-2">
+                            <div className="border-t border-border p-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -713,6 +717,11 @@ export default function ChannelAiSidebar({
                   ) : (
                     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-relaxed text-amber-800">
                       Upload analytics first so Channel Advisor can ground its answers in your real channel data.
+                    </div>
+                  )}
+                  {!aiEnabled && (
+                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-xs leading-relaxed text-red-700">
+                      Channel Advisor is disabled for this account. AI features are currently turned off.
                     </div>
                   )}
                 </div>
@@ -786,7 +795,12 @@ export default function ChannelAiSidebar({
                 </div>
               ) : (
                 <>
-                  {showTemplateQuestions && (
+                  {!aiEnabled ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center">
+                      <p className="text-sm font-medium text-red-800">Channel Advisor is disabled for this account.</p>
+                      <p className="mt-0.5 text-sm text-red-700">AI features are currently turned off.</p>
+                    </div>
+                  ) : showTemplateQuestions ? (
                     <div className="mb-3 flex flex-col gap-2">
                       {CHANNEL_TEMPLATE_QUESTIONS.map(question => (
                         <button
@@ -800,7 +814,7 @@ export default function ChannelAiSidebar({
                         </button>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                   <form onSubmit={event => { event.preventDefault(); sendMessage() }} className="flex items-end gap-3">
                     <textarea
                       ref={textareaRef}
@@ -812,8 +826,14 @@ export default function ChannelAiSidebar({
                           sendMessage()
                         }
                       }}
-                      placeholder={snapshots.length > 0 ? 'Ask about your channel, audience, or positioning...' : 'Upload analytics first to use Channel Advisor'}
-                      disabled={sending || snapshots.length === 0}
+                      placeholder={
+                        !aiEnabled
+                          ? 'Channel Advisor is disabled for this account'
+                          : snapshots.length > 0
+                            ? 'Ask about your channel, audience, or positioning...'
+                            : 'Upload analytics first to use Channel Advisor'
+                      }
+                      disabled={!aiEnabled || sending || snapshots.length === 0}
                       rows={1}
                       className="flex-1 resize-none overflow-hidden rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                       style={{ minHeight: '44px', maxHeight: '160px' }}
@@ -829,7 +849,7 @@ export default function ChannelAiSidebar({
                     ) : (
                       <button
                         type="submit"
-                        disabled={!input.trim() || sending || snapshots.length === 0}
+                        disabled={!aiEnabled || !input.trim() || sending || snapshots.length === 0}
                         className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                       >
                         <Send className="h-4 w-4" />

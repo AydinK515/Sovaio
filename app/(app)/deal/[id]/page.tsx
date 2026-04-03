@@ -1,3 +1,4 @@
+import { isAiEnabledForUser } from '@/lib/ai-access'
 import { createClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
 import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
@@ -59,9 +60,11 @@ export default async function DealPage({
       .eq('chat_id', selectedChat.id)
       .order('created_at', { ascending: true })
     : { data: [] }
+  const aiEnabled = await isAiEnabledForUser(supabase, user.id)
 
   return (
     <DealClient
+      aiEnabled={aiEnabled}
       deal={deal as Deal}
       rateCard={(rateCard as RateCard | null) ?? null}
       snapshots={(snapshots || []) as AnalyticsSnapshot[]}

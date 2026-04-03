@@ -2,6 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { buildRateCardName, getAnalyticsSnapshotContext } from '@/lib/analytics-context'
+import { requireAiEnabled } from '@/lib/ai-access'
 import { toNumber } from '@/lib/csv-summary'
 import { createClient } from '@/lib/supabase-server'
 
@@ -156,6 +157,11 @@ export async function POST(req: Request) {
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  const aiDisabledResponse = await requireAiEnabled(supabase, user.id)
+  if (aiDisabledResponse) {
+    return aiDisabledResponse
   }
 
   const { data: profile } = await supabase

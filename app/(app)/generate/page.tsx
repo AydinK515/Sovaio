@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { isAiEnabledForUser } from '@/lib/ai-access'
 import { createClient } from '@/lib/supabase-server'
 import type { AnalyticsSnapshot } from '@/lib/types'
 import GenerateRateCardClient from './client'
@@ -18,9 +19,11 @@ export default async function GeneratePage({
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+  const aiEnabled = await isAiEnabledForUser(supabase, user.id)
 
   return (
     <GenerateRateCardClient
+      aiEnabled={aiEnabled}
       snapshots={(snapshots || []) as AnalyticsSnapshot[]}
       initialSnapshotId={snapshot ?? null}
     />

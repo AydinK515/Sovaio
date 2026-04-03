@@ -34,9 +34,11 @@ const GENERATION_PHASES = [
 ] as const
 
 export default function GenerateRateCardClient({
+  aiEnabled,
   snapshots,
   initialSnapshotId,
 }: {
+  aiEnabled: boolean
   snapshots: AnalyticsSnapshot[]
   initialSnapshotId: string | null
 }) {
@@ -149,6 +151,11 @@ export default function GenerateRateCardClient({
   }, [loading])
 
   async function handleGenerate() {
+    if (!aiEnabled) {
+      setError('AI features are disabled for this account.')
+      return
+    }
+
     if (!snapshotId || !niche || hasSponsorships === null || offersDedicatedVideos === null) {
       setError('Please choose an analytics snapshot and fill in the required pricing inputs.')
       return
@@ -519,14 +526,19 @@ export default function GenerateRateCardClient({
         </div>
 
         {error && <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>}
+        {!aiEnabled && (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Rate card generation is disabled for this account because AI features are turned off.
+          </p>
+        )}
 
         <button
           type="button"
           onClick={() => void handleGenerate()}
-          disabled={loading}
+          disabled={!aiEnabled || loading}
           className="flex w-full items-center justify-center rounded-xl bg-primary py-4 text-lg font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
         >
-          {loading ? 'Generating Rate Card...' : 'Generate My Rate Card'}
+          {loading ? 'Generating Rate Card...' : aiEnabled ? 'Generate My Rate Card' : 'AI Disabled'}
         </button>
       </div>
     </div>
