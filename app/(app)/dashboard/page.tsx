@@ -132,7 +132,10 @@ export default async function DashboardPage() {
               <Upload className="h-4 w-4 text-muted" />
               <h2 className="font-semibold">Analytics Snapshots</h2>
             </div>
-            <Link href="/analytics" className="text-sm font-medium text-primary hover:underline">View All</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/analytics/new" className="text-sm font-medium text-primary hover:underline">Upload Analytics</Link>
+              <Link href="/analytics" className="text-sm font-medium text-primary hover:underline">View All</Link>
+            </div>
           </div>
           <div className="divide-y divide-border">
             {snapshotItems.slice(0, 3).map((snapshot) => (
@@ -151,7 +154,13 @@ export default async function DashboardPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Link href={`/analytics/${snapshot.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">View Snapshot <ArrowRight className="h-3.5 w-3.5" /></Link>
+                  <Link
+                    href={`/analytics/${snapshot.id}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-medium text-white transition-colors hover:opacity-90"
+                  >
+                    View Snapshot
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </div>
               </div>
             ))}
@@ -164,7 +173,10 @@ export default async function DashboardPage() {
               <FileStack className="h-4 w-4 text-muted" />
               <h2 className="font-semibold">Recent Rate Cards</h2>
             </div>
-            <Link href="/rate-card" className="text-sm font-medium text-primary hover:underline">View All</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/generate" className="text-sm font-medium text-primary hover:underline">New Rate Card</Link>
+              <Link href="/rate-card" className="text-sm font-medium text-primary hover:underline">View All</Link>
+            </div>
           </div>
           {rateCardItems.length === 0 ? (
             <div className="p-8 text-sm text-muted">
@@ -184,7 +196,13 @@ export default async function DashboardPage() {
                       {rateCard.analytics_snapshot_id ? ` - Built from ${snapshotById.get(rateCard.analytics_snapshot_id)?.name || 'snapshot'}` : ''}
                     </p>
                   </div>
-                  <Link href={`/rate-card/${rateCard.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">Open Rate Card <ArrowRight className="h-3.5 w-3.5" /></Link>
+                  <Link
+                    href={`/rate-card/${rateCard.id}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-medium text-white transition-colors hover:opacity-90"
+                  >
+                    Open Rate Card
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </div>
               ))}
             </div>
@@ -197,6 +215,7 @@ export default async function DashboardPage() {
               <MessageSquare className="h-4 w-4 text-muted" />
               <h2 className="font-semibold">Deals</h2>
             </div>
+            <Link href={`/deal/new?snapshot=${snapshotItems[0].id}`} className="text-sm font-medium text-primary hover:underline">Create Deal</Link>
           </div>
           {dealItems.length === 0 ? (
             <div className="p-8 text-sm text-muted">
@@ -222,9 +241,12 @@ export default async function DashboardPage() {
                       <td className="px-6 py-4"><StatusBadge status={deal.status} finalPrice={deal.final_price} /></td>
                       <td className="px-6 py-4 font-medium">{formatDealTarget(deal, deal.rate_card_id ? rateCardById.get(deal.rate_card_id) ?? null : null)}</td>
                       <td className="px-6 py-4">
-                        <Link href={`/deal/${deal.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                        <Link
+                          href={`/deal/${deal.id}`}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-medium text-white transition-colors hover:opacity-90"
+                        >
                           Open Deal
-                          <ArrowRight className="h-3.5 w-3.5" />
+                          <ArrowRight className="h-4 w-4" />
                         </Link>
                       </td>
                     </tr>

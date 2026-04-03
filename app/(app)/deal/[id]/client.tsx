@@ -205,6 +205,8 @@ export default function DealClient({
   const [chatFullscreen, setChatFullscreen] = useState(false)
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
   const [updatingSnapshot, setUpdatingSnapshot] = useState(false)
+  const [deletingDeal, setDeletingDeal] = useState(false)
+  const [dealActionError, setDealActionError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -725,6 +727,35 @@ export default function DealClient({
     setUpdatingSnapshot(false)
   }
 
+  async function deleteDeal() {
+    if (deletingDeal) return
+
+    const confirmed = window.confirm(
+      `Delete the ${deal.brand_name} deal? This will permanently remove the deal and its chat history.`
+    )
+
+    if (!confirmed) return
+
+    setDeletingDeal(true)
+    setDealActionError('')
+
+    try {
+      const response = await fetch(`/api/deals/${deal.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err: unknown) {
+      setDealActionError(err instanceof Error ? err.message : 'Failed to delete deal.')
+      setDeletingDeal(false)
+    }
+  }
+
   const visibleMessages = getVisibleMessages()
   const displayChat = currentChat ?? getDraftChat(deal)
   const showTemplateQuestions = currentChat === null && messages.length === 0 && deal.status === 'negotiating' && !aiTyping
@@ -809,6 +840,23 @@ export default function DealClient({
                 className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
               >
                 <Pause className="w-4 h-4" /> Stalled
+              </button>
+              <div className="px-1 pt-2">
+                <div className="border-t-2 border-border" />
+              </div>
+              {dealActionError && (
+                <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">
+                  {dealActionError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void deleteDeal()}
+                disabled={deletingDeal}
+                className="w-full flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deletingDeal ? 'Deleting Deal...' : 'Delete Deal'}
               </button>
             </div>
           </div>
