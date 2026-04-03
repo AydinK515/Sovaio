@@ -3,6 +3,8 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { captureAnalyticsEvent, resetAnalytics } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { createClient } from '@/lib/supabase-browser'
 import { User, CreditCard, Trash2, ExternalLink, Shield, Upload, Camera, Loader2 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -147,6 +149,10 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   }
 
   async function handleSignOut() {
+    captureAnalyticsEvent(POSTHOG_EVENTS.authSignOut, {
+      user_id: user.id,
+    })
+    resetAnalytics()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
@@ -156,6 +162,10 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
     setDeleting(true)
     // In production, this would call an edge function to delete all user data
     // For now, just sign out
+    captureAnalyticsEvent(POSTHOG_EVENTS.authSignOut, {
+      user_id: user.id,
+    })
+    resetAnalytics()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()

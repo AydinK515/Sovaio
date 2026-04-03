@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FileStack, MessageSquare, Pencil, Trash2 } from 'lucide-react'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload } from '@/lib/types'
 
 type CsvDataMap = Record<string, Record<string, unknown>[]>
@@ -78,6 +80,14 @@ export default function AnalyticsSnapshotViewer({
   const totalRows = Object.values(csvData).reduce((sum, rows) => sum + rows.length, 0)
   const selectedMeta = REPORT_TYPE_META[selectedReportType as CsvUpload['upload_type']]
 
+  useEffect(() => {
+    captureAnalyticsEvent(POSTHOG_EVENTS.analyticsSnapshotViewed, {
+      analytics_snapshot_id: snapshot.id,
+      report_confidence: snapshot.report_confidence,
+      subscriber_count: snapshot.subscriber_count,
+    })
+  }, [snapshot.id, snapshot.report_confidence, snapshot.subscriber_count])
+
   function handleSelectReportType(reportType: string) {
     setSelectedReportType(reportType)
     setCurrentPage(1)
@@ -133,6 +143,11 @@ export default function AnalyticsSnapshotViewer({
       if (!response.ok) {
         throw new Error(await response.text())
       }
+
+      captureAnalyticsEvent(POSTHOG_EVENTS.analyticsSnapshotDeleted, {
+        analytics_snapshot_id: snapshot.id,
+        report_confidence: snapshot.report_confidence,
+      })
 
       router.push('/analytics')
       router.refresh()

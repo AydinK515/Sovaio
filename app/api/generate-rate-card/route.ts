@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto'
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { buildRateCardName, getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { requireAiEnabled } from '@/lib/ai-access'
 import { toNumber } from '@/lib/csv-summary'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
+import { captureAiGeneration, captureServerEvent, createPostHogServerClient, shutdownPostHog } from '@/lib/posthog-server'
 import { createClient } from '@/lib/supabase-server'
 
 const RateCardSchema = z.object({
@@ -144,57 +147,72 @@ function buildPitchEmailContext(input: {
 }
 
 export async function POST(req: Request) {
-  const { analyticsSnapshotId, niche, hasSponsorships, offersDedicatedVideos, sponsorshipCount, avgDealAmount } = await req.json()
-  const apiKey = process.env.OPENAI_API_KEY
+  const posthog = createPostHogServerClient()
+  const traceId = randomUUID()
+  const startedAt = Date.now()
 
-  if (!apiKey) {
-    return new Response('Missing OPENAI_API_KEY', { status: 500 })
-  }
+  try {
+    const { analyticsSnapshotId, niche, hasSponsorships, offersDedicatedVideos, sponsorshipCount, avgDealAmount } = await req.json()
+    const apiKey = process.env.OPENAI_API_KEY
 
-  const openai = createOpenAI({ apiKey })
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+    if (!apiKey) {
+      return new Response('Missing OPENAI_API_KEY', { status: 500 })
+    }
 
-  if (!user) {
-    return new Response('Unauthorized', { status: 401 })
-  }
+    const openai = createOpenAI({ apiKey })
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-  const aiDisabledResponse = await requireAiEnabled(supabase, user.id)
-  if (aiDisabledResponse) {
-    return aiDisabledResponse
-  }
+    if (!user) {
+      return new Response('Unauthorized', { status: 401 })
+    }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, channel_name')
-    .eq('id', user.id)
-    .single()
+    const aiDisabledResponse = await requireAiEnabled(supabase, user.id)
+    if (aiDisabledResponse) {
+      return aiDisabledResponse
+    }
 
-  const analyticsContext = await getAnalyticsSnapshotContext({
-    supabase,
-    snapshotId: analyticsSnapshotId,
-    userId: user.id,
-  })
+    await captureServerEvent({
+      client: posthog,
+      distinctId: user.id,
+      event: POSTHOG_EVENTS.aiRequestStarted,
+      properties: {
+        route: 'generate-rate-card',
+        analytics_snapshot_id: analyticsSnapshotId,
+      },
+    })
 
-  if (!analyticsContext) {
-    return new Response('Analytics snapshot not found.', { status: 404 })
-  }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, channel_name')
+      .eq('id', user.id)
+      .single()
 
-  const subscriberCount = analyticsContext.snapshot.subscriber_count ?? 0
-  const confidence = analyticsContext.snapshot.report_confidence
-  const csvData = analyticsContext.csvData
-  const csvSummary = analyticsContext.csvSummary
-  const medianViews = getMedianViews(csvData)
-  const accessibleCpmBand = getAccessibleCpmBand(niche, medianViews)
-  const pitchEmailContext = buildPitchEmailContext({
-    channelName: profile?.channel_name ?? null,
-    creatorName: profile?.full_name ?? null,
-    subscriberCount,
-    medianViews,
-    csvData,
-  })
+    const analyticsContext = await getAnalyticsSnapshotContext({
+      supabase,
+      snapshotId: analyticsSnapshotId,
+      userId: user.id,
+    })
 
-  const system = `You are RateProof AI, a data-driven YouTube sponsorship rate strategist.
+    if (!analyticsContext) {
+      return new Response('Analytics snapshot not found.', { status: 404 })
+    }
+
+    const subscriberCount = analyticsContext.snapshot.subscriber_count ?? 0
+    const confidence = analyticsContext.snapshot.report_confidence
+    const csvData = analyticsContext.csvData
+    const csvSummary = analyticsContext.csvSummary
+    const medianViews = getMedianViews(csvData)
+    const accessibleCpmBand = getAccessibleCpmBand(niche, medianViews)
+    const pitchEmailContext = buildPitchEmailContext({
+      channelName: profile?.channel_name ?? null,
+      creatorName: profile?.full_name ?? null,
+      subscriberCount,
+      medianViews,
+      csvData,
+    })
+
+    const system = `You are RateProof AI, a data-driven YouTube sponsorship rate strategist.
 
 You calculate defensible rates by following a strict priority formula. Do not invent metrics or relationships not supplied.
 
@@ -273,7 +291,7 @@ Output rules:
 - The explanation must stay qualitative. Do not include any raw numbers, dollar amounts, CPM bands, percentages, multipliers, ranges, parentheses with figures, or intermediate math.
 - In the explanation, describe the factors in plain English instead, for example: strong premium-market audience, modest view volume for the niche, first-time sponsor discount, or strong engagement signals.`
 
-  const prompt = `Generate a data-backed sponsorship rate card for this YouTube creator.
+    const prompt = `Generate a data-backed sponsorship rate card for this YouTube creator.
 
 Creator profile:
 - Niche: ${niche}
@@ -307,19 +325,86 @@ For pitch_email:
 - Keep placeholders only for information that is truly unknown or brand-specific, such as [Brand Name] or [Contact Name].
 - Do not invent achievements, campaigns, or stats that are not in the provided data.`
 
-  console.log('\n=== generate-rate-card SYSTEM PROMPT ===\n', system, '\n=== USER PROMPT ===\n', prompt, '\n========================================\n')
+    console.log('\n=== generate-rate-card SYSTEM PROMPT ===\n', system, '\n=== USER PROMPT ===\n', prompt, '\n========================================\n')
 
-  const { object } = await generateObject({
-    model: openai('gpt-5-mini'),
-    schema: RateCardSchema,
-    system,
-    prompt,
-  })
+    const result = await generateObject({
+      model: openai('gpt-5-mini'),
+      schema: RateCardSchema,
+      system,
+      prompt,
+    })
+    const { object } = result
 
-  console.log('\n=== generate-rate-card RESPONSE ===\n', JSON.stringify(object, null, 2), '\n===================================\n')
+    console.log('\n=== generate-rate-card RESPONSE ===\n', JSON.stringify(object, null, 2), '\n===================================\n')
 
-  return Response.json({
-    ...object,
-    name: buildRateCardName({ niche }),
-  })
+    await captureServerEvent({
+      client: posthog,
+      distinctId: user.id,
+      event: POSTHOG_EVENTS.aiRequestCompleted,
+      properties: {
+        route: 'generate-rate-card',
+        analytics_snapshot_id: analyticsSnapshotId,
+        latency_ms: Date.now() - startedAt,
+      },
+    })
+
+    await captureAiGeneration({
+      client: posthog,
+      distinctId: user.id,
+      traceId,
+      model: 'gpt-5-mini',
+      input: {
+        system,
+        prompt,
+      },
+      output: object,
+      latencyMs: Date.now() - startedAt,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      totalTokens: result.usage.totalTokens,
+      properties: {
+        route: 'generate-rate-card',
+        analytics_snapshot_id: analyticsSnapshotId,
+      },
+    })
+
+    return Response.json({
+      ...object,
+      name: buildRateCardName({ niche }),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('generate-rate-card failed', error)
+
+    await captureServerEvent({
+      client: posthog,
+      distinctId: 'server',
+      event: POSTHOG_EVENTS.aiRequestFailed,
+      properties: {
+        route: 'generate-rate-card',
+        error: message,
+      },
+    })
+
+    await captureAiGeneration({
+      client: posthog,
+      distinctId: 'server',
+      traceId,
+      model: 'gpt-5-mini',
+      input: {
+        route: 'generate-rate-card',
+      },
+      output: null,
+      latencyMs: Date.now() - startedAt,
+      isError: true,
+      error: message,
+      properties: {
+        route: 'generate-rate-card',
+      },
+    })
+
+    return new Response(message, { status: 500 })
+  } finally {
+    await shutdownPostHog(posthog)
+  }
 }

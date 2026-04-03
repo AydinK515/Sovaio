@@ -1,7 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { parsePartialJson } from 'ai'
 import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { requireAiEnabled } from '@/lib/ai-access'
 import { formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
+import { captureAiGeneration, captureServerEvent, createPostHogServerClient, shutdownPostHog } from '@/lib/posthog-server'
 import { createClient } from '@/lib/supabase-server'
 import { buildCsvSummary } from '@/lib/csv-summary'
 import type { AnalyticsContext } from '@/lib/analytics-context'
@@ -410,6 +413,10 @@ async function ensureConversationState(input: {
 }
 
 export async function POST(req: Request) {
+  const posthog = createPostHogServerClient()
+  const traceId = randomUUID()
+  const startedAt = Date.now()
+
   try {
     const { chatId, userMessage, generateTitle } = await req.json()
     const latestUserMessage = typeof userMessage === 'string' ? userMessage.trim() : ''
@@ -456,6 +463,18 @@ export async function POST(req: Request) {
     if (!deal) {
       return new Response('Deal not found.', { status: 404 })
     }
+
+    await captureServerEvent({
+      client: posthog,
+      distinctId: user.id,
+      event: POSTHOG_EVENTS.aiRequestStarted,
+      properties: {
+        route: 'negotiate',
+        deal_id: deal.id,
+        chat_id: chat.id,
+        analytics_snapshot_id: deal.analytics_snapshot_id,
+      },
+    })
 
     let channelName: string | null = null
     if (channelNameCache.has(user.id)) {
@@ -659,6 +678,18 @@ export async function POST(req: Request) {
         if (body?.error?.code === 'conversation_locked' && attempt < maxAttempts - 1) {
           continue
         }
+        if (body?.error?.code === 'rate_limit_exceeded') {
+          await captureServerEvent({
+            client: posthog,
+            distinctId: user.id,
+            event: POSTHOG_EVENTS.aiRequestRateLimited,
+            properties: {
+              route: 'negotiate',
+              deal_id: deal.id,
+              chat_id: chat.id,
+            },
+          })
+        }
         console.error('Negotiation AI upstream failed', res.status, JSON.stringify(body))
         return new Response('Failed to generate negotiation advice.', { status: 500 })
       }
@@ -692,6 +723,11 @@ export async function POST(req: Request) {
           detected_creator_ask: null,
         }
         let latestResponseId: string | null = null
+        let completionUsage: {
+          input_tokens?: number
+          output_tokens?: number
+          total_tokens?: number
+        } | null = null
 
         try {
           while (true) {
@@ -718,7 +754,14 @@ export async function POST(req: Request) {
               const event = JSON.parse(data) as {
                 type?: string
                 delta?: string
-                response?: { id?: string }
+                response?: {
+                  id?: string
+                  usage?: {
+                    input_tokens?: number
+                    output_tokens?: number
+                    total_tokens?: number
+                  }
+                }
                 error?: { message?: string }
               }
 
@@ -727,6 +770,9 @@ export async function POST(req: Request) {
                 typeof event.response?.id === 'string'
               ) {
                 latestResponseId = event.response.id
+                if (event.response.usage) {
+                  completionUsage = event.response.usage
+                }
               }
 
               if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
@@ -907,13 +953,89 @@ export async function POST(req: Request) {
               })
             )
           )
+          await captureServerEvent({
+            client: posthog,
+            distinctId: user.id,
+            event: POSTHOG_EVENTS.aiRequestCompleted,
+            properties: {
+              route: 'negotiate',
+              deal_id: deal.id,
+              chat_id: chat.id,
+              analytics_snapshot_id: deal.analytics_snapshot_id,
+              latency_ms: Date.now() - startedAt,
+            },
+          })
+          await captureAiGeneration({
+            client: posthog,
+            distinctId: user.id,
+            traceId,
+            model: 'gpt-5-mini',
+            input: {
+              instructions: systemPrompt,
+              user_message: latestUserMessage,
+              deal_id: deal.id,
+              chat_id: chat.id,
+              conversation_id: conversationId,
+            },
+            output: finalPayload,
+            latencyMs: Date.now() - startedAt,
+            inputTokens: completionUsage?.input_tokens,
+            outputTokens: completionUsage?.output_tokens,
+            totalTokens: completionUsage?.total_tokens,
+            properties: {
+              route: 'negotiate',
+              deal_id: deal.id,
+              chat_id: chat.id,
+              analytics_snapshot_id: deal.analytics_snapshot_id,
+              openai_conversation_id: conversationId,
+              openai_response_id: latestResponseId,
+            },
+          })
         } catch (error) {
           console.error('Negotiation AI streaming failed', error)
+          const message = error instanceof Error ? error.message : 'Failed to stream negotiation advice.'
+          const isAbort = error instanceof Error && error.name === 'AbortError'
+          await captureServerEvent({
+            client: posthog,
+            distinctId: user.id,
+            event: isAbort ? POSTHOG_EVENTS.aiRequestAborted : POSTHOG_EVENTS.aiRequestFailed,
+            properties: {
+              route: 'negotiate',
+              deal_id: deal.id,
+              chat_id: chat.id,
+              analytics_snapshot_id: deal.analytics_snapshot_id,
+              error: message,
+            },
+          })
+          await captureAiGeneration({
+            client: posthog,
+            distinctId: user.id,
+            traceId,
+            model: 'gpt-5-mini',
+            input: {
+              instructions: systemPrompt,
+              user_message: latestUserMessage,
+              deal_id: deal.id,
+              chat_id: chat.id,
+              conversation_id: conversationId,
+            },
+            output: null,
+            latencyMs: Date.now() - startedAt,
+            isError: !isAbort,
+            error: message,
+            properties: {
+              route: 'negotiate',
+              deal_id: deal.id,
+              chat_id: chat.id,
+              analytics_snapshot_id: deal.analytics_snapshot_id,
+              openai_conversation_id: conversationId,
+            },
+          })
           controller.enqueue(
             encoder.encode(
               formatSseEvent({
                 type: 'error',
-                message: error instanceof Error ? error.message : 'Failed to stream negotiation advice.',
+                message,
               })
             )
           )
@@ -921,6 +1043,7 @@ export async function POST(req: Request) {
           try {
             await reader.cancel()
           } catch {}
+          await shutdownPostHog(posthog)
           controller.close()
         }
       },
@@ -935,6 +1058,7 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error('Negotiation AI failed', error)
+    await shutdownPostHog(posthog)
     return new Response('Failed to generate negotiation advice.', { status: 500 })
   }
 }

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight, Pencil, Trash2 } from 'lucide-react'
@@ -75,6 +77,24 @@ export default function RateCardClient({
 
     return () => { cancelled = true }
   }, [profile?.avatar_path, supabase])
+
+  useEffect(() => {
+    captureAnalyticsEvent(POSTHOG_EVENTS.rateCardViewed, {
+      rate_card_id: rateCard.id,
+      analytics_snapshot_id: rateCard.analytics_snapshot_id,
+      report_confidence: rateCard.report_confidence,
+      niche: rateCard.niche,
+      subscriber_count: rateCard.subscriber_count,
+      has_sponsorships: rateCard.has_sponsorships,
+    })
+  }, [
+    rateCard.analytics_snapshot_id,
+    rateCard.has_sponsorships,
+    rateCard.id,
+    rateCard.niche,
+    rateCard.report_confidence,
+    rateCard.subscriber_count,
+  ])
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -325,6 +345,13 @@ export default function RateCardClient({
       setCreatingDeal(false)
       return
     }
+
+    captureAnalyticsEvent(POSTHOG_EVENTS.rateCardUsedToCreateDeal, {
+      rate_card_id: rateCard.id,
+      deal_id: deal.id,
+      analytics_snapshot_id: rateCard.analytics_snapshot_id,
+      deal_type: dealType,
+    })
 
     if (!aiEnabled) {
       router.push(`/deal/${deal.id}`)

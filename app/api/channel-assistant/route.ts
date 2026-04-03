@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto'
 import { parsePartialJson } from 'ai'
 import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { requireAiEnabled } from '@/lib/ai-access'
 import { createClient } from '@/lib/supabase-server'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
+import { captureAiGeneration, captureServerEvent, createPostHogServerClient, shutdownPostHog } from '@/lib/posthog-server'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
 
 const OPENAI_API_BASE_URL = 'https://api.openai.com/v1'
@@ -274,6 +277,10 @@ async function getChannelSnapshotContext(
 }
 
 export async function POST(req: Request) {
+  const posthog = createPostHogServerClient()
+  const traceId = randomUUID()
+  const startedAt = Date.now()
+
   try {
     const { chatId, userMessage, generateTitle } = await req.json()
     const latestUserMessage = typeof userMessage === 'string' ? userMessage.trim() : ''
@@ -309,6 +316,17 @@ export async function POST(req: Request) {
     if (!chat) {
       return new Response('Chat not found.', { status: 404 })
     }
+
+    await captureServerEvent({
+      client: posthog,
+      distinctId: user.id,
+      event: POSTHOG_EVENTS.aiRequestStarted,
+      properties: {
+        route: 'channel-assistant',
+        chat_id: chatId,
+        analytics_snapshot_id: (chat as ChannelAiChat).analytics_snapshot_id ?? null,
+      },
+    })
 
     const { channelName, snapshot, channelContext } = await getChannelSnapshotContext(
       supabase,
@@ -422,6 +440,17 @@ export async function POST(req: Request) {
         if (body?.error?.code === 'conversation_locked' && attempt < maxAttempts - 1) {
           continue
         }
+        if (body?.error?.code === 'rate_limit_exceeded') {
+          await captureServerEvent({
+            client: posthog,
+            distinctId: user.id,
+            event: POSTHOG_EVENTS.aiRequestRateLimited,
+            properties: {
+              route: 'channel-assistant',
+              chat_id: chat.id,
+            },
+          })
+        }
         console.error('Channel assistant upstream failed', res.status, JSON.stringify(body))
         return new Response('Failed to generate channel advice.', { status: 500 })
       }
@@ -451,6 +480,11 @@ export async function POST(req: Request) {
           advice: '',
         }
         let latestResponseId: string | null = null
+        let completionUsage: {
+          input_tokens?: number
+          output_tokens?: number
+          total_tokens?: number
+        } | null = null
 
         try {
           while (true) {
@@ -477,7 +511,14 @@ export async function POST(req: Request) {
               const event = JSON.parse(data) as {
                 type?: string
                 delta?: string
-                response?: { id?: string }
+                response?: {
+                  id?: string
+                  usage?: {
+                    input_tokens?: number
+                    output_tokens?: number
+                    total_tokens?: number
+                  }
+                }
                 error?: { message?: string }
               }
 
@@ -486,6 +527,9 @@ export async function POST(req: Request) {
                 typeof event.response?.id === 'string'
               ) {
                 latestResponseId = event.response.id
+                if (event.response.usage) {
+                  completionUsage = event.response.usage
+                }
               }
 
               if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
@@ -608,18 +652,90 @@ export async function POST(req: Request) {
               })
             )
           )
+          await captureServerEvent({
+            client: posthog,
+            distinctId: user.id,
+            event: POSTHOG_EVENTS.aiRequestCompleted,
+            properties: {
+              route: 'channel-assistant',
+              chat_id: chat.id,
+              analytics_snapshot_id: snapshot?.id ?? null,
+              latency_ms: Date.now() - startedAt,
+            },
+          })
+          await captureAiGeneration({
+            client: posthog,
+            distinctId: user.id,
+            traceId,
+            model: 'gpt-5-mini',
+            input: {
+              instructions: systemPrompt,
+              user_message: latestUserMessage,
+              chat_id: chat.id,
+              conversation_id: conversationId,
+            },
+            output: finalPayload,
+            latencyMs: Date.now() - startedAt,
+            inputTokens: completionUsage?.input_tokens,
+            outputTokens: completionUsage?.output_tokens,
+            totalTokens: completionUsage?.total_tokens,
+            properties: {
+              route: 'channel-assistant',
+              chat_id: chat.id,
+              analytics_snapshot_id: snapshot?.id ?? null,
+              openai_conversation_id: conversationId,
+              openai_response_id: latestResponseId,
+            },
+          })
           controller.close()
         } catch (error) {
           console.error('Channel assistant streaming error', error)
+          const message = error instanceof Error ? error.message : 'Failed to stream channel advice.'
+          const isAbort = error instanceof Error && error.name === 'AbortError'
+          await captureServerEvent({
+            client: posthog,
+            distinctId: user.id,
+            event: isAbort ? POSTHOG_EVENTS.aiRequestAborted : POSTHOG_EVENTS.aiRequestFailed,
+            properties: {
+              route: 'channel-assistant',
+              chat_id: chat.id,
+              analytics_snapshot_id: snapshot?.id ?? null,
+              error: message,
+            },
+          })
+          await captureAiGeneration({
+            client: posthog,
+            distinctId: user.id,
+            traceId,
+            model: 'gpt-5-mini',
+            input: {
+              instructions: systemPrompt,
+              user_message: latestUserMessage,
+              chat_id: chat.id,
+              conversation_id: conversationId,
+            },
+            output: null,
+            latencyMs: Date.now() - startedAt,
+            isError: !isAbort,
+            error: message,
+            properties: {
+              route: 'channel-assistant',
+              chat_id: chat.id,
+              analytics_snapshot_id: snapshot?.id ?? null,
+              openai_conversation_id: conversationId,
+            },
+          })
           controller.enqueue(
             encoder.encode(
               formatSseEvent({
                 type: 'error',
-                message: error instanceof Error ? error.message : 'Failed to stream channel advice.',
+                message,
               })
             )
           )
           controller.close()
+        } finally {
+          await shutdownPostHog(posthog)
         }
       },
     })
@@ -633,6 +749,7 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error('Channel assistant route error', error)
+    await shutdownPostHog(posthog)
     return new Response('Failed to generate channel advice.', { status: 500 })
   }
 }

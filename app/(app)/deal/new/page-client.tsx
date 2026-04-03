@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { DEAL_TYPE_LABELS, getOpeningMessage } from '@/lib/deal-chat'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, Deal } from '@/lib/types'
 import FancySelect from '@/components/fancy-select'
 
@@ -61,6 +63,13 @@ export default function NewDealClient({
         .single()
 
       if (dealError) throw dealError
+
+      captureAnalyticsEvent(POSTHOG_EVENTS.dealCreated, {
+        user_id: user.id,
+        deal_id: deal.id,
+        analytics_snapshot_id: analyticsSnapshotId,
+        deal_type: dealType,
+      })
 
       const { data: chat, error: chatError } = await supabase
         .from('deal_chats')

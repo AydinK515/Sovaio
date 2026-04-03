@@ -7,6 +7,8 @@ import Papa from 'papaparse'
 import { strFromU8, unzipSync } from 'fflate'
 import { createClient } from '@/lib/supabase-browser'
 import { buildAnalyticsSnapshotName } from '@/lib/analytics-context'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES } from '@/lib/types'
 import { BarChart3, CheckCircle2, Circle, ExternalLink, FileText, Info, Upload, X } from 'lucide-react'
 import step1Image from '@/public/Step 1.jpg'
@@ -189,9 +191,17 @@ export default function AnalyticsUploadForm() {
     })
 
     if (fileArray.length === 0) {
+      captureAnalyticsEvent(POSTHOG_EVENTS.analyticsUploadValidationFailed, {
+        reason: 'unsupported_file_type',
+      })
       setError('Please upload YouTube CSV files or exported .zip bundles.')
       return
     }
+
+    captureAnalyticsEvent(POSTHOG_EVENTS.analyticsUploadStarted, {
+      file_count: fileArray.length,
+      includes_zip: fileArray.some(file => file.name.toLowerCase().endsWith('.zip')),
+    })
 
     try {
       const extracted = await Promise.all(fileArray.map(async (file) => {
@@ -206,6 +216,9 @@ export default function AnalyticsUploadForm() {
 
       const candidates = extracted.flat()
       if (candidates.length === 0) {
+        captureAnalyticsEvent(POSTHOG_EVENTS.analyticsUploadValidationFailed, {
+          reason: 'no_supported_reports_found',
+        })
         setError('No supported YouTube report tables were found in those files.')
         return
       }
@@ -235,6 +248,9 @@ export default function AnalyticsUploadForm() {
         return Array.from(bestByType.values())
       })
     } catch {
+      captureAnalyticsEvent(POSTHOG_EVENTS.analyticsUploadValidationFailed, {
+        reason: 'parse_failed',
+      })
       setError('One of the uploaded files could not be unpacked or parsed.')
     }
   }
@@ -294,6 +310,13 @@ export default function AnalyticsUploadForm() {
           subscriber_count: snapshotSubscriberCount,
         }).eq('id', user.id)
       }
+
+      captureAnalyticsEvent(POSTHOG_EVENTS.analyticsSnapshotCreated, {
+        user_id: user.id,
+        analytics_snapshot_id: snapshot.id,
+        report_confidence: confidence,
+        subscriber_count: snapshotSubscriberCount,
+      })
 
       router.push(`/analytics/${snapshot.id}`)
       router.refresh()

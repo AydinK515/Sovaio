@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
@@ -261,6 +263,15 @@ export default function DealClient({
     }
   }, [chatFullscreen])
 
+  useEffect(() => {
+    captureAnalyticsEvent(POSTHOG_EVENTS.dealViewed, {
+      deal_id: deal.id,
+      analytics_snapshot_id: deal.analytics_snapshot_id,
+      rate_card_id: deal.rate_card_id,
+      deal_type: deal.deal_type,
+    })
+  }, [deal.analytics_snapshot_id, deal.deal_type, deal.id, deal.rate_card_id])
+
   function markChatUpdated(chatId: string, updatedAt: string) {
     setChats(prev =>
       prev.map(chat =>
@@ -332,6 +343,10 @@ export default function DealClient({
   }
 
   function stopGeneration() {
+    captureAnalyticsEvent(POSTHOG_EVENTS.negotiationGenerationStopped, {
+      deal_id: deal.id,
+      chat_id: currentChat?.id ?? null,
+    })
     abortRef.current?.abort()
   }
 
@@ -382,6 +397,11 @@ export default function DealClient({
       setChats(prev => [...prev, activeChat!])
       setCurrentChat(activeChat)
       setChatMenuOpen(false)
+      captureAnalyticsEvent(POSTHOG_EVENTS.negotiationChatCreated, {
+        deal_id: deal.id,
+        chat_id: activeChat.id,
+        analytics_snapshot_id: deal.analytics_snapshot_id,
+      })
 
       if (openingAiMsg) {
         setMessages([openingAiMsg as DealMessage])
@@ -408,6 +428,12 @@ export default function DealClient({
     if (userMsg) {
       setMessages(prev => [...prev, userMsg as DealMessage])
     }
+
+    captureAnalyticsEvent(POSTHOG_EVENTS.negotiationMessageSent, {
+      deal_id: deal.id,
+      chat_id: activeChat.id,
+      analytics_snapshot_id: deal.analytics_snapshot_id,
+    })
 
     const messageTimestamp = new Date().toISOString()
     await supabase.from('deal_chats').update({ updated_at: messageTimestamp }).eq('id', activeChat.id)
@@ -574,10 +600,27 @@ export default function DealClient({
 
       if (typeof finalPayload?.detectedBrandOffer === 'number') {
         setDeal(prev => ({ ...prev, brand_last_offer: finalPayload!.detectedBrandOffer as number }))
+        captureAnalyticsEvent(POSTHOG_EVENTS.negotiationBrandOfferDetected, {
+          deal_id: deal.id,
+          chat_id: activeChat.id,
+          brand_last_offer: finalPayload.detectedBrandOffer,
+        })
       }
 
       if (typeof finalPayload?.detectedCreatorAsk === 'number') {
         setDeal(prev => ({ ...prev, creator_ask: finalPayload!.detectedCreatorAsk as number }))
+        captureAnalyticsEvent(POSTHOG_EVENTS.negotiationCreatorAskDetected, {
+          deal_id: deal.id,
+          chat_id: activeChat.id,
+          creator_ask: finalPayload.detectedCreatorAsk,
+        })
+      }
+
+      if (finalScript) {
+        captureAnalyticsEvent(POSTHOG_EVENTS.negotiationSuggestedScriptGenerated, {
+          deal_id: deal.id,
+          chat_id: activeChat.id,
+        })
       }
 
       if (finalPayload?.message) {
@@ -652,6 +695,11 @@ export default function DealClient({
 
   function createChat() {
     if (currentChat === null) return
+    captureAnalyticsEvent(POSTHOG_EVENTS.negotiationChatCreated, {
+      deal_id: deal.id,
+      analytics_snapshot_id: deal.analytics_snapshot_id,
+      chat_id: null,
+    })
     setCurrentChat(null)
     setMessages([])
     setChatMenuOpen(false)
@@ -708,6 +756,10 @@ export default function DealClient({
     if (status === 'negotiating') update.final_price = null
     await supabase.from('deals').update(update).eq('id', deal.id)
     setDeal(prev => ({ ...prev, status, ...(status === 'negotiating' ? { final_price: null } : {}) }))
+    captureAnalyticsEvent(POSTHOG_EVENTS.dealStatusChanged, {
+      deal_id: deal.id,
+      status,
+    })
   }
 
   async function closeDealWon() {
@@ -719,6 +771,10 @@ export default function DealClient({
     }).eq('id', deal.id)
     setDeal(prev => ({ ...prev, status: 'closed_won', final_price: price }))
     setShowCloseModal(false)
+    captureAnalyticsEvent(POSTHOG_EVENTS.dealPricingUpdated, {
+      deal_id: deal.id,
+      final_price: price,
+    })
   }
 
   async function updateAnalyticsSnapshot(nextSnapshotId: string) {
@@ -730,6 +786,10 @@ export default function DealClient({
       updated_at: new Date().toISOString(),
     }).eq('id', deal.id)
     setDeal(prev => ({ ...prev, analytics_snapshot_id: nextSnapshotId }))
+    captureAnalyticsEvent(POSTHOG_EVENTS.dealAnalyticsSnapshotChanged, {
+      deal_id: deal.id,
+      analytics_snapshot_id: nextSnapshotId,
+    })
     setUpdatingSnapshot(false)
   }
 

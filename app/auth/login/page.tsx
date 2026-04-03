@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { createClient } from '@/lib/supabase-browser'
 
 function LoginForm() {
@@ -22,11 +24,14 @@ function LoginForm() {
     setError('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
       setLoading(false)
     } else {
+      captureAnalyticsEvent(POSTHOG_EVENTS.authLoginCompleted, {
+        user_id: data.user.id,
+      })
       router.push(redirect)
       router.refresh()
     }
@@ -45,6 +50,9 @@ function LoginForm() {
     if (error) {
       setError(error.message)
     } else {
+      captureAnalyticsEvent(POSTHOG_EVENTS.authMagicLinkRequested, {
+        email,
+      })
       setMagicLinkSent(true)
     }
     setLoading(false)

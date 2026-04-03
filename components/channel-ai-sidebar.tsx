@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
 import { Bot, Check, ChevronDown, MessageSquare, Pencil, Plus, Send, Square, Trash2, X } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
@@ -265,6 +267,9 @@ export default function ChannelAiSidebar({
   }
 
   function createChat() {
+    captureAnalyticsEvent(POSTHOG_EVENTS.channelAiChatCreated, {
+      analytics_snapshot_id: selectedSnapshotId || null,
+    })
     setCurrentChat(null)
     setMessages([])
     setInput('')
@@ -283,6 +288,9 @@ export default function ChannelAiSidebar({
       .from('channel_ai_chats')
       .update({ title: trimmed })
       .eq('id', chatId)
+    captureAnalyticsEvent(POSTHOG_EVENTS.channelAiChatRenamed, {
+      chat_id: chatId,
+    })
   }
 
   async function deleteChat(chatId: string) {
@@ -327,6 +335,9 @@ export default function ChannelAiSidebar({
       }
     }
 
+    captureAnalyticsEvent(POSTHOG_EVENTS.channelAiChatDeleted, {
+      chat_id: chatId,
+    })
     setDeletingChatId(null)
   }
 
@@ -345,9 +356,17 @@ export default function ChannelAiSidebar({
 
     setCurrentChat(prev => prev ? { ...prev, analytics_snapshot_id: nextSnapshotId } : prev)
     setChats(prev => prev.map(chat => chat.id === currentChat.id ? { ...chat, analytics_snapshot_id: nextSnapshotId } : chat))
+    captureAnalyticsEvent(POSTHOG_EVENTS.channelAiSnapshotSwitched, {
+      chat_id: currentChat.id,
+      analytics_snapshot_id: nextSnapshotId,
+    })
   }
 
   function stopGeneration() {
+    captureAnalyticsEvent(POSTHOG_EVENTS.channelAiGenerationStopped, {
+      chat_id: currentChat?.id ?? null,
+      analytics_snapshot_id: currentChat?.analytics_snapshot_id ?? (selectedSnapshotId || null),
+    })
     abortRef.current?.abort()
   }
 
@@ -406,6 +425,10 @@ export default function ChannelAiSidebar({
       setChats(prev => sortChats([activeChat!, ...prev]))
       setCurrentChat(activeChat)
       setMessages(openingAiMessage ? [openingAiMessage as ChannelAiMessage] : [])
+      captureAnalyticsEvent(POSTHOG_EVENTS.channelAiChatCreated, {
+        chat_id: activeChat.id,
+        analytics_snapshot_id: activeChat.analytics_snapshot_id,
+      })
     }
 
     if (!activeChat) {
@@ -427,6 +450,11 @@ export default function ChannelAiSidebar({
     if (userMessage) {
       setMessages(prev => [...prev, userMessage as ChannelAiMessage])
     }
+
+    captureAnalyticsEvent(POSTHOG_EVENTS.channelAiMessageSent, {
+      chat_id: activeChat.id,
+      analytics_snapshot_id: activeChat.analytics_snapshot_id,
+    })
 
     const messageTimestamp = new Date().toISOString()
     await supabase.from('channel_ai_chats').update({ updated_at: messageTimestamp }).eq('id', activeChat.id)

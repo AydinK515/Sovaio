@@ -1,12 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { createClient } from '@/lib/supabase-browser'
 
 export default function SignupPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -20,8 +20,11 @@ export default function SignupPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+    captureAnalyticsEvent(POSTHOG_EVENTS.authSignUpSubmitted, {
+      email,
+    })
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -34,6 +37,11 @@ export default function SignupPage() {
       setError(error.message)
       setLoading(false)
     } else {
+      if (data.user) {
+        captureAnalyticsEvent(POSTHOG_EVENTS.authSignUpCompleted, {
+          user_id: data.user.id,
+        })
+      }
       setConfirmSent(true)
       setLoading(false)
     }

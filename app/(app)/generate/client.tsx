@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { BarChart3, CircleHelp, FileText, Sparkles, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { buildRateCardName } from '@/lib/analytics-context'
+import { captureAnalyticsEvent } from '@/lib/posthog-client'
+import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload, NICHES } from '@/lib/types'
 import FancySelect from '@/components/fancy-select'
 
@@ -173,6 +175,15 @@ export default function GenerateRateCardClient({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
+      captureAnalyticsEvent(POSTHOG_EVENTS.rateCardGenerationStarted, {
+        user_id: user.id,
+        analytics_snapshot_id: snapshotId,
+        report_confidence: snapshot?.report_confidence ?? null,
+        niche,
+        has_sponsorships: hasSponsorships,
+        subscriber_count: snapshot?.subscriber_count ?? null,
+      })
+
       const response = await fetch('/api/generate-rate-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,10 +239,26 @@ export default function GenerateRateCardClient({
         subscriber_count: snapshot?.subscriber_count ?? null,
       }).eq('id', user.id)
 
+      captureAnalyticsEvent(POSTHOG_EVENTS.rateCardGenerationSucceeded, {
+        user_id: user.id,
+        analytics_snapshot_id: snapshotId,
+        rate_card_id: rateCard.id,
+        report_confidence: snapshot?.report_confidence ?? null,
+        niche,
+        has_sponsorships: hasSponsorships,
+        subscriber_count: snapshot?.subscriber_count ?? null,
+      })
+
       router.push(`/rate-card/${rateCard.id}`)
       router.refresh()
       return
     } catch (err: unknown) {
+      captureAnalyticsEvent(POSTHOG_EVENTS.rateCardGenerationFailed, {
+        analytics_snapshot_id: snapshotId,
+        report_confidence: snapshot?.report_confidence ?? null,
+        niche: niche || null,
+        error: err instanceof Error ? err.message : 'unknown_error',
+      })
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
       return
