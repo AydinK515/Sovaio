@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
-import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight } from 'lucide-react'
+import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
 
 type AudienceSnapshot = {
@@ -57,6 +57,7 @@ export default function RateCardClient({
   const [editingCardName, setEditingCardName] = useState(false)
   const [draftCardName, setDraftCardName] = useState(rateCard.name || rateCard.niche || 'Untitled rate card')
   const [savingCardName, setSavingCardName] = useState(false)
+  const [deletingCard, setDeletingCard] = useState(false)
   const [cardNameError, setCardNameError] = useState('')
 
   const [supabase] = useState(() => createClient())
@@ -381,6 +382,33 @@ export default function RateCardClient({
     }
   }
 
+  async function deleteCard() {
+    const confirmed = window.confirm(
+      `Delete "${cardName}"? Existing deals will keep their data, but they will no longer be linked to this rate card.`
+    )
+
+    if (!confirmed) return
+
+    setDeletingCard(true)
+    setCardNameError('')
+
+    try {
+      const response = await fetch(`/api/rate-cards/${rateCard.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      router.push('/rate-card')
+      router.refresh()
+    } catch (err: unknown) {
+      setCardNameError(err instanceof Error ? err.message : 'Failed to delete rate card.')
+      setDeletingCard(false)
+    }
+  }
+
   const tips = rateCard.improvement_tips as { title: string; description: string }[] | null
   const exportAddOns = [
     { label: 'Organic usage rights (30 days)', value: formatCurrency(Math.round(rateCard.integration_60s_low * 0.2)) },
@@ -416,10 +444,9 @@ export default function RateCardClient({
 
       <div id="rate-card-content">
         <h1 className="text-3xl md:text-4xl font-bold">Your sponsorship rates are ready.</h1>
-        <div className="mt-4 rounded-2xl border border-border bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Rate Card Name</p>
+        <div className="mt-4">
           {editingCardName ? (
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 value={draftCardName}
                 onChange={(event) => setDraftCardName(event.target.value)}
@@ -448,17 +475,27 @@ export default function RateCardClient({
               </div>
             </div>
           ) : (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-lg font-semibold text-foreground">{cardName}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-semibold text-foreground">{cardName}</h2>
               <button
                 type="button"
                 onClick={() => {
                   setDraftCardName(cardName)
                   setEditingCardName(true)
                 }}
-                className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light"
+                aria-label={`Edit ${cardName}`}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-muted-light hover:text-foreground"
               >
-                Edit Name
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteCard()}
+                disabled={deletingCard}
+                aria-label={`Delete ${cardName}`}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           )}
