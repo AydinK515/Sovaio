@@ -44,11 +44,11 @@ export async function DELETE() {
   } = await supabase.auth.getUser()
 
   if (authError) {
-    return Response.json<DeleteResponse>({ error: authError.message }, { status: 401 })
+    return Response.json({ error: authError.message } satisfies DeleteResponse, { status: 401 })
   }
 
   if (!user) {
-    return Response.json<DeleteResponse>({ error: 'Unauthorized' }, { status: 401 })
+    return Response.json({ error: 'Unauthorized' } satisfies DeleteResponse, { status: 401 })
   }
 
   let admin: ReturnType<typeof createAdminClient>
@@ -57,7 +57,7 @@ export async function DELETE() {
     admin = createAdminClient()
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Supabase admin client is not configured.'
-    return Response.json<DeleteResponse>({ error: message }, { status: 500 })
+    return Response.json({ error: message } satisfies DeleteResponse, { status: 500 })
   }
 
   try {
@@ -84,6 +84,6 @@ export async function DELETE() {
     return Response.json({ ok: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to delete account.'
-    return Response.json<DeleteResponse>({ error: message }, { status: 500 })
+    return Response.json({ error: message } satisfies DeleteResponse, { status: 500 })
   }
 }
