@@ -832,7 +832,7 @@ export default function ChannelAiSidebar({
                       : 'rounded-bl-sm bg-muted-light text-foreground'
                   }`}>
                     <p className="mb-1 text-xs font-medium opacity-60">
-                      {message.role === 'creator' ? 'You' : 'RateProof AI'}
+                      {message.role === 'creator' ? 'You' : 'Sovaio'}
                     </p>
                     {message.role === 'ai' && message.reasoning_summary && (
                       <ReasoningDropdown text={message.reasoning_summary} />
@@ -847,7 +847,7 @@ export default function ChannelAiSidebar({
               {aiTyping && (
                 <div className="flex justify-start">
                   <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-muted-light px-4 py-3 text-foreground">
-                    <p className="mb-1 text-xs font-medium opacity-60">RateProof AI</p>
+                    <p className="mb-1 text-xs font-medium opacity-60">Sovaio</p>
                     {!aiText && (
                       <div className="text-sm leading-relaxed">
                         {aiReasoningText

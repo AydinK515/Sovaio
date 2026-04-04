@@ -1273,7 +1273,7 @@ export default function DealClient({
                     : 'bg-blue-50 rounded-2xl px-5 py-3'
                 }`}>
                   <p className="text-xs font-medium mb-1 opacity-60">
-                    {msg.role === 'ai' ? 'RateProof AI' : 'You'}
+                    {msg.role === 'ai' ? 'Sovaio' : 'You'}
                   </p>
                   {msg.role === 'ai' && msg.reasoning_summary && (
                     <ReasoningDropdown text={msg.reasoning_summary} />
@@ -1306,7 +1306,7 @@ export default function DealClient({
             {aiTyping && (
               <div className="flex justify-start">
                 <div className="max-w-[80%] bg-muted-light rounded-2xl rounded-bl-sm px-5 py-3">
-                  <p className="text-xs font-medium mb-1 opacity-60">RateProof AI</p>
+                  <p className="text-xs font-medium mb-1 opacity-60">Sovaio</p>
 
                   {/* Thinking phase: show reasoning live as it streams */}
                   {!aiText && (

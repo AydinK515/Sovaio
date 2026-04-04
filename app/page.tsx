@@ -55,7 +55,7 @@ export default async function LandingPage() {
                 </Link>
               </div>
               <p className="mt-4 text-sm text-muted">
-                Creators using RateProof close deals for <span className="font-semibold text-foreground">up to 40% more</span>.
+                Creators using Sovaio close deals for <span className="font-semibold text-foreground">up to 40% more</span>.
               </p>
             </div>
           </div>

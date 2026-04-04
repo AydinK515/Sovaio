@@ -136,7 +136,7 @@ export function getChecklistItems(state: OnboardingState): OnboardingChecklistIt
     {
       id: 'upload_analytics',
       title: 'Upload analytics',
-      description: 'Bring in your YouTube Studio exports so RateProof can work from real channel data.',
+      description: 'Bring in your YouTube Studio exports so Sovaio can work from real channel data.',
       href: '/analytics/new',
       status: statuses.upload_analytics,
     },

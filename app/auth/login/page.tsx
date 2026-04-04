@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
+import BrandLogo from '@/components/brand-logo'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { buildAuthCallbackUrl, normalizeAuthRedirectPath } from '@/lib/security'
@@ -133,9 +134,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted-light px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="font-bold text-2xl text-foreground">
-            RateProof <span className="text-primary">AI</span>
-          </Link>
+          <BrandLogo href="/" size="lg" priority className="justify-center" imageClassName="max-h-14 w-auto" />
           <h1 className="mt-4 text-2xl font-bold">Welcome back</h1>
           <p className="mt-1 text-sm text-muted">Sign in to your account</p>
         </div>

@@ -60,13 +60,13 @@ export default async function DashboardPage() {
     return (
       <div className="py-12">
         <h1 className="text-3xl md:text-4xl font-bold">Welcome, {firstName}</h1>
-        <p className="mt-2 text-lg text-muted">Everything starts with one saved analytics snapshot. Once you have that, the rest of RateProof becomes much easier to understand.</p>
+        <p className="mt-2 text-lg text-muted">Everything starts with one saved analytics snapshot. Once you have that, the rest of Sovaio becomes much easier to understand.</p>
 
         <div className="mt-10">
           <EmptyStateLaunchpad
             eyebrow="Your launchpad"
             title="Save your first analytics snapshot"
-            description="An analytics snapshot is your saved channel context. It gives RateProof the audience, geography, and performance signals it needs to generate pricing, guide deals, and answer channel questions with something real behind it."
+            description="An analytics snapshot is your saved channel context. It gives Sovaio the audience, geography, and performance signals it needs to generate pricing, guide deals, and answer channel questions with something real behind it."
             primaryHref="/analytics/new"
             primaryLabel="Upload analytics"
           />
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
             </div>
             <h2 className="text-lg font-semibold">What to upload first</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Start with the Content and Geography reports from YouTube Studio. Those give RateProof the strongest signals for early pricing and sponsorship guidance.
+              Start with the Content and Geography reports from YouTube Studio. Those give Sovaio the strongest signals for early pricing and sponsorship guidance.
             </p>
           </div>
         </div>

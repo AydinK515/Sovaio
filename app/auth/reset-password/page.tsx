@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import BrandLogo from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase-browser'
 
 export default function ResetPasswordPage() {
@@ -33,9 +34,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted-light px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="font-bold text-2xl text-foreground">
-            RateProof <span className="text-primary">AI</span>
-          </Link>
+          <BrandLogo href="/" size="lg" priority className="justify-center" imageClassName="max-h-14 w-auto" />
           <h1 className="mt-4 text-2xl font-bold">Reset your password</h1>
           <p className="mt-1 text-sm text-muted">We&apos;ll send you a reset link</p>
         </div>

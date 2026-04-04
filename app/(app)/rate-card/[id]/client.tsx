@@ -239,7 +239,7 @@ export default function RateCardClient({
       const imgData = canvas.toDataURL('image/png')
 
       if (format === 'png') {
-        downloadDataUrl(imgData, `RateProof-RateCard-${new Date().toISOString().split('T')[0]}.png`)
+        downloadDataUrl(imgData, `Sovaio-RateCard-${new Date().toISOString().split('T')[0]}.png`)
         return
       }
 
@@ -295,7 +295,7 @@ export default function RateCardClient({
         }
       }
 
-      pdf.save(`RateProof-RateCard-${new Date().toISOString().split('T')[0]}.pdf`)
+      pdf.save(`Sovaio-RateCard-${new Date().toISOString().split('T')[0]}.pdf`)
     } finally {
       setDownloadingFormat(null)
     }

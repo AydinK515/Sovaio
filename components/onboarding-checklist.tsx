@@ -26,10 +26,10 @@ export default function OnboardingChecklist({
       : 'Make your first result happen fast'
 
   const description = allComplete
-    ? 'You\'ve completed the setup. RateProof is fully ready to help with snapshots, pricing, deals, and AI guidance.'
+    ? 'You\'ve completed the setup. Sovaio is fully ready to help with snapshots, pricing, deals, and AI guidance.'
     : quieted
-      ? 'You already have the core setup in place. These last touches help you get even more value out of RateProof.'
-      : 'RateProof works best when you move from a saved snapshot into a real rate card and then into a live deal or AI conversation.'
+      ? 'You already have the core setup in place. These last touches help you get even more value out of Sovaio.'
+      : 'Sovaio works best when you move from a saved snapshot into a real rate card and then into a live deal or AI conversation.'
 
   function handleItemClick(itemId: OnboardingStepId) {
     trackChecklistClick(itemId, compact ? 'floating' : 'page')

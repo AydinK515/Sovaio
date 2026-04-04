@@ -13,9 +13,42 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteDescription =
+  "Generate data-backed sponsorship rate cards from your YouTube analytics and negotiate better brand deals with AI-powered guidance.";
+
 export const metadata: Metadata = {
-  title: "RateProof AI — Know Your Worth. Prove It. Close the Deal.",
-  description: "Generate data-backed sponsorship rate cards from your YouTube analytics and negotiate better deals with AI-powered guidance.",
+  metadataBase: new URL("https://sovaio.com"),
+  title: "Sovaio | YouTube sponsorship pricing and deal guidance",
+  description: siteDescription,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Sovaio",
+    description: siteDescription,
+    url: "https://sovaio.com",
+    siteName: "Sovaio",
+    type: "website",
+    images: [
+      {
+        url: "/sovaiologowhitebkgnd.png",
+        width: 1254,
+        height: 1254,
+        alt: "Sovaio logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sovaio",
+    description: siteDescription,
+    images: ["/sovaiologowhitebkgnd.png"],
+  },
+  icons: {
+    icon: "/sovaiologotransparent.png",
+    shortcut: "/sovaiologotransparent.png",
+    apple: "/sovaiologotransparent.png",
+  },
 };
 
 export default function RootLayout({

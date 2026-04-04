@@ -23,7 +23,7 @@ const OPTIONS: Array<{
   {
     value: 'negotiate_a_brand_deal',
     title: 'Negotiate a brand deal',
-    description: 'I want to get into a real deal workflow quickly and use RateProof to respond with confidence.',
+    description: 'I want to get into a real deal workflow quickly and use Sovaio to respond with confidence.',
     icon: BriefcaseBusiness,
   },
   {
@@ -91,7 +91,7 @@ export default function WelcomeClient({
               <div className="relative">
                 <div className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                   <Sparkles className="h-3.5 w-3.5" />
-                  {isReplay ? 'Replay onboarding' : 'Welcome to RateProof'}
+                  {isReplay ? 'Replay onboarding' : 'Welcome to Sovaio'}
                 </div>
 
                 {step === 0 ? (
@@ -100,7 +100,7 @@ export default function WelcomeClient({
                       Let&apos;s get started.
                     </h1>
                     <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
-                      RateProof helps YouTube creators turn channel analytics into clear sponsor pricing, stronger negotiation decisions, and better positioning. The product teaches itself once you have one saved snapshot.
+                      Sovaio helps YouTube creators turn channel analytics into clear sponsor pricing, stronger negotiation decisions, and better positioning. The product teaches itself once you have one saved snapshot.
                     </p>
                   </>
                 ) : (
@@ -109,7 +109,7 @@ export default function WelcomeClient({
                       Step 2 of 2
                     </p>
                     <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-                      What brought you to RateProof?
+                      What brought you to Sovaio?
                     </h1>
                     <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
                       Pick the reason that feels closest. We&apos;ll shape the next step around it and keep the onboarding focused.
@@ -172,7 +172,7 @@ export default function WelcomeClient({
                 <div className="mt-8 rounded-[32px] border border-border bg-white p-5 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.28)]">
                   {step === 0 ? (
                     <>
-                      <p className="text-sm font-semibold text-foreground">What RateProof actually does</p>
+                      <p className="text-sm font-semibold text-foreground">What Sovaio actually does</p>
                       <div className="mt-4 space-y-4">
                         <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
                           <p className="text-sm font-semibold text-foreground">Snapshots turn exports into reusable context</p>
@@ -207,7 +207,7 @@ export default function WelcomeClient({
                         </p>
                         <p className="mt-2 text-sm leading-relaxed text-muted">
                           {selectedPath === 'price_my_channel'
-                            ? 'That gives RateProof what it needs to generate accurate pricing instead of generic guesses.'
+                            ? 'That gives Sovaio what it needs to generate accurate pricing instead of generic guesses.'
                             : selectedPath === 'negotiate_a_brand_deal'
                               ? 'We\'ll keep nudging you toward the snapshot first, because that is what makes negotiation advice actually useful.'
                               : 'You can move through the product naturally and let the onboarding surface the next action at the right moment.'}

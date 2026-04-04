@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, User, X } from 'lucide-react'
+import BrandLogo from '@/components/brand-logo'
 
 interface MarketingNavProps {
   isLoggedIn?: boolean
@@ -41,9 +42,13 @@ export function MarketingNav({ isLoggedIn = false, avatarUrl = null, channelName
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <Link href="/" className="font-bold text-xl text-foreground">
-            RateProof <span className="text-primary">AI</span>
-          </Link>
+          <BrandLogo
+            href="/"
+            size="md"
+            priority
+            showWordmark
+            imageClassName="max-h-10 w-auto"
+          />
 
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted hover:text-foreground transition-colors">Features</a>
@@ -98,7 +103,8 @@ export function MarketingNav({ isLoggedIn = false, avatarUrl = null, channelName
   )
 }
 
-export function AppNav({ hasAnalytics: _hasAnalytics }: { hasAnalytics: boolean }) {
+export function AppNav({ hasAnalytics }: { hasAnalytics: boolean }) {
+  void hasAnalytics
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -113,9 +119,12 @@ export function AppNav({ hasAnalytics: _hasAnalytics }: { hasAnalytics: boolean 
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <Link href="/dashboard" className="font-bold text-xl text-foreground">
-            RateProof <span className="text-primary">AI</span>
-          </Link>
+          <BrandLogo
+            href="/dashboard"
+            size="md"
+            showWordmark
+            imageClassName="max-h-10 w-auto"
+          />
 
           <div className="hidden md:flex items-center gap-6">
             {links.map(l => (
@@ -151,15 +160,16 @@ export function Footer() {
     <footer className="border-t border-border bg-muted-light mt-auto">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted">
-            RateProof <span className="text-primary font-medium">AI</span>
-          </p>
+          <div className="flex flex-col items-center gap-1 sm:items-start">
+            <BrandLogo href="/" size="sm" imageClassName="max-h-8 w-auto" />
+            <p className="text-xs text-muted">sovaio.com</p>
+          </div>
           <div className="flex items-center gap-6">
             <Link href="#" className="text-xs text-muted hover:text-foreground transition-colors">FAQ</Link>
             <Link href="#" className="text-xs text-muted hover:text-foreground transition-colors">Terms</Link>
             <Link href="#" className="text-xs text-muted hover:text-foreground transition-colors">Privacy</Link>
           </div>
-          <p className="text-xs text-muted">&copy; {new Date().getFullYear()} RateProof AI. All rights reserved.</p>
+          <p className="text-xs text-muted">&copy; {new Date().getFullYear()} Sovaio. All rights reserved.</p>
         </div>
       </div>
     </footer>

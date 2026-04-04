@@ -430,7 +430,7 @@ export default function GenerateRateCardClient({
           bannerKey="generate-rate-card-guide"
           eyebrow="What this page does"
           title="Turn saved analytics into sponsor-ready pricing"
-          description="You are not filling out a generic calculator. This page combines your saved analytics snapshot with a small amount of business context so RateProof can produce realistic starting ranges and a pitch email."
+          description="You are not filling out a generic calculator. This page combines your saved analytics snapshot with a small amount of business context so Sovaio can produce realistic starting ranges and a pitch email."
         />
       </div>
 
