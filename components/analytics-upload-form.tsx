@@ -1,10 +1,13 @@
 'use client'
 
 import Image from 'next/image'
+import { useEffect } from 'react'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
 import { strFromU8, unzipSync } from 'fflate'
+import OnboardingRouteBanner from '@/components/onboarding-route-banner'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
 import { buildAnalyticsSnapshotName } from '@/lib/analytics-context'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
@@ -63,6 +66,7 @@ export default function AnalyticsUploadForm() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
+  const { completeStep } = useOnboarding()
 
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([])
   const [snapshotName, setSnapshotName] = useState(buildAnalyticsSnapshotName())
@@ -95,6 +99,13 @@ export default function AnalyticsUploadForm() {
   ].filter((value): value is string => Boolean(value))
   const canSaveSnapshot = missingRequiredFields.length === 0
   const showFieldErrors = submitAttempted
+
+  useEffect(() => {
+    captureAnalyticsEvent(POSTHOG_EVENTS.onboardingStepViewed, {
+      step_id: 'upload_analytics',
+      route: '/analytics/new',
+    })
+  }, [])
 
   function RequiredMark() {
     return (
@@ -339,6 +350,10 @@ export default function AnalyticsUploadForm() {
         report_confidence: confidence,
         subscriber_count: snapshotSubscriberCount,
       })
+      await completeStep('save_snapshot', {
+        snapshot_id: snapshot.id,
+        report_confidence: confidence,
+      })
 
       router.push(`/analytics/${snapshot.id}`)
       router.refresh()
@@ -355,6 +370,15 @@ export default function AnalyticsUploadForm() {
     <div className="py-8">
       <h1 className="text-3xl md:text-4xl font-bold">Upload Your Analytics</h1>
       <p className="mt-2 text-muted">This is the first step. Once you save an analytics snapshot, you can generate rate cards and power both AI assistants with real channel context.</p>
+
+      <div className="mt-8">
+        <OnboardingRouteBanner
+          bannerKey="analytics-upload-basics"
+          eyebrow="Before you upload"
+          title="Save one snapshot, then reuse it everywhere"
+          description="Content and Geography are the two reports you need to save a useful snapshot. We turn those exports into a saved channel context that powers pricing, deal prep, and Channel Advisor."
+        />
+      </div>
 
       <div className="mt-8 rounded-[28px] border border-border bg-white p-5 shadow-sm md:p-6">
         <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">Tutorial</p>

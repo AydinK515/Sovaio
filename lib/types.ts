@@ -25,6 +25,35 @@ export interface AnalyticsSnapshot {
   updated_at: string
 }
 
+export interface OnboardingState {
+  user_id: string
+  started_at: string
+  completed_at: string | null
+  dismissed_at: string | null
+  last_seen_at: string | null
+  updated_at: string | null
+  welcome_completed: boolean
+  welcome_path: 'price_my_channel' | 'negotiate_a_brand_deal' | 'just_exploring' | null
+  has_export_ready: boolean | null
+  snapshot_created: boolean
+  snapshot_created_at: string | null
+  rate_card_created: boolean
+  rate_card_created_at: string | null
+  deal_created: boolean
+  deal_created_at: string | null
+  first_negotiation_message: boolean
+  first_negotiation_message_at: string | null
+  first_channel_advisor_message: boolean
+  first_channel_advisor_message_at: string | null
+  checklist_dismissed: boolean
+  route_hints_dismissed: boolean
+  dismissed_hints: Record<string, string>
+  checklist_state: Partial<Record<'upload_analytics' | 'save_snapshot' | 'generate_rate_card' | 'start_deal' | 'ask_channel_ai', {
+    dismissed?: boolean
+    opened_at?: string | null
+  }>>
+}
+
 export interface CsvUpload {
   id: string
   user_id: string

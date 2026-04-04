@@ -1,8 +1,12 @@
 import { AppNav, Footer } from '@/components/navbar'
 import ChannelAiSidebar from '@/components/channel-ai-sidebar'
+import OnboardingShell from '@/components/onboarding-shell'
+import { OnboardingProvider } from '@/components/onboarding-provider'
 import { isAiEnabledForUser } from '@/lib/ai-access'
+import { fetchOnboardingState, type OnboardingStateReader } from '@/lib/onboarding'
 import { createClient } from '@/lib/supabase-server'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
+import { redirect } from 'next/navigation'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -14,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   let selectedChat: ChannelAiChat | null = null
   let messages: ChannelAiMessage[] = []
   let aiEnabled = true
+  let onboardingState = null
 
   if (user) {
     const [
@@ -21,11 +26,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       snapshotsResponse,
       chatsResponse,
       nextAiEnabled,
+      nextOnboardingState,
     ] = await Promise.all([
       supabase.from('profiles').select('channel_name').eq('id', user.id).single(),
       supabase.from('analytics_snapshots').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('channel_ai_chats').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }),
       isAiEnabledForUser(supabase, user.id),
+      fetchOnboardingState(supabase as unknown as OnboardingStateReader, user.id),
     ])
 
     channelName = profileResponse.data?.channel_name ?? null
@@ -33,6 +40,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     chats = (chatsResponse.data || []) as ChannelAiChat[]
     selectedChat = chats[0] ?? null
     aiEnabled = nextAiEnabled
+    onboardingState = nextOnboardingState
+
+    if (!onboardingState.welcome_completed) {
+      redirect('/welcome')
+    }
 
     if (selectedChat) {
       const { data: chatMessages } = await supabase
@@ -45,8 +57,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
+  if (!user || !onboardingState) {
+    return null
+  }
+
   return (
-    <>
+    <OnboardingProvider initialState={onboardingState}>
       <AppNav hasAnalytics={snapshots.length > 0} />
       <div className="flex min-h-[calc(100dvh-65px)] w-full items-start">
         <div className="flex min-w-0 flex-1 flex-col self-stretch">
@@ -63,7 +79,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           initialMessages={messages}
           channelName={channelName}
         />
+        <OnboardingShell />
       </div>
-    </>
+    </OnboardingProvider>
   )
 }

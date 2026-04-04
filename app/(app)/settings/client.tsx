@@ -3,16 +3,18 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { captureAnalyticsEvent, resetAnalytics } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { createClient } from '@/lib/supabase-browser'
-import { User, CreditCard, Trash2, ExternalLink, Shield, Upload, Camera, Loader2 } from 'lucide-react'
+import { User, CreditCard, Trash2, ExternalLink, Shield, Upload, Camera, Loader2, Sparkles, RotateCcw } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { Profile } from '@/lib/types'
 import ConfirmationModal from '@/components/confirmation-modal'
 
 export default function SettingsClient({ user, profile }: { user: SupabaseUser; profile: Profile | null }) {
   const router = useRouter()
+  const { replayOnboarding, reopenChecklist, resetHints } = useOnboarding()
   const [supabase] = useState(() => createClient())
   const [channelName, setChannelName] = useState(profile?.channel_name || '')
   const [avatarPath, setAvatarPath] = useState(profile?.avatar_path || null)
@@ -347,6 +349,40 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
         >
           {signingOut ? 'Signing Out...' : 'Sign Out'}
         </button>
+      </div>
+
+      <div className="mt-6 bg-white rounded-2xl border border-border p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Sparkles className="w-5 h-5 text-muted" />
+          <h2 className="text-lg font-semibold">Onboarding</h2>
+        </div>
+        <p className="text-sm text-muted">
+          Replay the guided setup, reopen the checklist, or restore any onboarding hints you dismissed earlier.
+        </p>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => void replayOnboarding()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Replay onboarding
+          </button>
+          <button
+            type="button"
+            onClick={() => void reopenChecklist()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light"
+          >
+            Reopen checklist
+          </button>
+          <button
+            type="button"
+            onClick={() => void resetHints()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light"
+          >
+            Reset hints
+          </button>
+        </div>
       </div>
 
       {/* Danger Zone */}

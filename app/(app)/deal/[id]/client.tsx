@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import OnboardingHint from '@/components/onboarding-hint'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
@@ -189,6 +191,7 @@ export default function DealClient({
   initialMessages: DealMessage[]
 }) {
   const router = useRouter()
+  const { markNegotiationMessage } = useOnboarding()
   const [deal, setDeal] = useState(initialDeal)
   const [chats, setChats] = useState(initialChats)
   const [currentChat, setCurrentChat] = useState(initialChat)
@@ -644,6 +647,11 @@ export default function DealClient({
           created_at: new Date().toISOString(),
         } as DealMessage])
       }
+      await markNegotiationMessage({
+        deal_id: deal.id,
+        chat_id: activeChat.id,
+        snapshot_id: deal.analytics_snapshot_id,
+      })
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         const partial = aiTextRef.current.trim()
@@ -946,6 +954,14 @@ export default function DealClient({
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
 
+      <div className="mb-8">
+        <OnboardingHint
+          hintKey={`deal-${deal.id}-guide`}
+          title="This workspace is for live negotiation help"
+          description="Use Deal Assistant for replies, counters, and pacing inside this specific brand conversation. Use Channel Advisor when you want broader guidance about your channel, positioning, or future sponsorship strategy."
+        />
+      </div>
+
       <div className="grid flex-1 gap-8 lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)]">
         {/* Sidebar */}
         <div className="space-y-6">
@@ -962,7 +978,7 @@ export default function DealClient({
                   deal.status === 'closed_lost' ? 'bg-red-50 text-red-700' :
                   'bg-amber-50 text-amber-700'
                 }`}>
-                  {deal.status === 'negotiating' ? 'Negotiating' : deal.status === 'closed_won' ? 'Closed Won' : deal.status === 'closed_lost' ? 'Closed Lost' : 'Stalled'}
+                  {deal.status === 'negotiating' ? 'In progress' : deal.status === 'closed_won' ? 'Won' : deal.status === 'closed_lost' ? 'Lost' : 'Paused'}
                 </span>
               </div>
             </div>
@@ -989,25 +1005,25 @@ export default function DealClient({
 
           {/* Status Controls */}
           <div className="bg-white rounded-2xl border border-border p-6">
-            <h3 className="text-sm font-semibold mb-3">Deal Status Controls</h3>
+            <h3 className="text-sm font-semibold mb-3">Deal stage</h3>
             <div className="space-y-2">
               <button
                 onClick={() => updateStatus('closed_won')}
                 className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
               >
-                <CheckCircle2 className="w-4 h-4" /> Closed Won
+                <CheckCircle2 className="w-4 h-4" /> Mark as won
               </button>
               <button
                 onClick={() => updateStatus('closed_lost')}
                 className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
               >
-                <XCircle className="w-4 h-4" /> Closed Lost
+                <XCircle className="w-4 h-4" /> Mark as lost
               </button>
               <button
                 onClick={() => updateStatus('stalled')}
                 className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
               >
-                <Pause className="w-4 h-4" /> Stalled
+                <Pause className="w-4 h-4" /> Pause deal
               </button>
               <div className="px-1 pt-2">
                 <div className="border-t-2 border-border" />
@@ -1378,7 +1394,7 @@ export default function DealClient({
           {deal.status !== 'negotiating' && (
             <div className="shrink-0 border-t border-border p-4 text-center">
               <p className="text-sm text-muted">
-                This deal is {deal.status === 'closed_won' ? 'closed (won)' : deal.status === 'closed_lost' ? 'closed (lost)' : 'stalled'}.
+                This deal is {deal.status === 'closed_won' ? 'won' : deal.status === 'closed_lost' ? 'lost' : 'paused'}.
                 <button onClick={() => updateStatus('negotiating')} className="ml-2 text-primary font-medium hover:underline">Resume</button>
               </p>
             </div>

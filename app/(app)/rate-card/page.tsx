@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Plus, Sparkles } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import EmptyStateLaunchpad from '@/components/empty-state-launchpad'
 import RateCardsClient from '@/components/rate-cards-client'
 import { createClient } from '@/lib/supabase-server'
 import type { AnalyticsSnapshot, RateCard } from '@/lib/types'
@@ -24,23 +25,18 @@ export default async function RateCardsPage() {
     return (
       <div className="py-12">
         <h1 className="text-3xl md:text-4xl font-bold">Your rate cards</h1>
-        <p className="mt-2 text-muted text-lg">Upload analytics first so you can generate your first rate card.</p>
+        <p className="mt-2 text-muted text-lg">Upload analytics first so your first rate card is grounded in real channel context.</p>
 
-        <div className="mt-10 bg-white rounded-3xl border border-border p-8 md:p-10">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Sparkles className="w-7 h-7 text-primary" />
-          </div>
-          <h2 className="mt-6 text-xl font-semibold">No analytics snapshots yet</h2>
-          <p className="mt-2 text-sm text-muted max-w-xl">
-            Snapshots are the source context for every rate card. Upload your YouTube Studio exports first, then come back here to generate pricing artifacts from them.
-          </p>
-          <Link
-            href="/analytics/new"
-            className="mt-6 inline-flex items-center gap-2 bg-primary text-white font-medium px-6 py-3 rounded-xl hover:bg-primary-hover transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Upload Analytics
-          </Link>
+        <div className="mt-10">
+          <EmptyStateLaunchpad
+            eyebrow="Before pricing"
+            title="You need one saved snapshot before you can price anything."
+            description="Rate cards are built from saved analytics snapshots, not generic assumptions. Once you upload your YouTube Studio exports and save a snapshot, this page becomes your reusable library of pricing assets."
+            primaryHref="/analytics/new"
+            primaryLabel="Upload analytics"
+            secondaryHref="/dashboard"
+            secondaryLabel="Back to dashboard"
+          />
         </div>
       </div>
     )
@@ -52,21 +48,16 @@ export default async function RateCardsPage() {
         <h1 className="text-3xl md:text-4xl font-bold">Your rate cards</h1>
         <p className="mt-2 text-muted text-lg">You haven&apos;t saved any rate cards yet.</p>
 
-        <div className="mt-10 bg-white rounded-3xl border border-border p-8 md:p-10">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Sparkles className="w-7 h-7 text-primary" />
-          </div>
-          <h2 className="mt-6 text-xl font-semibold">Generate your first card</h2>
-          <p className="mt-2 text-sm text-muted max-w-xl">
-            Upload your latest YouTube Studio exports and we&apos;ll turn them into a reusable sponsorship rate card you can come back to anytime.
-          </p>
-          <Link
-            href="/generate"
-            className="mt-6 inline-flex items-center gap-2 bg-primary text-white font-medium px-6 py-3 rounded-xl hover:bg-primary-hover transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Create Rate Card
-          </Link>
+        <div className="mt-10">
+          <EmptyStateLaunchpad
+            eyebrow="Your pricing library"
+            title="Generate your first sponsor-ready rate card"
+            description="A rate card gives you reusable ranges for dedicated videos and in-video integrations, plus explanation and pitch copy you can keep coming back to. This is usually the product's first real aha moment."
+            primaryHref="/generate"
+            primaryLabel="Create rate card"
+            secondaryHref="/analytics"
+            secondaryLabel="Review snapshots"
+          />
         </div>
       </div>
     )

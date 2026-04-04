@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
 import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
@@ -153,6 +154,7 @@ export default function ChannelAiSidebar({
   channelName: string | null
 }) {
   const supabase = createClient()
+  const { completeStep } = useOnboarding()
   const [open, setOpen] = useState(false)
   const [snapshots, setSnapshots] = useState(initialSnapshots)
   const [chats, setChats] = useState(initialChats)
@@ -563,6 +565,10 @@ export default function ChannelAiSidebar({
         reasoning_summary: streamedReasoning.trim() || null,
         created_at: new Date().toISOString(),
       } as ChannelAiMessage])
+      await completeStep('ask_channel_ai', {
+        chat_id: activeChat.id,
+        snapshot_id: activeChat.analytics_snapshot_id,
+      })
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         const partial = aiTextRef.current.trim()
@@ -615,10 +621,18 @@ export default function ChannelAiSidebar({
   }))
 
   return (
-    <div className="pointer-events-none fixed right-0 top-[65px] bottom-0 z-40 hidden lg:block">
+    <div className="pointer-events-none fixed inset-0 z-40">
+      {open ? (
+        <button
+          type="button"
+          aria-label="Close Channel Advisor"
+          onClick={() => setOpen(false)}
+          className="pointer-events-auto absolute inset-0 bg-slate-950/20 backdrop-blur-[2px] lg:hidden"
+        />
+      ) : null}
       <aside
-        className={`pointer-events-auto h-full w-[420px] border-l border-border bg-white shadow-2xl transition-transform duration-300 ease-out xl:w-[460px] ${
-          open ? 'translate-x-0' : 'translate-x-full'
+        className={`pointer-events-auto absolute inset-x-0 bottom-0 top-24 flex h-auto flex-col rounded-t-[28px] border border-border bg-white shadow-2xl transition-transform duration-300 ease-out lg:bottom-0 lg:left-auto lg:right-0 lg:top-[65px] lg:w-[420px] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l xl:w-[460px] ${
+          open ? 'translate-y-0 lg:translate-y-0 lg:translate-x-0' : 'translate-y-[105%] lg:translate-y-0 lg:translate-x-full'
         }`}
       >
         <div className="flex h-full min-w-0 flex-col">
@@ -755,6 +769,11 @@ export default function ChannelAiSidebar({
                         triggerClassName="px-3 py-2"
                       />
                       <p className="text-xs text-muted">{channelName || 'Your channel'} | {currentSnapshot ? `${currentSnapshot.report_confidence}% confidence snapshot` : 'Select snapshot'}</p>
+                      {visibleMessages.length <= 1 ? (
+                        <div className="rounded-xl border border-border bg-muted-light px-3 py-3 text-xs leading-relaxed text-muted">
+                          Channel Advisor is for channel strategy, audience questions, and pricing context. For a live brand negotiation, use the Deal Assistant inside a deal instead.
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-relaxed text-amber-800">
@@ -908,7 +927,7 @@ export default function ChannelAiSidebar({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open Channel Advisor"
-        className={`absolute bottom-6 right-6 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-5 text-white shadow-lg transition-all duration-300 hover:bg-primary-hover ${
+        className={`pointer-events-auto absolute bottom-4 right-4 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-5 text-white shadow-lg transition-all duration-300 hover:bg-primary-hover lg:bottom-6 lg:right-6 ${
           open ? 'pointer-events-none translate-y-4 scale-95 opacity-0' : 'pointer-events-auto translate-y-0 scale-100 opacity-100'
         }`}
       >

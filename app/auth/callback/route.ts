@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { fetchOnboardingState, type OnboardingStateReader } from '@/lib/onboarding'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { captureServerEvent } from '@/lib/posthog-server'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -14,6 +15,16 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (user) {
+      await supabase
+        .from('onboarding_states')
+        .upsert({
+          user_id: user.id,
+          started_at: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+        })
+
+      const onboardingState = await fetchOnboardingState(supabase as unknown as OnboardingStateReader, user.id)
+
       await captureServerEvent({
         distinctId: user.id,
         event: POSTHOG_EVENTS.authLoginCompleted,
@@ -21,6 +32,10 @@ export async function GET(request: NextRequest) {
           user_id: user.id,
         },
       })
+
+      if (!onboardingState.welcome_completed) {
+        return NextResponse.redirect(`${origin}/welcome`)
+      }
     }
   }
 

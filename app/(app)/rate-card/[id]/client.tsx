@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import OnboardingHint from '@/components/onboarding-hint'
 import { createClient } from '@/lib/supabase-browser'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
@@ -461,6 +462,14 @@ export default function RateCardClient({
           <p className="mt-2 text-sm text-muted">Generated from analytics snapshot: <span className="font-medium text-foreground">{snapshotName}</span></p>
         )}
 
+        <div className="mt-6">
+          <OnboardingHint
+            hintKey={`rate-card-${rateCard.id}-read-guide`}
+            title="Treat these as smart starting ranges"
+            description="These numbers are designed to help you open confidently, not quote the bare minimum. Start near the upper-middle when the scope is normal, move upward when usage rights or exclusivity expand, and use “Start Tracking A Deal” when you want help in a live negotiation."
+          />
+        </div>
+
         {/* Low-volume advisory — shown when 60s rate implies avg views are too small for real deals */}
         {rateCard.integration_60s_low <= 25 && (
           <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5">
@@ -669,6 +678,11 @@ export default function RateCardClient({
               const href = rateCard.analytics_snapshot_id
                 ? `/deal/new?snapshot=${rateCard.analytics_snapshot_id}`
                 : '/deal/new'
+              captureAnalyticsEvent(POSTHOG_EVENTS.emptyStateCtaClicked, {
+                cta_location: 'rate_card_start_deal',
+                destination: href,
+                rate_card_id: rateCard.id,
+              })
               router.push(href)
             }}
             className="flex items-center justify-center gap-2 py-4 rounded-xl bg-secondary text-white font-semibold hover:bg-secondary-hover transition-colors"

@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BarChart3, CircleHelp, FileText, Sparkles, Users } from 'lucide-react'
+import OnboardingHint from '@/components/onboarding-hint'
+import OnboardingRouteBanner from '@/components/onboarding-route-banner'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
 import { buildRateCardName } from '@/lib/analytics-context'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
@@ -47,6 +50,7 @@ export default function GenerateRateCardClient({
   const router = useRouter()
   const supabase = createClient()
   const defaultRateCardName = buildRateCardName({ niche: '' })
+  const { completeStep } = useOnboarding()
 
   const [snapshotId, setSnapshotId] = useState(initialSnapshotId ?? '')
   const [niche, setNiche] = useState('')
@@ -149,6 +153,13 @@ export default function GenerateRateCardClient({
       </span>
     )
   }
+
+  useEffect(() => {
+    captureAnalyticsEvent(POSTHOG_EVENTS.onboardingStepViewed, {
+      step_id: 'generate_rate_card',
+      route: '/generate',
+    })
+  }, [])
 
   useEffect(() => {
     if (!rateCardNameCustomized) {
@@ -285,6 +296,11 @@ export default function GenerateRateCardClient({
         has_sponsorships: hasSponsorships,
         subscriber_count: snapshot?.subscriber_count ?? null,
       })
+      await completeStep('generate_rate_card', {
+        rate_card_id: rateCard.id,
+        snapshot_id: snapshotId,
+        niche,
+      })
 
       router.push(`/rate-card/${rateCard.id}`)
       router.refresh()
@@ -409,6 +425,15 @@ export default function GenerateRateCardClient({
     <div className="py-8">
       <h1 className="text-3xl md:text-4xl font-bold">Generate a Rate Card</h1>
       <p className="mt-2 text-muted">Choose the analytics snapshot you want to price from, then fill in the sponsorship-specific details.</p>
+
+      <div className="mt-8">
+        <OnboardingRouteBanner
+          bannerKey="generate-rate-card-guide"
+          eyebrow="What this page does"
+          title="Turn saved analytics into sponsor-ready pricing"
+          description="You are not filling out a generic calculator. This page combines your saved analytics snapshot with a small amount of business context so RateProof can produce realistic starting ranges and a pitch email."
+        />
+      </div>
 
       <div className="mt-8 space-y-8">
         <div className="rounded-2xl border border-border bg-white p-6">
@@ -583,6 +608,10 @@ export default function GenerateRateCardClient({
                   <button
                     type="button"
                     aria-label="What are dedicated videos?"
+                    onClick={() => captureAnalyticsEvent(POSTHOG_EVENTS.tooltipOpened, {
+                      tooltip_key: 'dedicated_videos',
+                      route: '/generate',
+                    })}
                     className="flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
                   >
                     <CircleHelp className="h-4 w-4" />
@@ -628,6 +657,10 @@ export default function GenerateRateCardClient({
                     <button
                       type="button"
                       aria-label="Why we ask for average deal amount"
+                      onClick={() => captureAnalyticsEvent(POSTHOG_EVENTS.tooltipOpened, {
+                        tooltip_key: 'average_deal_amount',
+                        route: '/generate',
+                      })}
                       className="flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
                     >
                       <CircleHelp className="h-4 w-4" />
@@ -660,6 +693,12 @@ export default function GenerateRateCardClient({
             Fill the required fields to continue: {missingRequiredFields.join(', ')}.
           </div>
         )}
+
+        <OnboardingHint
+          hintKey="generate-terms-explainer"
+          title="Simple meaning of the pricing terms"
+          description="Dedicated video means a full sponsor-focused upload. A 60-second integration is roughly a one-minute in-video sponsor segment. A 30-second integration is a shorter sponsor mention. These are starting ranges, not locked quotes."
+        />
 
         <button
           type="button"

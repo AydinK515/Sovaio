@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import OnboardingHint from '@/components/onboarding-hint'
+import OnboardingRouteBanner from '@/components/onboarding-route-banner'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
 import { DEAL_TYPE_LABELS, getDealTypeSelectionValue, getOpeningMessage, normalizeCustomDealTypeLabel } from '@/lib/deal-chat'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
@@ -18,6 +21,7 @@ export default function NewDealClient({
 }) {
   const router = useRouter()
   const supabase = createClient()
+  const { completeStep } = useOnboarding()
   const fallbackDealType: Deal['deal_type'] = 'integration_60s'
 
   const [brandName, setBrandName] = useState('')
@@ -117,6 +121,11 @@ export default function NewDealClient({
         analytics_snapshot_id: analyticsSnapshotId,
         deal_type: dealTypeCustom ?? dealType,
       })
+      await completeStep('start_deal', {
+        deal_id: deal.id,
+        snapshot_id: analyticsSnapshotId,
+        deal_type: dealTypeCustom ?? dealType,
+      })
 
       const { data: chat, error: chatError } = await supabase
         .from('deal_chats')
@@ -213,6 +222,15 @@ export default function NewDealClient({
       <h1 className="text-3xl md:text-4xl font-bold">Create Deal</h1>
       <p className="mt-2 text-muted">Choose the analytics snapshot this negotiation should use. That gives the AI channel-size, audience, geography, and performance context right from the start.</p>
 
+      <div className="mt-8">
+        <OnboardingRouteBanner
+          bannerKey="deal-new-context-guide"
+          eyebrow="Before you start"
+          title="A deal is where your pricing turns into a live conversation"
+          description="Choose the snapshot you trust most for this negotiation. The Deal Assistant will use that saved channel context to reason about your value, brand offers, and reply drafts."
+        />
+      </div>
+
       <div className="mt-8 rounded-2xl border border-border bg-white p-6">
         <p className="mb-4 text-xs text-muted">
           <span className="font-semibold text-primary">*</span> Required before you can create a deal
@@ -281,6 +299,14 @@ export default function NewDealClient({
             Fill the required fields to continue: {missingRequiredFields.join(', ')}.
           </div>
         )}
+
+        <div className="mt-4">
+          <OnboardingHint
+            hintKey="deal-new-terms"
+            title="Quick field guide"
+            description="Your ask is the price you want to anchor with. Deal type describes the sponsor format. The AI can help you frame responses, but you still control the final quote and what you agree to."
+          />
+        </div>
 
         <button
           type="button"

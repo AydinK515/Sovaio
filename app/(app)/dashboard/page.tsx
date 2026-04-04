@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowRight, BarChart3, DollarSign, FileStack, MessageSquare, Upload } from 'lucide-react'
+import EmptyStateLaunchpad from '@/components/empty-state-launchpad'
+import OnboardingChecklist from '@/components/onboarding-checklist'
+import OnboardingSpotlightCard from '@/components/onboarding-spotlight-card'
+import { fetchOnboardingState, type OnboardingStateReader } from '@/lib/onboarding'
 import { createClient } from '@/lib/supabase-server'
 import { formatDealTarget } from '@/lib/deal-chat'
 import type { AnalyticsSnapshot, Deal, RateCard } from '@/lib/types'
@@ -41,6 +45,7 @@ export default async function DashboardPage() {
     supabase.from('rate_cards').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('deals').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }),
   ])
+  const onboardingState = await fetchOnboardingState(supabase as unknown as OnboardingStateReader, user.id)
 
   const snapshotItems = (snapshots || []) as AnalyticsSnapshot[]
   const rateCardItems = (rateCards || []) as RateCard[]
@@ -55,16 +60,28 @@ export default async function DashboardPage() {
     return (
       <div className="py-12">
         <h1 className="text-3xl md:text-4xl font-bold">Welcome, {firstName}</h1>
-        <p className="mt-2 text-lg text-muted">Everything starts with your analytics snapshot. Upload your YouTube Studio exports first, and then we can power the rest of the app from that real channel context.</p>
+        <p className="mt-2 text-lg text-muted">Everything starts with one saved analytics snapshot. Once you have that, the rest of RateProof becomes much easier to understand.</p>
 
-        <div className="mt-12 grid gap-8 md:grid-cols-2">
+        <div className="mt-10">
+          <EmptyStateLaunchpad
+            eyebrow="Your launchpad"
+            title="Save your first analytics snapshot"
+            description="An analytics snapshot is your saved channel context. It gives RateProof the audience, geography, and performance signals it needs to generate pricing, guide deals, and answer channel questions with something real behind it."
+            primaryHref="/analytics/new"
+            primaryLabel="Upload analytics"
+            secondaryHref="/analytics"
+            secondaryLabel="See how snapshots work"
+          />
+        </div>
+
+        <div className="mt-8 grid gap-8 md:grid-cols-2">
           <div className="rounded-2xl border border-border bg-white p-8">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <BarChart3 className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-lg font-semibold">What is an analytics snapshot?</h2>
+            <h2 className="text-lg font-semibold">Why snapshots matter</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              It&apos;s a reusable channel context built from your exported YouTube Studio reports. We use it to generate rate cards, guide live negotiations, and answer channel questions without relying on guesswork.
+              Snapshots are the reusable layer between raw exports and everything else you do in the product. Save one once, then reuse it for rate cards, deals, and Channel Advisor.
             </p>
           </div>
 
@@ -72,17 +89,10 @@ export default async function DashboardPage() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <Upload className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-lg font-semibold">Upload analytics first</h2>
+            <h2 className="text-lg font-semibold">What to upload first</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Upload the required Content and Geography reports, save a snapshot, and then you&apos;ll be able to generate rate cards or start deals with AI that actually knows your channel.
+              Start with the Content and Geography reports from YouTube Studio. Those give RateProof the strongest signals for early pricing and sponsorship guidance.
             </p>
-            <Link
-              href="/analytics/new"
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
-            >
-              <Upload className="h-4 w-4" />
-              Upload Analytics
-            </Link>
           </div>
         </div>
       </div>
@@ -102,6 +112,30 @@ export default async function DashboardPage() {
           <Link href={`/deal/new?snapshot=${snapshotItems[0].id}`} className="inline-flex items-center justify-center rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover">Create Deal</Link>
         </div>
       </div>
+
+      <div className="mt-8">
+        <OnboardingChecklist />
+      </div>
+
+      {!onboardingState.rate_card_created ? (
+        <div className="mt-8">
+          <OnboardingSpotlightCard
+            title="Your first real aha moment is the rate card"
+            description="You already have the hard part done: a saved snapshot. Generate a rate card from that real data and you’ll instantly see how the app turns analytics into sponsor-ready pricing."
+            ctaHref={snapshotItems[0] ? `/generate?snapshot=${snapshotItems[0].id}` : '/generate'}
+            ctaLabel="Generate your first rate card"
+          />
+        </div>
+      ) : !onboardingState.deal_created ? (
+        <div className="mt-8">
+          <OnboardingSpotlightCard
+            title="Next, turn your pricing into a live deal workflow"
+            description="Start a deal once your first rate card is ready. That’s where the negotiation assistant becomes useful and the product starts teaching itself in real context."
+            ctaHref={snapshotItems[0] ? `/deal/new?snapshot=${snapshotItems[0].id}` : '/deal/new'}
+            ctaLabel="Start your first deal"
+          />
+        </div>
+      ) : null}
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded-2xl border border-border bg-white p-6">
