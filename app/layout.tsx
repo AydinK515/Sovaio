@@ -31,10 +31,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/sovaiologowhitebkgnd.png",
-        width: 1254,
-        height: 1254,
-        alt: "Sovaio logo",
+        url: "/sovaiobanner.png",
+        width: 1536,
+        height: 1024,
+        alt: "Sovaio banner",
       },
     ],
   },
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Sovaio",
     description: siteDescription,
-    images: ["/sovaiologowhitebkgnd.png"],
+    images: ["/sovaiobanner.png"],
   },
   icons: {
     icon: [
