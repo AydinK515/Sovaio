@@ -615,13 +615,13 @@ export default function ChannelAiSidebar({
   }))
 
   return (
-    <aside
-      className={`sticky top-[65px] hidden h-[calc(100dvh-65px)] shrink-0 border-l border-border bg-white transition-[width] duration-300 ease-out lg:flex ${
-        open ? 'w-[420px] xl:w-[460px]' : 'w-16'
-      }`}
-    >
-      {open ? (
-        <div className="flex w-full min-w-0 flex-col">
+    <div className="pointer-events-none fixed right-0 top-[65px] bottom-0 z-40 hidden lg:block">
+      <aside
+        className={`pointer-events-auto h-full w-[420px] border-l border-border bg-white shadow-2xl transition-transform duration-300 ease-out xl:w-[460px] ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex h-full min-w-0 flex-col">
             <div className="border-b border-border px-5 py-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -892,26 +892,19 @@ export default function ChannelAiSidebar({
               )}
           </div>
         </div>
-      ) : (
-        <div className="flex h-full w-full flex-col items-center justify-between py-4">
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-sm transition-colors hover:bg-primary-hover"
-            aria-label="Open Channel Advisor"
-          >
-            <Bot className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="[writing-mode:vertical-rl] rotate-180 text-xs font-semibold uppercase tracking-[0.3em] text-muted"
-          >
-            Channel Advisor
-          </button>
-          <div className="h-11 w-11" />
-        </div>
-      )}
-    </aside>
+      </aside>
+
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open Channel Advisor"
+        className={`absolute bottom-6 right-6 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-5 text-white shadow-lg transition-all duration-300 hover:bg-primary-hover ${
+          open ? 'pointer-events-none translate-y-4 scale-95 opacity-0' : 'pointer-events-auto translate-y-0 scale-100 opacity-100'
+        }`}
+      >
+        <Bot className="h-5 w-5" />
+        <span className="text-sm font-semibold">Channel Advisor</span>
+      </button>
+    </div>
   )
 }
