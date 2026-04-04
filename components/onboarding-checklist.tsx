@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { CheckCircle2, CircleDashed, Sparkles, X } from 'lucide-react'
 import { useOnboarding, useOnboardingChecklist } from '@/components/onboarding-provider'
+import type { OnboardingStepId } from '@/lib/onboarding'
 
 export default function OnboardingChecklist({
   compact = false,
@@ -30,7 +31,7 @@ export default function OnboardingChecklist({
       ? 'You already have the core setup in place. These last touches help you get even more value out of RateProof.'
       : 'RateProof works best when you move from a saved snapshot into a real rate card and then into a live deal or AI conversation.'
 
-  function handleItemClick(itemId: string) {
+  function handleItemClick(itemId: OnboardingStepId) {
     trackChecklistClick(itemId, compact ? 'floating' : 'page')
 
     if (itemId === 'ask_channel_ai') {
