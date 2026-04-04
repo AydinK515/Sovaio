@@ -10,7 +10,7 @@ import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
 import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getDealTypeLabel, getDealTypeSelectionValue, getOpeningMessage, normalizeCustomDealTypeLabel } from '@/lib/deal-chat'
-import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
+import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil, CircleHelp } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
 import ConfirmationModal from '@/components/confirmation-modal'
 
@@ -1099,7 +1099,21 @@ export default function DealClient({
           </div>
 
           <div className="bg-white rounded-2xl border border-border p-6">
-            <h3 className="text-sm font-semibold mb-3">Analytics Context</h3>
+            <div className="mb-3 flex items-center gap-2">
+              <h3 className="text-sm font-semibold">Analytics Context</h3>
+              <div className="group relative">
+                <button
+                  type="button"
+                  aria-label="Explain analytics context"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+                >
+                  <CircleHelp className="h-4 w-4" />
+                </button>
+                <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-border bg-white px-3 py-2 text-xs leading-relaxed text-muted opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                  Pick which analytics snapshot Deal Assistant should use to ground its replies in your real channel data.
+                </div>
+              </div>
+            </div>
             {snapshots.length > 0 ? (
               <>
                 <FancySelect
