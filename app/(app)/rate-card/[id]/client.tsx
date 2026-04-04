@@ -765,6 +765,14 @@ function downloadFormatLabel(format: 'png' | 'pdf') {
   return format.toUpperCase()
 }
 
+function roundToNearestFifty(value: number) {
+  return Math.round(value / 50) * 50
+}
+
+function formatStartingFromRate(value: number) {
+  return `Starting from ${formatCurrency(roundToNearestFifty(value))}`
+}
+
 function ExportRateCardContent({
   rateCard,
   profile,
@@ -786,7 +794,7 @@ function ExportRateCardContent({
     ...(rateCard.offers_dedicated_videos
       ? [{
           label: 'Dedicated Video',
-          range: `${formatCurrency(rateCard.dedicated_video_low)} - ${formatCurrency(rateCard.dedicated_video_high)}`,
+          range: formatStartingFromRate(rateCard.dedicated_video_low),
           note: 'Brand-led feature',
           accent: '#dc2626',
           description: 'Includes full-video integration, dedicated CTA, and sponsor-first positioning.',
@@ -794,14 +802,14 @@ function ExportRateCardContent({
       : []),
     {
       label: '60-Second Integration',
-      range: `${formatCurrency(rateCard.integration_60s_low)} - ${formatCurrency(rateCard.integration_60s_high)}`,
+      range: formatStartingFromRate(rateCard.integration_60s_low),
       note: 'Mid-roll placement',
       accent: '#16a34a',
       description: 'Includes in-video talking points, natural script fit, and clickable callout.',
     },
     {
       label: '30-Second Integration',
-      range: `${formatCurrency(rateCard.integration_30s_low)} - ${formatCurrency(rateCard.integration_30s_high)}`,
+      range: formatStartingFromRate(rateCard.integration_30s_low),
       note: 'High-efficiency brand mention',
       accent: '#64748b',
       description: 'Best for lighter tests, launches, and repeat campaign exposure.',
@@ -819,18 +827,18 @@ function ExportRateCardContent({
         fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
-        <div>
-          <h1 style={{ margin: '0', fontSize: '72px', lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', maxWidth: '760px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '24px' }}>
+        <div style={{ flex: '1 1 auto', paddingBottom: '10px' }}>
+          <h1 style={{ margin: '0 0 14px 0', fontSize: '72px', lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', maxWidth: '760px' }}>
             Sponsorship
             <br />
             Rate Card
           </h1>
         </div>
         {(avatarUrl || profile?.channel_name) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', alignSelf: 'center', gap: '16px', minHeight: '120px' }}>
             {profile?.channel_name && (
-              <div style={{ fontSize: '36px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap', letterSpacing: '-0.03em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', minHeight: '120px', fontSize: '36px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap', letterSpacing: '-0.03em', lineHeight: 1, transform: 'translateY(-8px)' }}>
                 {profile.channel_name}
               </div>
             )}
@@ -851,7 +859,7 @@ function ExportRateCardContent({
         {[
           { value: rateCard.subscriber_count ? rateCard.subscriber_count.toLocaleString() : 'N/A', label: 'Subscribers' },
           { value: rateCard.niche || 'General', label: 'Category' },
-          { value: 'Brand integrations', label: 'Media Type' },
+          { value: 'YouTube sponsorships', label: 'Sponsorship Type' },
           { value: 'USD', label: 'Currency' },
         ].map((item) => (
           <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 22px', backgroundColor: '#ffffff' }}>
@@ -874,7 +882,7 @@ function ExportRateCardContent({
           <div key={tier.label} style={{ border: '1px solid #e2e8f0', borderRadius: '28px', padding: '28px', backgroundColor: '#ffffff' }}>
             <div style={{ fontSize: '14px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tier.label}</div>
             <div style={{ marginTop: '18px', fontSize: '46px', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.05em', color: '#0f172a' }}>
-              {tier.range}*
+              {tier.range}
             </div>
             <div style={{ marginTop: '16px', fontSize: '15px', color: tier.accent, fontWeight: 600 }}>
               {tier.note}
@@ -886,7 +894,7 @@ function ExportRateCardContent({
         ))}
       </div>
       <div style={{ marginTop: '14px', fontSize: '15px', lineHeight: 1.6, color: '#64748b' }}>
-        * Final price depends on scope, usage rights, placement, etc. These numbers are intended as a range, not one fixed quote.
+        Final price depends on scope, usage rights, placement, and timeline. Starting rates increase for broader deliverables.
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
@@ -924,11 +932,11 @@ function ExportRateCardContent({
         <div style={{ borderRadius: '30px', padding: '30px 30px 32px', backgroundColor: '#0f172a', color: '#ffffff' }}>
           <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>What&apos;s Included</div>
           <div style={{ marginTop: '18px', fontSize: '18px', lineHeight: 1.8, color: 'rgba(255,255,255,0.92)' }}>
-            <div>- Sponsored segment tailored to the video format</div>
-            <div>- Brand mention plus spoken call-to-action</div>
-            <div>- Link placement in the description when applicable</div>
-            <div>- Creative alignment before final recording</div>
-            <div>- Standard performance-friendly integration style</div>
+            <div>- One in-video sponsorship placement sized to the package selected</div>
+            <div>- Brand talking points delivered in my normal style</div>
+            <div>- Description link placement when included in campaign scope</div>
+            <div>- One standard brand review pass for factual or compliance notes</div>
+            <div>- Final quote confirmed based on scope, usage rights, exclusivity, and timeline</div>
           </div>
         </div>
       </div>
