@@ -166,17 +166,31 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   }
 
   async function handleDelete() {
-    setShowDeleteModal(false)
+    resetStatus()
     setDeleting(true)
-    // In production, this would call an edge function to delete all user data
-    // For now, just sign out
-    captureAnalyticsEvent(POSTHOG_EVENTS.authSignOut, {
-      user_id: user.id,
-    })
-    resetAnalytics()
-    await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
+
+    try {
+      const response = await fetch('/api/account', {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error || 'Unable to delete account.')
+      }
+
+      setShowDeleteModal(false)
+      captureAnalyticsEvent(POSTHOG_EVENTS.authSignOut, {
+        user_id: user.id,
+      })
+      resetAnalytics()
+      await supabase.auth.signOut().catch(() => undefined)
+      router.push('/')
+      router.refresh()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete account.')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -193,12 +207,16 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
         }}
       />
       <ConfirmationModal
+        key={showDeleteModal ? 'delete-account-open' : 'delete-account-closed'}
         open={showDeleteModal}
         title="Delete account?"
-        message="Permanently delete your account and all associated data? This action cannot be undone."
+        message="Permanently delete your account and all associated data? This action cannot be undone. Type CONFIRM to continue."
         confirmLabel="Delete Account"
         tone="danger"
         pending={deleting}
+        confirmationText="CONFIRM"
+        confirmationLabel="Type CONFIRM to permanently delete your account"
+        confirmationPlaceholder="CONFIRM"
         onClose={() => setShowDeleteModal(false)}
         onConfirm={() => {
           void handleDelete()

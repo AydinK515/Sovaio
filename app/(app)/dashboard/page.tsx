@@ -69,8 +69,6 @@ export default async function DashboardPage() {
             description="An analytics snapshot is your saved channel context. It gives RateProof the audience, geography, and performance signals it needs to generate pricing, guide deals, and answer channel questions with something real behind it."
             primaryHref="/analytics/new"
             primaryLabel="Upload analytics"
-            secondaryHref="/analytics"
-            secondaryLabel="See how snapshots work"
           />
         </div>
 

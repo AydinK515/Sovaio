@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 type ConfirmationModalProps = {
   open: boolean
@@ -12,6 +12,9 @@ type ConfirmationModalProps = {
   pending?: boolean
   onConfirm: () => void
   onClose: () => void
+  confirmationText?: string
+  confirmationLabel?: string
+  confirmationPlaceholder?: string
 }
 
 export default function ConfirmationModal({
@@ -24,7 +27,12 @@ export default function ConfirmationModal({
   pending = false,
   onConfirm,
   onClose,
+  confirmationText,
+  confirmationLabel,
+  confirmationPlaceholder,
 }: ConfirmationModalProps) {
+  const [confirmationInput, setConfirmationInput] = useState('')
+
   useEffect(() => {
     if (!open) return
 
@@ -49,6 +57,8 @@ export default function ConfirmationModal({
   const confirmButtonClassName = tone === 'danger'
     ? 'bg-primary text-white hover:bg-primary-hover'
     : 'bg-secondary text-white hover:bg-secondary-hover'
+  const confirmationMatches = !confirmationText || confirmationInput.trim() === confirmationText
+  const confirmDisabled = pending || !confirmationMatches
 
   return (
     <div
@@ -71,6 +81,22 @@ export default function ConfirmationModal({
           {message}
         </p>
 
+        {confirmationText ? (
+          <div className="mt-5">
+            <label className="block text-xs font-medium uppercase tracking-[0.18em] text-muted">
+              {confirmationLabel || `Type ${confirmationText} to confirm`}
+            </label>
+            <input
+              value={confirmationInput}
+              onChange={(event) => setConfirmationInput(event.target.value)}
+              placeholder={confirmationPlaceholder || confirmationText}
+              autoComplete="off"
+              spellCheck={false}
+              className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+          </div>
+        ) : null}
+
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -83,7 +109,7 @@ export default function ConfirmationModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={pending}
+            disabled={confirmDisabled}
             className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${confirmButtonClassName}`}
           >
             {pending ? 'Working...' : confirmLabel}
