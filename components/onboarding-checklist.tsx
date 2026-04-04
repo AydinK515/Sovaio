@@ -10,11 +10,25 @@ export default function OnboardingChecklist({
   compact?: boolean
 }) {
   const { checklistOpen, dismissChecklist, trackChecklistClick } = useOnboarding()
-  const { items, completedCount, totalCount, quieted } = useOnboardingChecklist()
+  const { items, completedCount, totalCount, quieted, completed } = useOnboardingChecklist()
 
   if (!checklistOpen) {
     return null
   }
+
+  const allComplete = completed || (totalCount > 0 && completedCount === totalCount)
+
+  const heading = allComplete
+    ? 'You\'re all set'
+    : quieted
+      ? 'Keep the momentum going'
+      : 'Make your first result happen fast'
+
+  const description = allComplete
+    ? 'You\'ve completed the setup. RateProof is fully ready to help with snapshots, pricing, deals, and AI guidance.'
+    : quieted
+      ? 'You already have the core setup in place. These last touches help you get even more value out of RateProof.'
+      : 'RateProof works best when you move from a saved snapshot into a real rate card and then into a live deal or AI conversation.'
 
   return (
     <section className={`rounded-[28px] border border-border bg-white shadow-[0_18px_50px_-36px_rgba(15,23,42,0.3)] ${compact ? 'p-4' : 'p-6'}`}>
@@ -25,13 +39,20 @@ export default function OnboardingChecklist({
             Getting Started
           </div>
           <h2 className={`mt-3 font-semibold text-foreground ${compact ? 'text-lg' : 'text-2xl'}`}>
-            {quieted ? 'Keep the momentum going' : 'Make your first result happen fast'}
+            {heading}
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-            {quieted
-              ? 'You already have the core setup in place. These last touches help you get even more value out of RateProof.'
-              : 'RateProof works best when you move from a saved snapshot into a real rate card and then into a live deal or AI conversation.'}
+            {description}
           </p>
+          {allComplete ? (
+            <button
+              type="button"
+              onClick={() => void dismissChecklist()}
+              className="mt-4 inline-flex items-center justify-center rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+            >
+              Close
+            </button>
+          ) : null}
         </div>
         <button
           type="button"
