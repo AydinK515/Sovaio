@@ -945,7 +945,7 @@ export default function ChannelAiSidebar({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open Channel Advisor"
-        className={`pointer-events-auto absolute bottom-4 right-4 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-5 text-white shadow-lg transition-all duration-300 hover:bg-primary-hover lg:bottom-6 lg:right-6 ${
+        className={`channel-ai-launcher pointer-events-auto absolute bottom-4 right-4 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-5 text-white shadow-lg transition-all duration-300 hover:bg-primary-hover lg:bottom-6 lg:right-6 ${
           open ? 'pointer-events-none translate-y-4 scale-95 opacity-0' : 'pointer-events-auto translate-y-0 scale-100 opacity-100'
         }`}
       >

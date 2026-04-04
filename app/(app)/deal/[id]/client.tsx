@@ -219,6 +219,7 @@ export default function DealClient({
   const [showDeleteDealModal, setShowDeleteDealModal] = useState(false)
   const [showCustomDealTypeModal, setShowCustomDealTypeModal] = useState(false)
   const [customDealTypeDraft, setCustomDealTypeDraft] = useState('')
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -246,7 +247,13 @@ export default function DealClient({
   }, [initialMessages])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth',
+    })
   }, [messages, aiTyping, aiText, aiReasoningText, aiScriptText, aiScriptSubject])
 
   useEffect(() => {
@@ -264,9 +271,13 @@ export default function DealClient({
     if (!chatFullscreen) return
 
     const previousOverflow = document.body.style.overflow
+    document.documentElement.classList.add('deal-chat-fullscreen')
+    document.body.classList.add('deal-chat-fullscreen')
     document.body.style.overflow = 'hidden'
 
     return () => {
+      document.documentElement.classList.remove('deal-chat-fullscreen')
+      document.body.classList.remove('deal-chat-fullscreen')
       document.body.style.overflow = previousOverflow
     }
   }, [chatFullscreen])
@@ -631,6 +642,11 @@ export default function DealClient({
         })
       }
 
+      setAiTyping(false)
+      setAiText('')
+      setAiReasoningText('')
+      setAiScriptText('')
+      setAiScriptSubject('')
       if (finalPayload?.message) {
         setMessages(prev => [...prev, finalPayload.message!])
       } else if (messageContent) {
@@ -653,42 +669,52 @@ export default function DealClient({
         snapshot_id: deal.analytics_snapshot_id,
       })
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        const partial = aiTextRef.current.trim()
-        if (partial) {
-          const partialSubject = aiScriptSubjectRef.current.trim() || null
-          const partialScript = aiScriptTextRef.current.trim() || null
-          const partialReasoning = aiReasoningText.trim() || null
+        if (err instanceof Error && err.name === 'AbortError') {
+          const partial = aiTextRef.current.trim()
+          if (partial) {
+            const partialSubject = aiScriptSubjectRef.current.trim() || null
+            const partialScript = aiScriptTextRef.current.trim() || null
+            const partialReasoning = aiReasoningText.trim() || null
           const { data: savedPartial } = await supabase.from('deal_messages').insert({
             deal_id: deal.id,
             chat_id: activeChat.id,
             user_id: user?.id ?? '',
             role: 'ai',
             content: partial,
-            subject: partialSubject,
-            suggested_script: partialScript,
-            reasoning_summary: partialReasoning,
-          }).select('*').single()
-          setMessages(prev => [...prev, (savedPartial ?? {
-            id: crypto.randomUUID(),
-            deal_id: deal.id,
-            chat_id: activeChat.id,
-            user_id: user?.id ?? '',
+              subject: partialSubject,
+              suggested_script: partialScript,
+              reasoning_summary: partialReasoning,
+            }).select('*').single()
+            setAiTyping(false)
+            setAiText('')
+            setAiReasoningText('')
+            setAiScriptText('')
+            setAiScriptSubject('')
+            setMessages(prev => [...prev, (savedPartial ?? {
+              id: crypto.randomUUID(),
+              deal_id: deal.id,
+              chat_id: activeChat.id,
+              user_id: user?.id ?? '',
             role: 'ai',
             content: partial,
             subject: partialSubject,
             suggested_script: partialScript,
             reasoning_summary: partialReasoning,
             created_at: new Date().toISOString(),
-          }) as DealMessage])
-        }
-      } else if (err instanceof Error) {
-        // Save error message so conversation isn't broken
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          deal_id: deal.id,
-          chat_id: activeChat.id,
-          user_id: user?.id ?? '',
+            }) as DealMessage])
+          }
+        } else if (err instanceof Error) {
+          // Save error message so conversation isn't broken
+          setAiTyping(false)
+          setAiText('')
+          setAiReasoningText('')
+          setAiScriptText('')
+          setAiScriptSubject('')
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            deal_id: deal.id,
+            chat_id: activeChat.id,
+            user_id: user?.id ?? '',
           role: 'ai',
           content: `Sorry, I ran into an error${err.message ? `: ${err.message}` : '.'}`,
           subject: null,
@@ -1222,7 +1248,7 @@ export default function DealClient({
           </div>
 
           {/* Messages */}
-          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
+          <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
             {visibleMessages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'brand' || msg.role === 'creator' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] ${

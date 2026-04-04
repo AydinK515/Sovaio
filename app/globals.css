@@ -81,6 +81,11 @@ body {
 .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
 .animate-pop-in { animation: pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
+body.deal-chat-fullscreen .channel-ai-launcher,
+html.deal-chat-fullscreen .channel-ai-launcher {
+  display: none !important;
+}
+
 /* Confidence meter */
 .confidence-low { background: linear-gradient(90deg, #dc2626 0%, #dc2626 var(--confidence), #e2e8f0 var(--confidence)); }
 .confidence-medium { background: linear-gradient(90deg, #f59e0b 0%, #f59e0b var(--confidence), #e2e8f0 var(--confidence)); }

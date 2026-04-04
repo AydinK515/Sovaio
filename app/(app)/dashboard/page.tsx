@@ -105,9 +105,9 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted">Your snapshots power everything here: rate cards, deals, and both AI assistants.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link href="/analytics/new" className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light">Upload Analytics</Link>
           <Link href="/generate" className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover">Generate Rate Card</Link>
-          <Link href={`/deal/new?snapshot=${snapshotItems[0].id}`} className="inline-flex items-center justify-center rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover">Create Deal</Link>
+          <Link href={`/deal/new?snapshot=${snapshotItems[0].id}`} className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light">Create Deal</Link>
+          <Link href="/analytics/new" className="inline-flex items-center justify-center px-1 py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground">Upload Analytics</Link>
         </div>
       </div>
 

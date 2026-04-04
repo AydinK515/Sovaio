@@ -76,11 +76,11 @@ export function formatDealTarget(
   }
 
   if (deal.deal_type_custom?.trim()) {
-    return 'your selected pricing context'
+    return 'No ask set yet'
   }
 
   if (!rateCard) {
-    return 'your selected pricing context'
+    return 'No ask set yet'
   }
 
   const range = getDealTypeRange(rateCard, deal.deal_type)
@@ -91,5 +91,11 @@ export function getOpeningMessage(
   deal: Pick<Deal, 'brand_name' | 'creator_ask' | 'deal_type' | 'deal_type_custom'>,
   rateCard?: Pick<RateCard, 'dedicated_video_low' | 'dedicated_video_high' | 'integration_60s_low' | 'integration_60s_high' | 'integration_30s_low' | 'integration_30s_high'> | null
 ) {
-  return `This is a fresh deal thread for ${deal.brand_name}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. You're targeting ${formatDealTarget(deal, rateCard)}${getDealTypeMessageFragment(deal)}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
+  const targetText = deal.creator_ask != null
+    ? `You're targeting ${formatDealTarget(deal, rateCard)}${getDealTypeMessageFragment(deal)}.`
+    : rateCard || deal.deal_type_custom?.trim()
+      ? `You haven't set a creator ask yet, so we'll use your pricing context${getDealTypeMessageFragment(deal)} as the starting point.`
+      : `You haven't set a creator ask yet, so we'll work from the negotiation context and set a target together.`
+
+  return `This is a fresh deal thread for ${deal.brand_name}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. ${targetText} Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
 }
