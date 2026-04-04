@@ -48,7 +48,7 @@ export interface OnboardingState {
   checklist_dismissed: boolean
   route_hints_dismissed: boolean
   dismissed_hints: Record<string, string>
-  checklist_state: Partial<Record<'upload_analytics' | 'save_snapshot' | 'generate_rate_card' | 'start_deal' | 'ask_channel_ai', {
+  checklist_state: Partial<Record<'upload_analytics' | 'generate_rate_card' | 'start_deal' | 'ask_channel_ai', {
     dismissed?: boolean
     opened_at?: string | null
   }>>

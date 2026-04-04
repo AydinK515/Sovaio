@@ -128,7 +128,7 @@ async function maybeCompleteOnboarding(
 
 function getMilestoneEvent(stepId: OnboardingStepId) {
   switch (stepId) {
-    case 'save_snapshot':
+    case 'upload_analytics':
       return {
         completedEvent: POSTHOG_EVENTS.timeToFirstSnapshot,
         stateKey: 'snapshot_created_at' as const,
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
       checklist_dismissed: false,
     }
 
-    if (body.stepId === 'save_snapshot') {
+    if (body.stepId === 'upload_analytics') {
       updates.snapshot_created = true
       updates.snapshot_created_at = state.snapshot_created_at ?? now
     }
@@ -306,10 +306,6 @@ export async function POST(request: Request) {
     if (body.stepId === 'ask_channel_ai') {
       updates.first_channel_advisor_message = true
       updates.first_channel_advisor_message_at = state.first_channel_advisor_message_at ?? now
-    }
-
-    if (body.stepId === 'upload_analytics') {
-      updates.last_seen_at = now
     }
 
     nextState = await upsertState(supabase, state, updates)

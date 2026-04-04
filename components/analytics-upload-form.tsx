@@ -350,7 +350,7 @@ export default function AnalyticsUploadForm() {
         report_confidence: confidence,
         subscriber_count: snapshotSubscriberCount,
       })
-      await completeStep('save_snapshot', {
+      await completeStep('upload_analytics', {
         snapshot_id: snapshot.id,
         report_confidence: confidence,
       })

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BarChart3, CircleHelp, FileText, Sparkles, Users } from 'lucide-react'
-import OnboardingHint from '@/components/onboarding-hint'
 import OnboardingRouteBanner from '@/components/onboarding-route-banner'
 import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
@@ -693,12 +692,6 @@ export default function GenerateRateCardClient({
             Fill the required fields to continue: {missingRequiredFields.join(', ')}.
           </div>
         )}
-
-        <OnboardingHint
-          hintKey="generate-terms-explainer"
-          title="Simple meaning of the pricing terms"
-          description="Dedicated video means a full sponsor-focused upload. A 60-second integration is roughly a one-minute in-video sponsor segment. A 30-second integration is a shorter sponsor mention. These are starting ranges, not locked quotes."
-        />
 
         <button
           type="button"

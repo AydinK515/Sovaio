@@ -8,7 +8,6 @@ export const ONBOARDING_PATHS = [
 
 export const ONBOARDING_STEP_IDS = [
   'upload_analytics',
-  'save_snapshot',
   'generate_rate_card',
   'start_deal',
   'ask_channel_ai',
@@ -128,7 +127,6 @@ export function shouldQuietOnboarding(state: OnboardingState) {
 export function getChecklistItems(state: OnboardingState): OnboardingChecklistItem[] {
   const statuses: Record<OnboardingStepId, OnboardingStepStatus> = {
     upload_analytics: state.snapshot_created ? 'complete' : 'active',
-    save_snapshot: state.snapshot_created ? 'complete' : 'active',
     generate_rate_card: state.rate_card_created ? 'complete' : state.snapshot_created ? 'active' : 'locked',
     start_deal: state.deal_created ? 'complete' : state.rate_card_created ? 'active' : 'locked',
     ask_channel_ai: state.first_channel_advisor_message ? 'complete' : state.snapshot_created ? 'active' : 'locked',
@@ -141,13 +139,6 @@ export function getChecklistItems(state: OnboardingState): OnboardingChecklistIt
       description: 'Bring in your YouTube Studio exports so RateProof can work from real channel data.',
       href: '/analytics/new',
       status: statuses.upload_analytics,
-    },
-    {
-      id: 'save_snapshot',
-      title: 'Save your first snapshot',
-      description: 'Snapshots are your saved channel context for pricing, deals, and AI.',
-      href: '/analytics/new',
-      status: statuses.save_snapshot,
     },
     {
       id: 'generate_rate_card',
@@ -173,7 +164,7 @@ export function getChecklistItems(state: OnboardingState): OnboardingChecklistIt
   ]
 
   if (state.welcome_path === 'negotiate_a_brand_deal') {
-    return [items[0], items[1], items[3], items[2], items[4]]
+    return [items[0], items[2], items[1], items[3]]
   }
 
   return items
