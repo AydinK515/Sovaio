@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { parsePartialJson } from 'ai'
 import { getAnalyticsSnapshotContext } from '@/lib/analytics-context'
 import { requireAiEnabled } from '@/lib/ai-access'
-import { formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
+import { formatDealTarget, getDealTypePromptLabel, getOpeningMessage } from '@/lib/deal-chat'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { captureAiGeneration, captureServerEvent, createPostHogServerClient, shutdownPostHog } from '@/lib/posthog-server'
 import {
@@ -147,6 +147,7 @@ function buildSystemPrompt(
   const titleInstruction = generateTitle
     ? '\n- The chat title must be 1 to 5 words, plain text only, and summarize the latest user message.'
     : ''
+  const dealTypePromptLabel = getDealTypePromptLabel(deal)
 
   return `You are RateProof AI, the Deal Assistant for YouTube creators.
 
@@ -156,7 +157,7 @@ You are handling a specific deal thread, not broad channel strategy in the abstr
 The creator's deal context:
 ${channelName ? `- Creator channel: ${channelName}` : ''}
 - Brand: ${deal.brand_name}
-- Deal type: ${deal.deal_type === 'dedicated_video' ? 'Dedicated Video' : deal.deal_type === 'integration_60s' ? '60-second Integration' : '30-second Integration'}
+${dealTypePromptLabel ? `- Deal type: ${dealTypePromptLabel}` : ''}
 - Creator's current ask: ${formatDealTarget(deal)}
 ${deal.brand_last_offer ? `- Brand's last known offer: $${deal.brand_last_offer.toLocaleString()}` : ''}
 ${deal.timeline ? `- Timeline: ${deal.timeline}` : ''}

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@/lib/types'
-import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
+import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getDealTypeLabel, getDealTypeSelectionValue, getOpeningMessage, normalizeCustomDealTypeLabel } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
 import ConfirmationModal from '@/components/confirmation-modal'
@@ -210,9 +210,12 @@ export default function DealClient({
   const [chatFullscreen, setChatFullscreen] = useState(false)
   const [rateLimitType, setRateLimitType] = useState<'chat' | 'daily' | null>(null)
   const [updatingSnapshot, setUpdatingSnapshot] = useState(false)
+  const [updatingDealType, setUpdatingDealType] = useState(false)
   const [deletingDeal, setDeletingDeal] = useState(false)
   const [dealActionError, setDealActionError] = useState('')
   const [showDeleteDealModal, setShowDeleteDealModal] = useState(false)
+  const [showCustomDealTypeModal, setShowCustomDealTypeModal] = useState(false)
+  const [customDealTypeDraft, setCustomDealTypeDraft] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -795,6 +798,47 @@ export default function DealClient({
     setUpdatingSnapshot(false)
   }
 
+  function openCustomDealTypeModal() {
+    setCustomDealTypeDraft(
+      deal.deal_type_custom?.trim().toLowerCase() === 'other'
+        ? ''
+        : (deal.deal_type_custom ?? '')
+    )
+    setShowCustomDealTypeModal(true)
+  }
+
+  async function updateDealType(nextDealType: Deal['deal_type'], nextDealTypeCustom: string | null) {
+    setUpdatingDealType(true)
+    setDealActionError('')
+
+    try {
+      const { error } = await supabase.from('deals').update({
+        deal_type: nextDealType,
+        deal_type_custom: nextDealTypeCustom,
+        updated_at: new Date().toISOString(),
+      }).eq('id', deal.id)
+
+      if (error) throw error
+
+      setDeal(prev => ({
+        ...prev,
+        deal_type: nextDealType,
+        deal_type_custom: nextDealTypeCustom,
+      }))
+      router.refresh()
+    } catch (err: unknown) {
+      setDealActionError(err instanceof Error ? err.message : 'Failed to update deal type.')
+    } finally {
+      setUpdatingDealType(false)
+    }
+  }
+
+  async function commitCustomDealType() {
+    const baseDealType = deal.deal_type ?? 'integration_60s'
+    setShowCustomDealTypeModal(false)
+    await updateDealType(baseDealType, normalizeCustomDealTypeLabel(customDealTypeDraft))
+  }
+
   async function deleteDeal() {
     if (deletingDeal) return
 
@@ -827,9 +871,58 @@ export default function DealClient({
     value: snapshot.id,
     label: snapshot.name,
   }))
+  const dealTypeOptions = [
+    ...Object.entries(DEAL_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+    {
+      value: 'other',
+      label: deal.deal_type_custom?.trim() ? `Other: ${deal.deal_type_custom.trim()}` : 'Other',
+    },
+  ]
+  const dealTypeSelection = getDealTypeSelectionValue(deal)
 
   return (
     <div className="flex flex-col py-8">
+      {showCustomDealTypeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+          onClick={() => setShowCustomDealTypeModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-[28px] border border-border bg-white p-6 shadow-2xl animate-pop-in md:p-7"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-2xl font-semibold">Custom Deal Type</h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Enter a custom deal type if you want something more specific. Leave it blank if you just want this set to &quot;Other&quot;.
+            </p>
+            <input
+              autoFocus
+              value={customDealTypeDraft}
+              onChange={(event) => setCustomDealTypeDraft(event.target.value)}
+              placeholder="e.g. Newsletter sponsorship, livestream mention"
+              className="mt-4 w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCustomDealTypeModal(false)}
+                className="rounded-xl border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void commitCustomDealType()
+                }}
+                className="rounded-xl bg-secondary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ConfirmationModal
         open={showDeleteDealModal}
         title="Delete deal?"
@@ -940,9 +1033,25 @@ export default function DealClient({
           <div className="bg-white rounded-2xl border border-border p-6">
             <h3 className="text-sm font-semibold mb-3">Campaign Details</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted">Type:</span>
-                <span className="font-medium">{DEAL_TYPE_LABELS[deal.deal_type]}</span>
+              <div>
+                <span className="mb-2 block text-muted">Type:</span>
+                <FancySelect
+                  value={dealTypeSelection}
+                  disabled={updatingDealType}
+                  onChange={(nextValue) => {
+                    if (nextValue === 'other') {
+                      openCustomDealTypeModal()
+                      return
+                    }
+
+                    void updateDealType(nextValue as Deal['deal_type'], null)
+                  }}
+                  options={dealTypeOptions}
+                  triggerClassName="disabled:opacity-60"
+                />
+                <p className="mt-2 text-xs text-muted">
+                  Current type: {getDealTypeLabel(deal)}
+                </p>
               </div>
             </div>
           </div>

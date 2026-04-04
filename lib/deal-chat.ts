@@ -6,6 +6,42 @@ export const DEAL_TYPE_LABELS = {
   integration_30s: 'Integrated (30s)',
 } satisfies Record<Deal['deal_type'], string>
 
+export type DealTypeSelection = Deal['deal_type'] | 'other'
+
+export function normalizeCustomDealTypeLabel(label: string | null | undefined) {
+  const trimmed = label?.trim() ?? ''
+  return trimmed || 'Other'
+}
+
+export function getDealTypeLabel(deal: Pick<Deal, 'deal_type' | 'deal_type_custom'>) {
+  if (deal.deal_type_custom?.trim()) {
+    return normalizeCustomDealTypeLabel(deal.deal_type_custom)
+  }
+
+  return DEAL_TYPE_LABELS[deal.deal_type]
+}
+
+export function getDealTypeSelectionValue(deal: Pick<Deal, 'deal_type' | 'deal_type_custom'>): DealTypeSelection {
+  return deal.deal_type_custom?.trim() ? 'other' : deal.deal_type
+}
+
+export function getDealTypePromptLabel(deal: Pick<Deal, 'deal_type' | 'deal_type_custom'>) {
+  const customLabel = deal.deal_type_custom?.trim()
+
+  if (customLabel) {
+    return customLabel.toLowerCase() === 'other'
+      ? null
+      : customLabel
+  }
+
+  return DEAL_TYPE_LABELS[deal.deal_type]
+}
+
+export function getDealTypeMessageFragment(deal: Pick<Deal, 'deal_type' | 'deal_type_custom'>) {
+  const label = getDealTypePromptLabel(deal)
+  return label ? ` for a ${label.toLowerCase()}` : ''
+}
+
 export function formatCurrency(value: number | null) {
   if (value == null) return '--'
   return `$${value.toLocaleString()}`
@@ -32,11 +68,15 @@ export function getDealTypeRange(rateCard: Pick<RateCard, 'dedicated_video_low' 
 }
 
 export function formatDealTarget(
-  deal: Pick<Deal, 'creator_ask' | 'deal_type'>,
+  deal: Pick<Deal, 'creator_ask' | 'deal_type' | 'deal_type_custom'>,
   rateCard?: Pick<RateCard, 'dedicated_video_low' | 'dedicated_video_high' | 'integration_60s_low' | 'integration_60s_high' | 'integration_30s_low' | 'integration_30s_high'> | null
 ) {
   if (deal.creator_ask != null) {
     return formatCurrency(deal.creator_ask)
+  }
+
+  if (deal.deal_type_custom?.trim()) {
+    return 'your selected pricing context'
   }
 
   if (!rateCard) {
@@ -48,8 +88,8 @@ export function formatDealTarget(
 }
 
 export function getOpeningMessage(
-  deal: Pick<Deal, 'brand_name' | 'creator_ask' | 'deal_type'>,
+  deal: Pick<Deal, 'brand_name' | 'creator_ask' | 'deal_type' | 'deal_type_custom'>,
   rateCard?: Pick<RateCard, 'dedicated_video_low' | 'dedicated_video_high' | 'integration_60s_low' | 'integration_60s_high' | 'integration_30s_low' | 'integration_30s_high'> | null
 ) {
-  return `This is a fresh deal thread for ${deal.brand_name}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. You're targeting ${formatDealTarget(deal, rateCard)} for a ${DEAL_TYPE_LABELS[deal.deal_type].toLowerCase()}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
+  return `This is a fresh deal thread for ${deal.brand_name}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. You're targeting ${formatDealTarget(deal, rateCard)}${getDealTypeMessageFragment(deal)}. Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
 }

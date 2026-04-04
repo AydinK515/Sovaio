@@ -66,6 +66,7 @@ export interface Deal {
   brand_logo_url: string | null
   status: 'negotiating' | 'closed_won' | 'closed_lost' | 'stalled'
   deal_type: 'dedicated_video' | 'integration_60s' | 'integration_30s'
+  deal_type_custom: string | null
   creator_ask: number | null
   brand_last_offer: number | null
   final_price: number | null

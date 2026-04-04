@@ -6,10 +6,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
-import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
-import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
+import type { RateCard, Profile } from '@/lib/types'
+import { formatCurrency } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight, Pencil, Trash2 } from 'lucide-react'
-import FancySelect from '@/components/fancy-select'
 import ConfirmationModal from '@/components/confirmation-modal'
 
 type AudienceSnapshot = {
@@ -24,18 +23,14 @@ type PerformanceSnapshotItem = {
 }
 
 export default function RateCardClient({
-  aiEnabled,
   rateCard,
   profile,
-  availableSnapshots,
   snapshotName,
   audienceSnapshot,
   performanceSnapshot,
 }: {
-  aiEnabled: boolean
   rateCard: RateCard
   profile: Profile | null
-  availableSnapshots: AnalyticsSnapshot[]
   snapshotName: string | null
   audienceSnapshot: AudienceSnapshot
   performanceSnapshot: PerformanceSnapshotItem[]
@@ -45,14 +40,7 @@ export default function RateCardClient({
   const previewViewportRef = useRef<HTMLDivElement>(null)
   const previewContentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
-  const [brandName, setBrandName] = useState('')
-  const [showDealModal, setShowDealModal] = useState(false)
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
-  const [dealType, setDealType] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s'>(
-    rateCard.offers_dedicated_videos ? 'dedicated_video' : 'integration_60s'
-  )
-  const [creatorAsk, setCreatorAsk] = useState('')
-  const [creatingDeal, setCreatingDeal] = useState(false)
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
   const [expandedRangeInfo, setExpandedRangeInfo] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s' | null>(null)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
@@ -183,24 +171,6 @@ export default function RateCardClient({
     },
   ]
   const visibleLiveRateTiers = liveRateTiers.filter((tier) => rateCard.offers_dedicated_videos || tier.id !== 'dedicated_video')
-  const availableDealTypes = visibleLiveRateTiers.map((tier) => tier.id)
-
-  const selectedDealRange = getDealTypeRange(rateCard, dealType)
-  const selectedDealRangeLabel = `${formatCurrency(selectedDealRange.low)} - ${formatCurrency(selectedDealRange.high)}`
-  const dealTypeOptions = visibleLiveRateTiers.map((tier) => ({
-    value: tier.id,
-    label: `${tier.title} (${tier.range})`,
-  }))
-  const analyticsContextOptions = availableSnapshots.map((snapshot) => ({
-    value: snapshot.id,
-    label: snapshot.name,
-  }))
-
-  useEffect(() => {
-    if (!availableDealTypes.includes(dealType)) {
-      setDealType(availableDealTypes[0] ?? 'integration_60s')
-    }
-  }, [availableDealTypes, dealType])
 
   async function copyEmail() {
     await navigator.clipboard.writeText(rateCard.pitch_email || '')
@@ -325,72 +295,6 @@ export default function RateCardClient({
     } finally {
       setDownloadingFormat(null)
     }
-  }
-
-  async function createDeal() {
-    if (!brandName.trim()) return
-    setCreatingDeal(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setCreatingDeal(false)
-      return
-    }
-
-    const askAmount = creatorAsk ? parseInt(creatorAsk.replace(/,/g, '')) : null
-
-    const { data: deal, error } = await supabase.from('deals').insert({
-      user_id: user.id,
-      rate_card_id: rateCard.id,
-      analytics_snapshot_id: rateCard.analytics_snapshot_id,
-      brand_name: brandName.trim(),
-      deal_type: dealType,
-      creator_ask: askAmount,
-      status: 'negotiating',
-    }).select('id').single()
-
-    if (error) {
-      setCreatingDeal(false)
-      return
-    }
-
-    captureAnalyticsEvent(POSTHOG_EVENTS.rateCardUsedToCreateDeal, {
-      rate_card_id: rateCard.id,
-      deal_id: deal.id,
-      analytics_snapshot_id: rateCard.analytics_snapshot_id,
-      deal_type: dealType,
-    })
-
-    if (!aiEnabled) {
-      router.push(`/deal/${deal.id}`)
-      return
-    }
-
-    const { data: chat, error: chatError } = await supabase.from('deal_chats').insert({
-      deal_id: deal.id,
-      user_id: user.id,
-      title: 'New Chat',
-    }).select('id').single()
-
-    if (chatError || !chat) {
-      setCreatingDeal(false)
-      return
-    }
-
-    // Create initial AI message
-    await supabase.from('deal_messages').insert({
-      deal_id: deal.id,
-      chat_id: chat.id,
-      user_id: user.id,
-      role: 'ai',
-      content: getOpeningMessage({
-        brand_name: brandName.trim(),
-        creator_ask: askAmount,
-        deal_type: dealType,
-      }, rateCard),
-    })
-
-    router.push(`/deal/${deal.id}?chat=${chat.id}`)
   }
 
   async function saveCardName() {
@@ -761,7 +665,12 @@ export default function RateCardClient({
           )}
         </div>
           <button
-            onClick={() => setShowDealModal(true)}
+            onClick={() => {
+              const href = rateCard.analytics_snapshot_id
+                ? `/deal/new?snapshot=${rateCard.analytics_snapshot_id}`
+                : '/deal/new'
+              router.push(href)
+            }}
             className="flex items-center justify-center gap-2 py-4 rounded-xl bg-secondary text-white font-semibold hover:bg-secondary-hover transition-colors"
           >
             <FileText className="w-5 h-5" />
@@ -778,73 +687,6 @@ export default function RateCardClient({
           </Link>
         </div>
       </div>
-
-      {/* Deal creation modal */}
-      {showDealModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full animate-slide-up">
-            <h2 className="text-xl font-bold mb-4">Start a New Deal</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Brand Name</label>
-                <input
-                  value={brandName}
-                  onChange={e => setBrandName(e.target.value)}
-                  placeholder="e.g. NordVPN, Squarespace"
-                  className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Deal Type</label>
-                <FancySelect
-                  value={dealType}
-                  onChange={nextValue => setDealType(nextValue as typeof dealType)}
-                  options={dealTypeOptions}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Analytics Context</label>
-                <FancySelect
-                  value={rateCard.analytics_snapshot_id ?? ''}
-                  onChange={() => undefined}
-                  disabled
-                  options={analyticsContextOptions}
-                />
-                <p className="mt-1.5 text-xs text-muted">This deal will start from the same analytics snapshot this rate card was generated from.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Your Ask (optional)</label>
-                <input
-                  value={creatorAsk}
-                  onChange={e => setCreatorAsk(e.target.value)}
-                  placeholder={`Leave blank to use ${selectedDealRangeLabel}`}
-                  className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-                <p className="mt-1.5 text-xs text-muted">
-                  If left blank, this deal will use the selected range: {selectedDealRangeLabel}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setShowDealModal(false)} className="flex-1 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted-light transition-colors">
-                Cancel
-              </button>
-              <button
-                onClick={createDeal}
-                disabled={!brandName.trim() || creatingDeal}
-                className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
-              >
-                {creatingDeal ? 'Creating...' : aiEnabled ? 'Start Deal' : 'Start Deal Without AI'}
-              </button>
-            </div>
-            {!aiEnabled && (
-              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                Deal Assistant is disabled for this account. We&apos;ll still create the deal, but no AI chat will be started.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
 
       {showPreviewModal && (
         <div

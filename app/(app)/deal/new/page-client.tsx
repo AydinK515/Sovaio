@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import { DEAL_TYPE_LABELS, getOpeningMessage } from '@/lib/deal-chat'
+import { DEAL_TYPE_LABELS, getDealTypeSelectionValue, getOpeningMessage, normalizeCustomDealTypeLabel } from '@/lib/deal-chat'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, Deal } from '@/lib/types'
@@ -18,18 +18,32 @@ export default function NewDealClient({
 }) {
   const router = useRouter()
   const supabase = createClient()
+  const fallbackDealType: Deal['deal_type'] = 'integration_60s'
 
   const [brandName, setBrandName] = useState('')
-  const [dealType, setDealType] = useState<Deal['deal_type']>('integration_60s')
+  const [dealType, setDealType] = useState<Deal['deal_type']>(fallbackDealType)
+  const [dealTypeCustom, setDealTypeCustom] = useState<string | null>(null)
+  const [showCustomDealTypeModal, setShowCustomDealTypeModal] = useState(false)
+  const [customDealTypeDraft, setCustomDealTypeDraft] = useState('')
   const [analyticsSnapshotId, setAnalyticsSnapshotId] = useState(initialSnapshotId ?? snapshots[0]?.id ?? '')
   const [creatorAsk, setCreatorAsk] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const dealTypeOptions = useMemo(
-    () => Object.entries(DEAL_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-    []
+    () => [
+      ...Object.entries(DEAL_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+      {
+        value: 'other',
+        label: dealTypeCustom?.trim() ? `Other: ${dealTypeCustom.trim()}` : 'Other',
+      },
+    ],
+    [dealTypeCustom]
   )
+  const dealTypeSelection = getDealTypeSelectionValue({
+    deal_type: dealType,
+    deal_type_custom: dealTypeCustom,
+  })
   const snapshotOptions = useMemo(
     () => snapshots.map((snapshot) => ({ value: snapshot.id, label: snapshot.name })),
     [snapshots]
@@ -51,6 +65,17 @@ export default function NewDealClient({
         *
       </span>
     )
+  }
+
+  function openCustomDealTypeModal() {
+    setCustomDealTypeDraft(dealTypeCustom?.trim().toLowerCase() === 'other' ? '' : (dealTypeCustom ?? ''))
+    setShowCustomDealTypeModal(true)
+  }
+
+  function commitCustomDealType() {
+    setDealType(fallbackDealType)
+    setDealTypeCustom(normalizeCustomDealTypeLabel(customDealTypeDraft))
+    setShowCustomDealTypeModal(false)
   }
 
   async function handleCreateDeal() {
@@ -77,6 +102,7 @@ export default function NewDealClient({
           analytics_snapshot_id: analyticsSnapshotId,
           brand_name: brandName.trim(),
           deal_type: dealType,
+          deal_type_custom: dealTypeCustom,
           creator_ask: askAmount,
           status: 'negotiating',
         })
@@ -89,7 +115,7 @@ export default function NewDealClient({
         user_id: user.id,
         deal_id: deal.id,
         analytics_snapshot_id: analyticsSnapshotId,
-        deal_type: dealType,
+        deal_type: dealTypeCustom ?? dealType,
       })
 
       const { data: chat, error: chatError } = await supabase
@@ -113,6 +139,7 @@ export default function NewDealClient({
           brand_name: brandName.trim(),
           creator_ask: askAmount,
           deal_type: dealType,
+          deal_type_custom: dealTypeCustom,
         }),
       })
 
@@ -144,6 +171,45 @@ export default function NewDealClient({
 
   return (
     <div className="py-8">
+      {showCustomDealTypeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+          onClick={() => setShowCustomDealTypeModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-[28px] border border-border bg-white p-6 shadow-2xl animate-pop-in md:p-7"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-2xl font-semibold">Custom Deal Type</h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Enter a more specific deal type if you want. If you leave this blank, we&apos;ll just use &quot;Other&quot;.
+            </p>
+            <input
+              autoFocus
+              value={customDealTypeDraft}
+              onChange={(event) => setCustomDealTypeDraft(event.target.value)}
+              placeholder="e.g. Newsletter sponsorship, livestream mention"
+              className="mt-4 w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCustomDealTypeModal(false)}
+                className="rounded-xl border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitCustomDealType}
+                className="rounded-xl bg-secondary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <h1 className="text-3xl md:text-4xl font-bold">Create Deal</h1>
       <p className="mt-2 text-muted">Choose the analytics snapshot this negotiation should use. That gives the AI channel-size, audience, geography, and performance context right from the start.</p>
 
@@ -170,8 +236,16 @@ export default function NewDealClient({
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Deal Type</label>
             <FancySelect
-              value={dealType}
-              onChange={(nextValue) => setDealType(nextValue as Deal['deal_type'])}
+              value={dealTypeSelection}
+              onChange={(nextValue) => {
+                if (nextValue === 'other') {
+                  openCustomDealTypeModal()
+                  return
+                }
+
+                setDealType(nextValue as Deal['deal_type'])
+                setDealTypeCustom(null)
+              }}
               options={dealTypeOptions}
             />
           </div>
