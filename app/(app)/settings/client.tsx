@@ -7,10 +7,12 @@ import { useOnboarding } from '@/components/onboarding-provider'
 import { captureAnalyticsEvent, resetAnalytics } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { createClient } from '@/lib/supabase-browser'
-import { User, CreditCard, Trash2, ExternalLink, Shield, Upload, Camera, Loader2, Sparkles, RotateCcw } from 'lucide-react'
+import { User, Trash2, Shield, Upload, Camera, Loader2, Sparkles, RotateCcw } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { Profile } from '@/lib/types'
 import ConfirmationModal from '@/components/confirmation-modal'
+
+type StatusScope = 'profile' | 'security' | 'danger' | null
 
 export default function SettingsClient({ user, profile }: { user: SupabaseUser; profile: Profile | null }) {
   const router = useRouter()
@@ -33,6 +35,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [awaitingPasswordNonce, setAwaitingPasswordNonce] = useState(false)
+  const [statusScope, setStatusScope] = useState<StatusScope>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -65,13 +68,26 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
     }
   }, [avatarPath, supabase])
 
-  function resetStatus() {
+  function resetStatus(scope: StatusScope) {
+    setStatusScope(scope)
     setMessage('')
     setError('')
   }
 
+  function renderStatus(scope: StatusScope) {
+    if (statusScope !== scope || (!message && !error)) {
+      return null
+    }
+
+    return (
+      <div className={`rounded-2xl border px-4 py-3 text-sm ${error ? 'border-red-200 bg-primary-light text-primary' : 'border-green-200 bg-green-50 text-green-700'}`}>
+        {error || message}
+      </div>
+    )
+  }
+
   async function handleSaveProfile() {
-    resetStatus()
+    resetStatus('profile')
     setSavingProfile(true)
 
     const trimmedFullName = fullName.trim()
@@ -102,7 +118,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
 
     if (!file) return
 
-    resetStatus()
+    resetStatus('profile')
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
     if (!allowedTypes.includes(file.type)) {
@@ -174,7 +190,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   }
 
   async function handleSavePassword() {
-    resetStatus()
+    resetStatus('security')
 
     if (newPassword.length < 6) {
       setError('Password must be at least 6 characters.')
@@ -233,7 +249,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   }
 
   async function handleDelete() {
-    resetStatus()
+    resetStatus('danger')
     setDeleting(true)
 
     try {
@@ -292,12 +308,6 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
       <h1 className="text-3xl font-bold">Settings</h1>
       <p className="mt-2 text-muted">Manage your account and subscription.</p>
 
-      {(message || error) && (
-        <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${error ? 'border-red-200 bg-primary-light text-primary' : 'border-green-200 bg-green-50 text-green-700'}`}>
-          {error || message}
-        </div>
-      )}
-
       {/* Channel Profile */}
       <div className="mt-8 bg-white rounded-2xl border border-border p-6">
         <div className="flex items-center gap-3 mb-6">
@@ -339,6 +349,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
           </div>
 
           <div className="flex-1 space-y-4">
+            {renderStatus('profile')}
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">Your Name</label>
               <input
@@ -401,36 +412,6 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
         </div>
       </div>
 
-      {/* Subscription */}
-      <div className="mt-6 bg-white rounded-2xl border border-border p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <CreditCard className="w-5 h-5 text-muted" />
-          <h2 className="text-lg font-semibold">Subscription</h2>
-        </div>
-        <div className="flex items-center justify-between p-4 bg-muted-light rounded-xl">
-          <div>
-            <p className="font-medium capitalize">{profile?.subscription_tier || 'Free'} Plan</p>
-            <p className="text-xs text-muted mt-0.5">
-              {profile?.subscription_tier === 'pro'
-                ? 'Unlimited rate cards, negotiation AI, deal tracking'
-                : `${profile?.generations_used || 0} of 1 free generation${(profile?.generations_used || 0) >= 1 ? ' used' : ''}`
-              }
-            </p>
-          </div>
-          {profile?.subscription_tier !== 'pro' && (
-            <button className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-hover transition-colors">
-              Upgrade to Pro
-            </button>
-          )}
-        </div>
-        {profile?.subscription_tier === 'pro' && (
-          <button className="mt-4 flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors">
-            <ExternalLink className="w-4 h-4" />
-            Manage Billing Portal
-          </button>
-        )}
-      </div>
-
       {/* Security */}
       <div className="mt-6 bg-white rounded-2xl border border-border p-6">
         <div className="flex items-center gap-3 mb-6">
@@ -439,6 +420,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
         </div>
         <div className="space-y-6">
           <div className="space-y-4">
+            {renderStatus('security')}
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">New Password</label>
               <input
@@ -541,6 +523,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
         <p className="text-sm text-muted mb-4">
           Permanently delete your account and all associated data. This action cannot be undone.
         </p>
+        {renderStatus('danger')}
         <button
           onClick={() => setShowDeleteModal(true)}
           disabled={deleting}
