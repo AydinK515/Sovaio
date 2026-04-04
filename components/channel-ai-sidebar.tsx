@@ -240,6 +240,15 @@ export default function ChannelAiSidebar({
     return () => cancelAnimationFrame(frame)
   }, [open, currentChat])
 
+  useEffect(() => {
+    function handleOpenChannelAdvisor() {
+      setOpen(true)
+    }
+
+    window.addEventListener('open-channel-advisor', handleOpenChannelAdvisor)
+    return () => window.removeEventListener('open-channel-advisor', handleOpenChannelAdvisor)
+  }, [])
+
   function sortChats(nextChats: ChannelAiChat[]) {
     return [...nextChats].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
   }

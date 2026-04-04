@@ -30,6 +30,14 @@ export default function OnboardingChecklist({
       ? 'You already have the core setup in place. These last touches help you get even more value out of RateProof.'
       : 'RateProof works best when you move from a saved snapshot into a real rate card and then into a live deal or AI conversation.'
 
+  function handleItemClick(itemId: string) {
+    trackChecklistClick(itemId, compact ? 'floating' : 'page')
+
+    if (itemId === 'ask_channel_ai') {
+      window.dispatchEvent(new CustomEvent('open-channel-advisor'))
+    }
+  }
+
   return (
     <section className={`rounded-[28px] border border-border bg-white shadow-[0_18px_50px_-36px_rgba(15,23,42,0.3)] ${compact ? 'p-4' : 'p-6'}`}>
       <div className="flex items-start justify-between gap-4">
@@ -72,18 +80,43 @@ export default function OnboardingChecklist({
       <div className="mt-4 space-y-3">
         {items.map((item) => {
           const isComplete = item.status === 'complete'
+          const itemClassName = `group flex items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+            isComplete
+              ? 'border-emerald-200 bg-emerald-50/70'
+              : item.status === 'active'
+                ? 'border-border bg-white hover:border-primary/25 hover:bg-primary-light/40'
+                : 'border-border bg-slate-50 text-muted'
+          }`
+
+          if (item.id === 'ask_channel_ai') {
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleItemClick(item.id)}
+                className={itemClassName}
+              >
+                <div className="mt-0.5 shrink-0">
+                  {isComplete ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : (
+                    <CircleDashed className={`h-5 w-5 ${item.status === 'active' ? 'text-primary' : 'text-border-dark'}`} />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted">{item.description}</p>
+                </div>
+              </button>
+            )
+          }
+
           return (
             <Link
               key={item.id}
               href={item.href}
-              onClick={() => trackChecklistClick(item.id, compact ? 'floating' : 'page')}
-              className={`group flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${
-                isComplete
-                  ? 'border-emerald-200 bg-emerald-50/70'
-                  : item.status === 'active'
-                    ? 'border-border bg-white hover:border-primary/25 hover:bg-primary-light/40'
-                    : 'border-border bg-slate-50 text-muted'
-              }`}
+              onClick={() => handleItemClick(item.id)}
+              className={itemClassName}
             >
               <div className="mt-0.5 shrink-0">
                 {isComplete ? (
