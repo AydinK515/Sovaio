@@ -25,6 +25,7 @@ export default function NewDealClient({
   const [creatorAsk, setCreatorAsk] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const dealTypeOptions = useMemo(
     () => Object.entries(DEAL_TYPE_LABELS).map(([value, label]) => ({ value, label })),
     []
@@ -33,8 +34,28 @@ export default function NewDealClient({
     () => snapshots.map((snapshot) => ({ value: snapshot.id, label: snapshot.name })),
     [snapshots]
   )
+  const missingRequiredFields = useMemo(() => {
+    const missing: string[] = []
+
+    if (!brandName.trim()) missing.push('Brand name')
+    if (!analyticsSnapshotId) missing.push('Analytics snapshot')
+
+    return missing
+  }, [analyticsSnapshotId, brandName])
+  const canCreateDeal = missingRequiredFields.length === 0
+  const showFieldErrors = submitAttempted
+
+  function RequiredMark() {
+    return (
+      <span aria-hidden="true" className="ml-1 text-primary">
+        *
+      </span>
+    )
+  }
 
   async function handleCreateDeal() {
+    setSubmitAttempted(true)
+
     if (!brandName.trim() || !analyticsSnapshotId) {
       setError('Please choose a snapshot and enter the brand name.')
       return
@@ -127,15 +148,24 @@ export default function NewDealClient({
       <p className="mt-2 text-muted">Choose the analytics snapshot this negotiation should use. That gives the AI channel-size, audience, geography, and performance context right from the start.</p>
 
       <div className="mt-8 rounded-2xl border border-border bg-white p-6">
+        <p className="mb-4 text-xs text-muted">
+          <span className="font-semibold text-primary">*</span> Required before you can create a deal
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Brand Name</label>
+            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+              Brand Name
+              <RequiredMark />
+            </label>
             <input
               value={brandName}
               onChange={(event) => setBrandName(event.target.value)}
               placeholder="e.g. NordVPN"
-              className="w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className={`w-full rounded-xl border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${showFieldErrors && !brandName.trim() ? 'border-primary' : 'border-border'}`}
             />
+            {showFieldErrors && !brandName.trim() && (
+              <p className="mt-2 text-sm text-primary">Enter the brand you are negotiating with.</p>
+            )}
           </div>
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Deal Type</label>
@@ -146,15 +176,22 @@ export default function NewDealClient({
             />
           </div>
           <div>
-            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Analytics Snapshot</label>
+            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+              Analytics Snapshot
+              <RequiredMark />
+            </label>
             <FancySelect
               value={analyticsSnapshotId}
               onChange={setAnalyticsSnapshotId}
               options={snapshotOptions}
+              triggerClassName={showFieldErrors && !analyticsSnapshotId ? 'border-primary shadow-[0_0_0_3px_rgba(220,38,38,0.08)]' : undefined}
             />
+            {showFieldErrors && !analyticsSnapshotId && (
+              <p className="mt-2 text-sm text-primary">Choose which analytics snapshot should power this deal.</p>
+            )}
           </div>
           <div>
-            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Your Ask (optional)</label>
+            <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Your Ask</label>
             <input
               value={creatorAsk}
               onChange={(event) => setCreatorAsk(event.target.value)}
@@ -165,12 +202,17 @@ export default function NewDealClient({
         </div>
 
         {error && <p className="mt-4 rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>}
+        {!canCreateDeal && (
+          <div className="mt-4 rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
+            Fill the required fields to continue: {missingRequiredFields.join(', ')}.
+          </div>
+        )}
 
         <button
           type="button"
           onClick={() => void handleCreateDeal()}
-          disabled={loading}
-          className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          disabled={!canCreateDeal || loading}
+          className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? 'Creating Deal...' : 'Create Deal'}
         </button>

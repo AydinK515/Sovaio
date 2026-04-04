@@ -46,10 +46,12 @@ export default function GenerateRateCardClient({
 }) {
   const router = useRouter()
   const supabase = createClient()
+  const defaultRateCardName = buildRateCardName({ niche: '' })
 
   const [snapshotId, setSnapshotId] = useState(initialSnapshotId ?? '')
   const [niche, setNiche] = useState('')
-  const [rateCardName, setRateCardName] = useState('')
+  const [rateCardName, setRateCardName] = useState(defaultRateCardName)
+  const [rateCardNameCustomized, setRateCardNameCustomized] = useState(false)
   const [hasSponsorships, setHasSponsorships] = useState<boolean | null>(null)
   const [offersDedicatedVideos, setOffersDedicatedVideos] = useState<boolean | null>(null)
   const [sponsorshipCount, setSponsorshipCount] = useState('')
@@ -57,6 +59,7 @@ export default function GenerateRateCardClient({
   const [loading, setLoading] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState('')
+  const [submitAttempted, setSubmitAttempted] = useState(false)
 
   const snapshot = useMemo(
     () => snapshots.find(item => item.id === snapshotId) ?? null,
@@ -120,6 +123,38 @@ export default function GenerateRateCardClient({
   )
   const activePhaseIndex = loadingProgress < 33 ? 0 : loadingProgress < 66 ? 1 : 2
   const activePhase = GENERATION_PHASES[activePhaseIndex]
+  const needsSponsorshipHistory = hasSponsorships === true
+  const generatedRateCardName = useMemo(
+    () => buildRateCardName({ niche }),
+    [niche]
+  )
+  const missingRequiredFields = useMemo(() => {
+    const missing: string[] = []
+
+    if (!snapshotId) missing.push('Analytics snapshot')
+    if (!niche) missing.push('Niche')
+    if (!rateCardName.trim()) missing.push('Rate card name')
+    if (hasSponsorships === null) missing.push('Sponsorship history')
+    if (offersDedicatedVideos === null) missing.push('Dedicated videos')
+    if (needsSponsorshipHistory && !sponsorshipCount.trim()) missing.push('Number of past sponsorships')
+    return missing
+  }, [hasSponsorships, needsSponsorshipHistory, niche, offersDedicatedVideos, rateCardName, snapshotId, sponsorshipCount])
+  const canGenerate = aiEnabled && missingRequiredFields.length === 0
+  const showFieldErrors = submitAttempted
+
+  function RequiredMark() {
+    return (
+      <span aria-hidden="true" className="ml-1 text-primary">
+        *
+      </span>
+    )
+  }
+
+  useEffect(() => {
+    if (!rateCardNameCustomized) {
+      setRateCardName(generatedRateCardName)
+    }
+  }, [generatedRateCardName, rateCardNameCustomized])
 
   useEffect(() => {
     if (!loading) {
@@ -153,17 +188,19 @@ export default function GenerateRateCardClient({
   }, [loading])
 
   async function handleGenerate() {
+    setSubmitAttempted(true)
+
     if (!aiEnabled) {
       setError('AI features are disabled for this account.')
       return
     }
 
-    if (!snapshotId || !niche || hasSponsorships === null || offersDedicatedVideos === null) {
+    if (!snapshotId || !niche || !rateCardName.trim() || hasSponsorships === null || offersDedicatedVideos === null) {
       setError('Please choose an analytics snapshot and fill in the required pricing inputs.')
       return
     }
 
-    if (hasSponsorships && (!sponsorshipCount || !avgDealAmount)) {
+    if (hasSponsorships && !sponsorshipCount) {
       setError('Please fill in your sponsorship history details.')
       return
     }
@@ -202,7 +239,7 @@ export default function GenerateRateCardClient({
       }
 
       const aiRates = await response.json()
-      const nextRateCardName = rateCardName.trim() || buildRateCardName({ niche })
+      const nextRateCardName = rateCardName.trim()
 
       const { data: rateCard, error: saveError } = await supabase
         .from('rate_cards')
@@ -377,16 +414,26 @@ export default function GenerateRateCardClient({
         <div className="rounded-2xl border border-border bg-white p-6">
           <h2 className="text-lg font-semibold">Analytics Snapshot</h2>
           <p className="mt-1 text-sm text-muted">This snapshot powers the channel context. We only send derived metrics and summaries to the model, never giant raw CSV blobs.</p>
+          <p className="mt-3 text-xs text-muted">
+            <span className="font-semibold text-primary">*</span> Required before you can generate a rate card
+          </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="flex h-full flex-col">
               <div>
-                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot</label>
+                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                  Snapshot
+                  <RequiredMark />
+                </label>
                 <FancySelect
                   value={snapshotId}
                   onChange={setSnapshotId}
                   options={snapshotOptions}
                   placeholder="Select an analytics snapshot"
+                  triggerClassName={showFieldErrors && !snapshotId ? 'border-primary shadow-[0_0_0_3px_rgba(220,38,38,0.08)]' : undefined}
                 />
+                {showFieldErrors && !snapshotId && (
+                  <p className="mt-2 text-sm text-primary">Choose the analytics snapshot you want to price from.</p>
+                )}
               </div>
 
               {snapshot && confidenceTone && confidenceMessage && (
@@ -479,35 +526,59 @@ export default function GenerateRateCardClient({
           <h2 className="text-lg font-semibold">Pricing Inputs</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Rate Card Name</label>
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                Rate Card Name
+                <RequiredMark />
+              </label>
               <input
                 value={rateCardName}
-                onChange={(event) => setRateCardName(event.target.value)}
-                placeholder={buildRateCardName({ niche })}
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                onChange={(event) => {
+                  setRateCardNameCustomized(true)
+                  setRateCardName(event.target.value)
+                }}
+                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${showFieldErrors && !rateCardName.trim() ? 'border-primary' : 'border-border'}`}
               />
+              {showFieldErrors && !rateCardName.trim() && (
+                <p className="mt-2 text-sm text-primary">Give this rate card a name before generating it.</p>
+              )}
             </div>
           </div>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div>
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Niche</label>
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                Niche
+                <RequiredMark />
+              </label>
               <FancySelect
-                  value={niche}
-                  onChange={setNiche}
-                  options={nicheOptions}
-                  placeholder="Select your primary niche"
-                />
+                value={niche}
+                onChange={setNiche}
+                options={nicheOptions}
+                placeholder="Select your primary niche"
+                triggerClassName={showFieldErrors && !niche ? 'border-primary shadow-[0_0_0_3px_rgba(220,38,38,0.08)]' : undefined}
+              />
+              {showFieldErrors && !niche && (
+                <p className="mt-2 text-sm text-primary">Select the niche that best matches your channel.</p>
+              )}
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Sponsorship History</label>
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                Sponsorship History
+                <RequiredMark />
+              </label>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setHasSponsorships(true)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${hasSponsorships === true ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}>Yes</button>
-                <button type="button" onClick={() => setHasSponsorships(false)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${hasSponsorships === false ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}>No</button>
+                <button type="button" onClick={() => setHasSponsorships(true)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${hasSponsorships === true ? 'border-primary bg-primary-light text-primary' : showFieldErrors && hasSponsorships === null ? 'border-primary text-primary' : 'border-border hover:bg-muted-light'}`}>Yes</button>
+                <button type="button" onClick={() => setHasSponsorships(false)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${hasSponsorships === false ? 'border-primary bg-primary-light text-primary' : showFieldErrors && hasSponsorships === null ? 'border-primary text-primary' : 'border-border hover:bg-muted-light'}`}>No</button>
               </div>
+              {showFieldErrors && hasSponsorships === null && (
+                <p className="mt-2 text-sm text-primary">Tell us whether you have past sponsorship experience.</p>
+              )}
             </div>
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <label className="block text-xs font-medium uppercase tracking-wider text-muted">Dedicated Videos</label>
+                <label className="block text-xs font-medium uppercase tracking-wider text-muted">
+                  Dedicated Videos
+                  <RequiredMark />
+                </label>
                 <div className="group relative">
                   <button
                     type="button"
@@ -522,31 +593,57 @@ export default function GenerateRateCardClient({
                 </div>
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setOffersDedicatedVideos(true)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${offersDedicatedVideos === true ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}>Yes</button>
-                <button type="button" onClick={() => setOffersDedicatedVideos(false)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${offersDedicatedVideos === false ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}>No</button>
+                <button type="button" onClick={() => setOffersDedicatedVideos(true)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${offersDedicatedVideos === true ? 'border-primary bg-primary-light text-primary' : showFieldErrors && offersDedicatedVideos === null ? 'border-primary text-primary' : 'border-border hover:bg-muted-light'}`}>Yes</button>
+                <button type="button" onClick={() => setOffersDedicatedVideos(false)} className={`flex-1 rounded-xl border py-3 text-sm font-medium ${offersDedicatedVideos === false ? 'border-primary bg-primary-light text-primary' : showFieldErrors && offersDedicatedVideos === null ? 'border-primary text-primary' : 'border-border hover:bg-muted-light'}`}>No</button>
               </div>
+              {showFieldErrors && offersDedicatedVideos === null && (
+                <p className="mt-2 text-sm text-primary">Choose whether you offer dedicated sponsor videos.</p>
+              )}
             </div>
           </div>
 
-          {hasSponsorships === true && (
+          {needsSponsorshipHistory && (
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Past Sponsorships</label>
+                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                  Number of Past Sponsorships
+                  <RequiredMark />
+                </label>
                 <input
                   value={sponsorshipCount}
                   onChange={(event) => setSponsorshipCount(event.target.value)}
                   placeholder="e.g. 10"
-                  className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${showFieldErrors && !sponsorshipCount.trim() ? 'border-primary' : 'border-border'}`}
                 />
+                {showFieldErrors && !sponsorshipCount.trim() && (
+                  <p className="mt-2 text-sm text-primary">Enter roughly how many sponsorships you have done.</p>
+                )}
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Average Deal Amount</label>
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="block text-xs font-medium uppercase tracking-wider text-muted">
+                    Average Deal Amount
+                  </label>
+                  <div className="group relative">
+                    <button
+                      type="button"
+                      aria-label="Why we ask for average deal amount"
+                      className="flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
+                    >
+                      <CircleHelp className="h-4 w-4" />
+                    </button>
+                    <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-72 -translate-x-1/2 rounded-xl border border-border bg-white p-3 text-left text-xs leading-relaxed text-muted opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                      This does not need to be exact. We know sponsorship pricing changes a lot based on scope, brand fit, usage rights, turnaround time, and plenty of other details. We just want a rough estimate so the model has a realistic anchor point for your past deals.
+                    </div>
+                  </div>
+                </div>
                 <input
                   value={avgDealAmount}
                   onChange={(event) => setAvgDealAmount(event.target.value)}
                   placeholder="e.g. $2,000"
                   className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+                <p className="mt-2 text-xs text-muted">Optional, but helpful if you want the model to anchor to your typical deal size.</p>
               </div>
             </div>
           )}
@@ -558,14 +655,19 @@ export default function GenerateRateCardClient({
             Rate card generation is disabled for this account because AI features are turned off.
           </p>
         )}
+        {aiEnabled && !canGenerate && (
+          <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
+            Fill the required fields to continue: {missingRequiredFields.join(', ')}.
+          </div>
+        )}
 
         <button
           type="button"
           onClick={() => void handleGenerate()}
-          disabled={!aiEnabled || loading}
-          className="flex w-full items-center justify-center rounded-xl bg-primary py-4 text-lg font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          disabled={!canGenerate || loading}
+          className="flex w-full items-center justify-center rounded-xl bg-primary py-4 text-lg font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? 'Generating Rate Card...' : aiEnabled ? 'Generate My Rate Card' : 'AI Disabled'}
+          {loading ? 'Generating Rate Card...' : !aiEnabled ? 'AI Disabled' : 'Generate My Rate Card'}
         </button>
       </div>
     </div>

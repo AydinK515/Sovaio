@@ -71,6 +71,7 @@ export default function AnalyticsUploadForm() {
   const [activeTutorialStep, setActiveTutorialStep] = useState(0)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
 
   const confidence = (() => {
     let score = 0
@@ -88,6 +89,20 @@ export default function AnalyticsUploadForm() {
   const confidenceLabel = confidence < 40 ? 'Low' : confidence < 70 ? 'Medium' : 'High'
   const confidenceColor = confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
   const barColor = confidence < 40 ? 'bg-primary' : confidence < 70 ? 'bg-warning' : 'bg-success'
+  const missingRequiredFields = [
+    !snapshotName.trim() ? 'Snapshot name' : null,
+    ...missingRequired.map(type => CSV_TYPES.find(item => item.key === type)?.label ?? type),
+  ].filter((value): value is string => Boolean(value))
+  const canSaveSnapshot = missingRequiredFields.length === 0
+  const showFieldErrors = submitAttempted
+
+  function RequiredMark() {
+    return (
+      <span aria-hidden="true" className="ml-1 text-primary">
+        *
+      </span>
+    )
+  }
 
   function detectCsvType(headers: string[], fileName: string): string | null {
     const h = headers.map(s => s.toLowerCase().trim())
@@ -260,6 +275,13 @@ export default function AnalyticsUploadForm() {
   }
 
   async function handleCreateSnapshot() {
+    setSubmitAttempted(true)
+
+    if (!snapshotName.trim()) {
+      setError('Snapshot name is required before you can save an analytics snapshot.')
+      return
+    }
+
     if (!hasRequiredTypes) {
       const labels = missingRequired.map(type => CSV_TYPES.find(item => item.key === type)?.label).join(' and ')
       setError(`"${labels}" ${missingRequired.length === 1 ? 'is' : 'are'} required before you can save an analytics snapshot.`)
@@ -433,14 +455,19 @@ export default function AnalyticsUploadForm() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Snapshot Name</label>
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                Snapshot Name
+                <RequiredMark />
+              </label>
               <input
                 type="text"
                 value={snapshotName}
                 onChange={event => setSnapshotName(event.target.value)}
-                placeholder={buildAnalyticsSnapshotName()}
-                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${showFieldErrors && !snapshotName.trim() ? 'border-primary' : 'border-border'}`}
               />
+              {showFieldErrors && !snapshotName.trim() && (
+                <p className="mt-2 text-sm text-primary">Give this analytics snapshot a name before saving it.</p>
+              )}
             </div>
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Subscriber Count</label>
@@ -455,6 +482,11 @@ export default function AnalyticsUploadForm() {
           </div>
 
           {error && <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>}
+          {!canSaveSnapshot && (
+            <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
+              Fill the required fields to continue: {missingRequiredFields.join(', ')}.
+            </div>
+          )}
 
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted-light p-4">
             <Info className="h-5 w-5 shrink-0 text-muted" />
@@ -464,17 +496,21 @@ export default function AnalyticsUploadForm() {
           <button
             type="button"
             onClick={() => void handleCreateSnapshot()}
-            disabled={!hasRequiredTypes || saving}
+            disabled={!canSaveSnapshot || saving}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 text-lg font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? 'Saving Analytics Snapshot...' : 'Save Analytics Snapshot'}
           </button>
 
-          {!hasRequiredTypes && (
+          {!canSaveSnapshot && (
             <p className="text-center text-xs text-muted">
-              {parsedFiles.length === 0
-                ? 'Upload files to save your first snapshot'
-                : `Still need: ${missingRequired.map(type => CSV_TYPES.find(item => item.key === type)?.label).join(' and ')}`}
+              {parsedFiles.length === 0 && !snapshotName.trim()
+                ? 'Name your snapshot and upload the required files to save it'
+                : parsedFiles.length === 0
+                  ? 'Upload files to save your first snapshot'
+                  : !snapshotName.trim() && missingRequired.length === 0
+                    ? 'Add a snapshot name to save this upload'
+                    : `Still need: ${missingRequiredFields.join(' and ')}`}
             </p>
           )}
         </div>
