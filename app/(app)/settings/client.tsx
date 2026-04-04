@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { User, CreditCard, Trash2, ExternalLink, Shield, Upload, Camera, Loader2 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { Profile } from '@/lib/types'
+import ConfirmationModal from '@/components/confirmation-modal'
 
 export default function SettingsClient({ user, profile }: { user: SupabaseUser; profile: Profile | null }) {
   const router = useRouter()
@@ -18,8 +19,10 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [showDelete, setShowDelete] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showSignOutModal, setShowSignOutModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -149,6 +152,8 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   }
 
   async function handleSignOut() {
+    setShowSignOutModal(false)
+    setSigningOut(true)
     captureAnalyticsEvent(POSTHOG_EVENTS.authSignOut, {
       user_id: user.id,
     })
@@ -159,6 +164,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   }
 
   async function handleDelete() {
+    setShowDeleteModal(false)
     setDeleting(true)
     // In production, this would call an edge function to delete all user data
     // For now, just sign out
@@ -173,6 +179,29 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
 
   return (
     <div className="py-8 max-w-2xl">
+      <ConfirmationModal
+        open={showSignOutModal}
+        title="Sign out?"
+        message="Are you sure you want to sign out of your account?"
+        confirmLabel="Sign Out"
+        pending={signingOut}
+        onClose={() => setShowSignOutModal(false)}
+        onConfirm={() => {
+          void handleSignOut()
+        }}
+      />
+      <ConfirmationModal
+        open={showDeleteModal}
+        title="Delete account?"
+        message="Permanently delete your account and all associated data? This action cannot be undone."
+        confirmLabel="Delete Account"
+        tone="danger"
+        pending={deleting}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          void handleDelete()
+        }}
+      />
       <h1 className="text-3xl font-bold">Settings</h1>
       <p className="mt-2 text-muted">Manage your account and subscription.</p>
 
@@ -312,10 +341,11 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
           <h2 className="text-lg font-semibold">Security</h2>
         </div>
         <button
-          onClick={handleSignOut}
+          onClick={() => setShowSignOutModal(true)}
+          disabled={signingOut}
           className="px-4 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted-light transition-colors"
         >
-          Sign Out
+          {signingOut ? 'Signing Out...' : 'Sign Out'}
         </button>
       </div>
 
@@ -328,27 +358,13 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
         <p className="text-sm text-muted mb-4">
           Permanently delete your account and all associated data. This action cannot be undone.
         </p>
-        {!showDelete ? (
-          <button
-            onClick={() => setShowDelete(true)}
-            className="px-4 py-2.5 border border-red-200 text-primary rounded-xl text-sm font-medium hover:bg-primary-light transition-colors"
-          >
-            Delete Account
-          </button>
-        ) : (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
-            >
-              {deleting ? 'Deleting...' : 'Yes, Delete My Account'}
-            </button>
-            <button onClick={() => setShowDelete(false)} className="text-sm text-muted hover:text-foreground">
-              Cancel
-            </button>
-          </div>
-        )}
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          disabled={deleting}
+          className="px-4 py-2.5 border border-red-200 text-primary rounded-xl text-sm font-medium hover:bg-primary-light transition-colors disabled:opacity-50"
+        >
+          {deleting ? 'Deleting...' : 'Delete Account'}
+        </button>
       </div>
     </div>
   )

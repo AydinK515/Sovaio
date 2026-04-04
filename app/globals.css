@@ -41,6 +41,11 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
@@ -74,6 +79,7 @@ body {
 
 .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
 .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
+.animate-pop-in { animation: pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 
 /* Confidence meter */
 .confidence-low { background: linear-gradient(90deg, #dc2626 0%, #dc2626 var(--confidence), #e2e8f0 var(--confidence)); }

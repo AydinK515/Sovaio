@@ -61,7 +61,7 @@ export default function ConfirmationModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirmation-modal-title"
-        className="w-full max-w-lg rounded-[28px] border border-border bg-white p-6 shadow-2xl animate-slide-up md:p-7"
+        className="w-full max-w-lg rounded-[28px] border border-border bg-white p-6 shadow-2xl animate-pop-in md:p-7"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="confirmation-modal-title" className="text-2xl font-semibold text-foreground">

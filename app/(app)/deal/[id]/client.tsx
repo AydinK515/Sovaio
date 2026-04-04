@@ -1280,7 +1280,7 @@ export default function DealClient({
       {/* Close Won Modal */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full animate-slide-up">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full animate-pop-in">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trophy className="w-8 h-8 text-green-600" />

@@ -495,11 +495,11 @@ export default function RateCardClient({
         <h1 className="text-3xl md:text-4xl font-bold">Your sponsorship rates are ready.</h1>
         <div className="mt-4">
           {editingCardName ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <input
                 value={draftCardName}
                 onChange={(event) => setDraftCardName(event.target.value)}
-                className="min-w-0 flex-1 rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-auto sm:min-w-[20rem] sm:max-w-[32rem]"
               />
               <div className="flex gap-2">
                 <button
