@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
-import { useOnboarding } from '@/components/onboarding-provider'
+import { useOnboarding, useOnboardingChecklist } from '@/components/onboarding-provider'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 
@@ -20,16 +20,19 @@ export default function OnboardingRouteBanner({
   children?: React.ReactNode
 }) {
   const { state } = useOnboarding()
+  const { completedCount, totalCount } = useOnboardingChecklist()
+  const onboardingFullyComplete = totalCount > 0 && completedCount >= totalCount
 
   useEffect(() => {
+    if (onboardingFullyComplete) return
     if (state.dismissed_hints[bannerKey]) return
     captureAnalyticsEvent(POSTHOG_EVENTS.onboardingHintViewed, {
       hint_key: bannerKey,
       source: 'route_banner',
     })
-  }, [bannerKey, state.dismissed_hints])
+  }, [bannerKey, onboardingFullyComplete, state.dismissed_hints])
 
-  if (state.dismissed_hints[bannerKey]) {
+  if (onboardingFullyComplete || state.dismissed_hints[bannerKey]) {
     return null
   }
 

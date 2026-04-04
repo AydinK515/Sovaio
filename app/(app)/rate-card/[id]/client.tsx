@@ -480,32 +480,36 @@ export default function RateCardClient({
           </div>
         )}
 
-        <div className="mt-8 rounded-[28px] border border-primary/15 bg-[linear-gradient(135deg,rgba(254,243,199,0.45),rgba(255,255,255,0.98))] p-6 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-              <TrendingUp className="h-4 w-4 text-primary" />
+        <div className="mt-8 rounded-[28px] border border-primary/15 bg-[linear-gradient(135deg,rgba(254,243,199,0.45),rgba(255,255,255,0.98))] px-6 py-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fde7df] text-[#ef4444]">
+              <TrendingUp className="h-4 w-4" />
             </div>
-            <h2 className="text-lg font-semibold">How To Use These Ranges</h2>
+            <h2 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-foreground sm:text-[1.3rem]">
+              How To Use These Ranges
+            </h2>
           </div>
-          <p className="mt-4 text-sm leading-relaxed text-muted">
+
+          <p className="mt-4 max-w-none text-sm leading-[1.45] text-slate-500 sm:text-[15px] sm:leading-[1.45]">
             These numbers are not telling you to default to the bottom. In most normal negotiations, you should usually open in the upper-middle of the range and try to hold there unless the scope is especially light.
           </p>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
-              <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">Where To Start</p>
-              <p className="mt-2 text-sm text-foreground">
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[24px] bg-white/70 px-4 py-4">
+              <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">Where To Start</p>
+              <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
                 Aim to quote above the midpoint when the brand fit is strong, the brief is standard, and you are not desperate to close quickly.
               </p>
             </div>
-            <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
-              <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">When To Push Higher</p>
-              <p className="mt-2 text-sm text-foreground">
+            <div className="rounded-[24px] bg-white/70 px-4 py-4">
+              <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">When To Push Higher</p>
+              <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
                 Push toward the top when they want tighter scripting, stronger placement, usage rights, exclusivity, extra revisions, or a fast turnaround.
               </p>
             </div>
-            <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
-              <p className="text-xs font-mono uppercase tracking-[0.16em] text-muted">About The Low End</p>
-              <p className="mt-2 text-sm text-foreground">
+            <div className="rounded-[24px] bg-white/70 px-4 py-4">
+              <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">About The Low End</p>
+              <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
                 The lower bound is still a fair rate, not a failure. It is the right outcome for lighter-scope deals, test budgets, or brands with less flexibility.
               </p>
             </div>
@@ -943,14 +947,49 @@ function ExportRateCardContent({
           </div>
         </div>
 
-        <div style={{ borderRadius: '30px', padding: '30px 30px 32px', backgroundColor: '#0f172a', color: '#ffffff' }}>
-          <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>What&apos;s Included</div>
-          <div style={{ marginTop: '18px', fontSize: '18px', lineHeight: 1.8, color: 'rgba(255,255,255,0.92)' }}>
-            <div>- One in-video sponsorship placement sized to the package selected</div>
-            <div>- Brand talking points delivered in my normal style</div>
-            <div>- Description link placement when included in campaign scope</div>
-            <div>- One standard brand review pass for factual or compliance notes</div>
-            <div>- Final quote confirmed based on scope, usage rights, exclusivity, and timeline</div>
+        <div
+          style={{
+            borderRadius: '30px',
+            padding: '30px 30px 34px',
+            background: 'linear-gradient(135deg, rgba(254,243,199,0.45), rgba(255,255,255,0.98))',
+            border: '1px solid rgba(251, 191, 36, 0.16)',
+            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.08)',
+            color: '#0f172a',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '999px',
+                backgroundColor: '#fde7df',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <TrendingUp size={26} color="#ef4444" />
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>What&apos;s Included</div>
+          </div>
+          <div
+            style={{
+              marginTop: '20px',
+              borderRadius: '24px',
+              backgroundColor: 'rgba(255,255,255,0.72)',
+              padding: '22px 24px',
+              border: '1px solid rgba(255,255,255,0.82)',
+            }}
+          >
+            <div style={{ display: 'grid', gap: '14px', fontSize: '18px', lineHeight: 1.65, color: '#334155' }}>
+              <div>One in-video sponsorship placement sized to the package selected</div>
+              <div>Brand talking points delivered in my normal style</div>
+              <div>Description link placement when included in campaign scope</div>
+              <div>One standard brand review pass for factual or compliance notes</div>
+              <div>Final quote confirmed based on scope, usage rights, exclusivity, and timeline</div>
+            </div>
           </div>
         </div>
       </div>

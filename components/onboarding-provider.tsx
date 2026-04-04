@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, useTransition } from 'react'
+import { createContext, useContext, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   getChecklistAnalyticsProperties,
@@ -80,7 +80,7 @@ export function OnboardingProvider({
     }
   }
 
-  const value = useMemo<OnboardingContextValue>(() => ({
+  const value: OnboardingContextValue = {
     state,
     checklistOpen,
     isPending,
@@ -174,7 +174,7 @@ export function OnboardingProvider({
         getChecklistAnalyticsProperties(state, stepId, pathname, { source })
       )
     },
-  }), [checklistOpen, isPending, pathname, router, state])
+  }
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>
 }

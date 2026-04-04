@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, BarChart3, BriefcaseBusiness, Compass, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BarChart3, BriefcaseBusiness, Compass, Sparkles } from 'lucide-react'
 import { updateOnboardingState } from '@/lib/onboarding-client'
 import type { OnboardingPath, OnboardingState } from '@/lib/onboarding'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
@@ -17,20 +17,38 @@ const OPTIONS: Array<{
   {
     value: 'price_my_channel',
     title: 'Price my channel',
-    description: 'I want to upload my analytics, understand my value, and generate a first rate card.',
+    description: 'I want to understand my value, upload analytics, and generate a strong first rate card.',
     icon: BarChart3,
   },
   {
     value: 'negotiate_a_brand_deal',
     title: 'Negotiate a brand deal',
-    description: 'I want to get into a live deal workflow fast and let RateProof help me respond confidently.',
+    description: 'I want to get into a real deal workflow quickly and use RateProof to respond with confidence.',
     icon: BriefcaseBusiness,
   },
   {
     value: 'just_exploring',
     title: 'Just exploring',
-    description: 'Show me the fastest path to understand how the product works before I go deeper.',
+    description: 'I want a guided tour of how snapshots, rate cards, deals, and AI fit together.',
     icon: Compass,
+  },
+]
+
+const INTRO_STEPS = [
+  {
+    eyebrow: 'Step 1',
+    title: 'Save one analytics snapshot',
+    description: 'Bring in your YouTube Studio reports once so RateProof can work from real channel context.',
+  },
+  {
+    eyebrow: 'Step 2',
+    title: 'Turn it into pricing',
+    description: 'Generate a rate card with sponsor-ready ranges, packaging guidance, and pitch copy.',
+  },
+  {
+    eyebrow: 'Step 3',
+    title: 'Use AI with context',
+    description: 'Open a deal or ask Channel Advisor when you want strategy help grounded in your snapshot.',
   },
 ]
 
@@ -42,26 +60,26 @@ export default function WelcomeClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const isReplay = searchParams.get('mode') === 'replay'
+  const [step, setStep] = useState(0)
   const [selectedPath, setSelectedPath] = useState<OnboardingPath>(initialState.welcome_path ?? 'price_my_channel')
-  const [hasExportReady, setHasExportReady] = useState(initialState.has_export_ready ?? true)
   const [submitting, setSubmitting] = useState(false)
 
   async function finishWelcome() {
     setSubmitting(true)
 
-    const payload = await updateOnboardingState({
+    await updateOnboardingState({
       action: 'complete_welcome',
       welcomePath: selectedPath,
-      hasExportReady,
+      hasExportReady: false,
     })
 
     captureAnalyticsEvent(POSTHOG_EVENTS.onboardingStarted, {
       onboarding_path: selectedPath,
-      has_export_ready: hasExportReady,
+      has_export_ready: false,
       source: isReplay ? 'replay' : 'first_run',
     })
 
-    const destination = hasExportReady
+    const destination = selectedPath === 'price_my_channel'
       ? '/analytics/new'
       : selectedPath === 'negotiate_a_brand_deal'
         ? '/dashboard?focus=deal'
@@ -69,7 +87,6 @@ export default function WelcomeClient({
 
     router.push(destination)
     router.refresh()
-    return payload
   }
 
   async function skipWelcome() {
@@ -83,98 +100,209 @@ export default function WelcomeClient({
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(254,242,242,0.95),rgba(255,255,255,1)_55%)] px-4 py-10">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(254,242,242,0.95),rgba(255,255,255,1)_52%)] px-4 py-10">
       <div className="mx-auto max-w-5xl">
-        <div className="rounded-[36px] border border-border bg-white/95 p-6 shadow-[0_30px_90px_-54px_rgba(15,23,42,0.38)] backdrop-blur md:p-10">
-          <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-            <section>
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                <Sparkles className="h-3.5 w-3.5" />
-                {isReplay ? 'Replay onboarding' : 'Welcome to RateProof'}
-              </div>
-              <h1 className="mt-4 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-                Learn the product while you use it.
-              </h1>
-              <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-                RateProof helps YouTube creators turn real analytics into sponsor-ready pricing, better negotiation decisions, and clearer channel strategy. Everything starts with one saved analytics snapshot.
-              </p>
+        <div className="overflow-hidden rounded-[36px] border border-border bg-white/95 shadow-[0_30px_90px_-54px_rgba(15,23,42,0.38)] backdrop-blur">
+          <div className="grid min-h-[720px] lg:grid-cols-[1.05fr_0.95fr]">
+            <section className="relative overflow-hidden border-b border-border px-6 py-8 md:px-10 md:py-10 lg:border-b-0 lg:border-r">
+              <div className="absolute inset-x-10 top-0 h-32 rounded-full bg-[radial-gradient(circle,rgba(220,38,38,0.08),transparent_72%)] blur-3xl" />
+              <div className="relative">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {isReplay ? 'Replay onboarding' : 'Welcome to RateProof'}
+                </div>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                {[
-                  ['1', 'Upload analytics', 'Bring in YouTube Studio reports and save your first snapshot.'],
-                  ['2', 'Generate your rate card', 'Turn that snapshot into sponsor-ready ranges and pitch copy.'],
-                  ['3', 'Use the AI with context', 'Start a deal or ask Channel Advisor when you are ready.'],
-                ].map(([step, title, description]) => (
-                  <div key={step} className="rounded-3xl border border-border bg-muted-light p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Step {step}</p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">{title}</p>
-                    <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
-                  </div>
-                ))}
+                {step === 0 ? (
+                  <>
+                    <h1 className="mt-5 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+                      Learn RateProof in two calm steps.
+                    </h1>
+                    <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
+                      RateProof helps YouTube creators turn channel analytics into clear sponsor pricing, stronger negotiation decisions, and better positioning. The product teaches itself once you have one saved snapshot.
+                    </p>
+
+                    <div className="mt-10 grid gap-4 md:grid-cols-3">
+                      {INTRO_STEPS.map((item, index) => (
+                        <div key={item.title} className="rounded-[28px] border border-border bg-[linear-gradient(180deg,#ffffff,rgba(248,250,252,0.92))] p-5 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.45)]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                            {item.eyebrow}
+                          </p>
+                          <p className="mt-3 text-xl font-semibold text-foreground">
+                            {item.title}
+                          </p>
+                          <p className="mt-3 text-sm leading-relaxed text-muted">
+                            {item.description}
+                          </p>
+                          <div className="mt-5 h-1.5 rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${(index + 1) * 32}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+                      Step 2 of 2
+                    </p>
+                    <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+                      What brought you to RateProof?
+                    </h1>
+                    <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
+                      Pick the reason that feels closest. We&apos;ll shape the next step around it and keep the onboarding focused.
+                    </p>
+
+                    <div className="mt-8 space-y-4">
+                      {OPTIONS.map((option) => {
+                        const active = selectedPath === option.value
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setSelectedPath(option.value)}
+                            className={`w-full rounded-[28px] border px-5 py-5 text-left transition-all ${
+                              active
+                                ? 'border-primary bg-primary-light shadow-[0_20px_45px_-36px_rgba(220,38,38,0.45)]'
+                                : 'border-border bg-white hover:border-primary/30 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${
+                                active
+                                  ? 'border-primary bg-primary text-white'
+                                  : 'border-border bg-white text-muted'
+                              }`}>
+                                <option.icon className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-base font-semibold text-foreground">{option.title}</p>
+                                <p className="mt-1.5 text-sm leading-relaxed text-muted">{option.description}</p>
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-8 rounded-[28px] border border-border bg-[linear-gradient(180deg,rgba(248,250,252,0.9),#ffffff)] p-5">
+                      <p className="text-sm font-semibold text-foreground">What happens next</p>
+                      <p className="mt-2 text-sm leading-relaxed text-muted">
+                        {selectedPath === 'price_my_channel'
+                          ? 'We\'ll send you straight into analytics upload so you can save a snapshot and generate your first real rate card.'
+                          : selectedPath === 'negotiate_a_brand_deal'
+                            ? 'We\'ll send you to the dashboard with the deal workflow emphasized, then guide you into the fastest path to live negotiation help.'
+                            : 'We\'ll send you to the dashboard and keep the product guidance lightweight while you explore snapshots, pricing, and AI.'}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </section>
 
-            <section className="rounded-[32px] border border-border bg-slate-50 p-5 md:p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Tailor the path</p>
-              <h2 className="mt-3 text-2xl font-semibold text-foreground">What do you want to do first?</h2>
-              <div className="mt-5 space-y-3">
-                {OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setSelectedPath(option.value)}
-                    className={`w-full rounded-3xl border p-4 text-left transition-all ${
-                      selectedPath === option.value
-                        ? 'border-primary bg-primary-light shadow-[0_16px_42px_-34px_rgba(220,38,38,0.85)]'
-                        : 'border-border bg-white hover:border-primary/25'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl ${selectedPath === option.value ? 'bg-primary text-white' : 'bg-muted-light text-muted'}`}>
-                        <option.icon className="h-4.5 w-4.5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{option.title}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-muted">{option.description}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+            <section className="flex flex-col justify-between bg-[linear-gradient(180deg,rgba(248,250,252,0.82),#ffffff)] px-6 py-8 md:px-8 md:py-10">
+              <div>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                      {step === 0 ? 'Overview' : 'Tailor the path'}
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold text-foreground">
+                      {step === 0 ? 'Start simple' : 'Choose your starting point'}
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted">
+                    <span className={`h-2 w-2 rounded-full ${step === 0 ? 'bg-primary' : 'bg-border-dark'}`} />
+                    <span className={`h-2 w-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-border-dark'}`} />
+                  </div>
+                </div>
 
-              <div className="mt-6 rounded-3xl border border-border bg-white p-4">
-                <p className="text-sm font-semibold text-foreground">Do you already have a YouTube Studio export ready?</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted">
-                  If you do, we&apos;ll send you straight into the upload flow. If not, we&apos;ll guide you from the dashboard first.
-                </p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setHasExportReady(true)}
-                    className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-colors ${hasExportReady ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}
-                  >
-                    Yes, ready to upload
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHasExportReady(false)}
-                    className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-colors ${!hasExportReady ? 'border-primary bg-primary-light text-primary' : 'border-border hover:bg-muted-light'}`}
-                  >
-                    Not yet
-                  </button>
+                <div className="mt-8 rounded-[32px] border border-border bg-white p-5 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.28)]">
+                  {step === 0 ? (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">What RateProof actually does</p>
+                      <div className="mt-4 space-y-4">
+                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
+                          <p className="text-sm font-semibold text-foreground">Snapshots turn exports into reusable context</p>
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                            Instead of re-explaining your channel every time, you save one analytics snapshot and reuse it across pricing, deals, and AI.
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
+                          <p className="text-sm font-semibold text-foreground">Rate cards give you a confident starting point</p>
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                            Your first rate card is usually the moment the product clicks, because it turns raw channel data into something useful immediately.
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
+                          <p className="text-sm font-semibold text-foreground">The AI works best after the snapshot exists</p>
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                            Channel Advisor helps with strategy and pricing context. Deal Assistant helps once you are in a live negotiation.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">Recommended next move</p>
+                      <div className="mt-4 rounded-[28px] border border-primary/20 bg-primary-light px-4 py-5">
+                        <p className="text-lg font-semibold text-foreground">
+                          {selectedPath === 'price_my_channel'
+                            ? 'Go save your first analytics snapshot'
+                            : selectedPath === 'negotiate_a_brand_deal'
+                              ? 'Get your deal workflow set up with real context'
+                              : 'Explore the dashboard with guidance turned on'}
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          {selectedPath === 'price_my_channel'
+                            ? 'That gives RateProof what it needs to generate accurate pricing instead of generic guesses.'
+                            : selectedPath === 'negotiate_a_brand_deal'
+                              ? 'We\'ll keep nudging you toward the snapshot first, because that is what makes negotiation advice actually useful.'
+                              : 'You can move through the product naturally and let the onboarding surface the next action at the right moment.'}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => void finishWelcome()}
-                  disabled={submitting}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-                >
-                  Continue
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                {step === 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setStep(0)}
+                    disabled={submitting}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border px-5 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                  </button>
+                ) : null}
+
+                {step === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    disabled={submitting}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                  >
+                    Continue
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void finishWelcome()}
+                    disabled={submitting}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                  >
+                    Start with this path
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                )}
+
                 {!isReplay ? (
                   <button
                     type="button"
