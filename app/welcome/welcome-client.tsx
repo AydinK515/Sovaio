@@ -34,24 +34,6 @@ const OPTIONS: Array<{
   },
 ]
 
-const INTRO_STEPS = [
-  {
-    eyebrow: 'Step 1',
-    title: 'Save one analytics snapshot',
-    description: 'Bring in your YouTube Studio reports once so RateProof can work from real channel context.',
-  },
-  {
-    eyebrow: 'Step 2',
-    title: 'Turn it into pricing',
-    description: 'Generate a rate card with sponsor-ready ranges, packaging guidance, and pitch copy.',
-  },
-  {
-    eyebrow: 'Step 3',
-    title: 'Use AI with context',
-    description: 'Open a deal or ask Channel Advisor when you want strategy help grounded in your snapshot.',
-  },
-]
-
 export default function WelcomeClient({
   initialState,
 }: {
@@ -115,33 +97,11 @@ export default function WelcomeClient({
                 {step === 0 ? (
                   <>
                     <h1 className="mt-5 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-                      Learn RateProof in two calm steps.
+                      Let&apos;s get started.
                     </h1>
                     <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
                       RateProof helps YouTube creators turn channel analytics into clear sponsor pricing, stronger negotiation decisions, and better positioning. The product teaches itself once you have one saved snapshot.
                     </p>
-
-                    <div className="mt-10 grid gap-4 md:grid-cols-3">
-                      {INTRO_STEPS.map((item, index) => (
-                        <div key={item.title} className="rounded-[28px] border border-border bg-[linear-gradient(180deg,#ffffff,rgba(248,250,252,0.92))] p-5 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.45)]">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                            {item.eyebrow}
-                          </p>
-                          <p className="mt-3 text-xl font-semibold text-foreground">
-                            {item.title}
-                          </p>
-                          <p className="mt-3 text-sm leading-relaxed text-muted">
-                            {item.description}
-                          </p>
-                          <div className="mt-5 h-1.5 rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-primary"
-                              style={{ width: `${(index + 1) * 32}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </>
                 ) : (
                   <>
@@ -169,13 +129,13 @@ export default function WelcomeClient({
                                 : 'border-border bg-white hover:border-primary/30 hover:bg-slate-50'
                             }`}
                           >
-                            <div className="flex items-start gap-4">
-                              <div className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${
+                            <div className="flex items-stretch gap-4">
+                              <div className={`flex w-16 shrink-0 items-center justify-center self-stretch rounded-2xl border ${
                                 active
                                   ? 'border-primary bg-primary text-white'
                                   : 'border-border bg-white text-muted'
                               }`}>
-                                <option.icon className="h-5 w-5" />
+                                <option.icon className="h-6 w-6" />
                               </div>
                               <div className="min-w-0">
                                 <p className="text-base font-semibold text-foreground">{option.title}</p>
@@ -187,16 +147,6 @@ export default function WelcomeClient({
                       })}
                     </div>
 
-                    <div className="mt-8 rounded-[28px] border border-border bg-[linear-gradient(180deg,rgba(248,250,252,0.9),#ffffff)] p-5">
-                      <p className="text-sm font-semibold text-foreground">What happens next</p>
-                      <p className="mt-2 text-sm leading-relaxed text-muted">
-                        {selectedPath === 'price_my_channel'
-                          ? 'We\'ll send you straight into analytics upload so you can save a snapshot and generate your first real rate card.'
-                          : selectedPath === 'negotiate_a_brand_deal'
-                            ? 'We\'ll send you to the dashboard with the deal workflow emphasized, then guide you into the fastest path to live negotiation help.'
-                            : 'We\'ll send you to the dashboard and keep the product guidance lightweight while you explore snapshots, pricing, and AI.'}
-                      </p>
-                    </div>
                   </>
                 )}
               </div>
@@ -263,6 +213,15 @@ export default function WelcomeClient({
                               : 'You can move through the product naturally and let the onboarding surface the next action at the right moment.'}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => void finishWelcome()}
+                        disabled={submitting}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                      >
+                        Start with this path
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
                     </>
                   )}
                 </div>
@@ -291,17 +250,7 @@ export default function WelcomeClient({
                     Continue
                     <ArrowRight className="h-4 w-4" />
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void finishWelcome()}
-                    disabled={submitting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-                  >
-                    Start with this path
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                )}
+                ) : null}
 
                 {!isReplay ? (
                   <button

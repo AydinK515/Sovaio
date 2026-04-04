@@ -97,15 +97,29 @@ const THINKING_LABELS = ['Thinking...', 'Reviewing stats...', 'Checking rates...
 
 function ThinkingLabel() {
   const [index, setIndex] = useState(0)
+  const [visible, setVisible] = useState(true)
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setIndex(prev => (prev + 1) % THINKING_LABELS.length)
-    }, 2400)
+    const cycle = () => {
+      setVisible(false)
+      setTimeout(() => {
+        setIndex(prev => (prev + 1) % THINKING_LABELS.length)
+        setVisible(true)
+      }, 300)
+    }
+
+    const id = setInterval(cycle, 2800)
     return () => clearInterval(id)
   }, [])
 
-  return <span className="text-sm font-medium text-muted">{THINKING_LABELS[index]}</span>
+  return (
+    <span
+      className="thinking-text text-sm font-medium"
+      style={{ transition: 'opacity 0.3s ease', opacity: visible ? 1 : 0 }}
+    >
+      {THINKING_LABELS[index]}
+    </span>
+  )
 }
 
 function ReasoningDropdown({ text }: { text: string }) {
@@ -556,6 +570,9 @@ export default function ChannelAiSidebar({
         markChatUpdated(activeChat.id, finalPayload.updatedAt)
       }
 
+      setAiTyping(false)
+      setAiText('')
+      setAiReasoningText('')
       setMessages(prev => [...prev, finalPayload?.message ?? {
         id: crypto.randomUUID(),
         chat_id: activeChat.id,
@@ -570,31 +587,37 @@ export default function ChannelAiSidebar({
         snapshot_id: activeChat.analytics_snapshot_id,
       })
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        const partial = aiTextRef.current.trim()
-        if (partial) {
-          const { data: savedPartial } = await supabase
-            .from('channel_ai_messages')
+        if (error instanceof Error && error.name === 'AbortError') {
+          const partial = aiTextRef.current.trim()
+          if (partial) {
+            const { data: savedPartial } = await supabase
+              .from('channel_ai_messages')
             .insert({
               chat_id: activeChat.id,
               user_id: user.id,
               role: 'ai',
               content: partial,
               reasoning_summary: aiReasoningText.trim() || null,
-            })
-            .select('*')
-            .single()
-          setMessages(prev => [...prev, (savedPartial ?? {
-            id: crypto.randomUUID(),
-            chat_id: activeChat.id,
-            user_id: user.id,
-            role: 'ai',
+              })
+              .select('*')
+              .single()
+            setAiTyping(false)
+            setAiText('')
+            setAiReasoningText('')
+            setMessages(prev => [...prev, (savedPartial ?? {
+              id: crypto.randomUUID(),
+              chat_id: activeChat.id,
+              user_id: user.id,
+              role: 'ai',
             content: partial,
             reasoning_summary: aiReasoningText.trim() || null,
             created_at: new Date().toISOString(),
-          }) as ChannelAiMessage])
-        }
-      } else {
+            }) as ChannelAiMessage])
+          }
+        } else {
+        setAiTyping(false)
+        setAiText('')
+        setAiReasoningText('')
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           chat_id: activeChat.id,
@@ -642,108 +665,6 @@ export default function ChannelAiSidebar({
                   <div className="min-w-0">
                     <h2 className="text-sm font-semibold">Channel Advisor</h2>
                     <p className="text-xs text-muted">For your channel stats, sponsorship positioning, and analytics-backed context</p>
-                    <div className="relative mt-2" ref={chatMenuRef}>
-                        <button
-                          type="button"
-                          onClick={() => setChatMenuOpen(prev => !prev)}
-                          className="inline-flex max-w-full items-center gap-2 rounded-xl border border-border bg-muted-light px-3 py-2 text-sm font-medium transition-colors hover:bg-muted-light/80"
-                        >
-                          <span className="max-w-[180px] truncate">{currentChat?.title || 'New Chat'}</span>
-                          <ChevronDown className={`h-4 w-4 text-muted transition-transform ${chatMenuOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {chatMenuOpen && (
-                          <div className="absolute left-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-white shadow-xl">
-                            <div className="max-h-80 overflow-y-auto py-2">
-                              <div className="px-2">
-                                {currentChat === null && (
-                                  <div className="flex items-center gap-2 rounded-xl bg-primary/8 px-3 py-2 text-sm text-foreground">
-                                    <span className="flex min-w-0 flex-1 items-center justify-between">
-                                      <span className="truncate font-medium">New Chat</span>
-                                      <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />
-                                    </span>
-                                  </div>
-                                )}
-                                {chats.map(chat => (
-                                  <div
-                                    key={chat.id}
-                                    className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
-                                      chat.id === currentChat?.id ? 'bg-primary/8 text-foreground' : 'hover:bg-muted-light'
-                                    }`}
-                                  >
-                                    {renamingChatId === chat.id ? (
-                                      <input
-                                        autoFocus
-                                        type="text"
-                                        value={renameValue}
-                                        onChange={event => setRenameValue(event.target.value)}
-                                        onBlur={() => void submitRename(chat.id)}
-                                        onKeyDown={event => {
-                                          if (event.key === 'Enter') { event.preventDefault(); void submitRename(chat.id) }
-                                          if (event.key === 'Escape') { event.preventDefault(); setRenamingChatId(null) }
-                                        }}
-                                        onClick={event => event.stopPropagation()}
-                                        className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
-                                      />
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          void loadChat(chat)
-                                          setChatMenuOpen(false)
-                                        }}
-                                        className="flex min-w-0 flex-1 items-center justify-between text-left"
-                                      >
-                                        <span className="truncate font-medium">{chat.title}</span>
-                                        {chat.id === currentChat?.id && <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />}
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={event => {
-                                        event.stopPropagation()
-                                        setRenameValue(chat.title)
-                                        setRenamingChatId(chat.id)
-                                      }}
-                                      aria-label={`Rename ${chat.title}`}
-                                      className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={event => {
-                                        event.stopPropagation()
-                                        void deleteChat(chat.id)
-                                      }}
-                                      disabled={deletingChatId === chat.id}
-                                      aria-label={`Delete ${chat.title}`}
-                                      className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className="border-t border-border p-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  createChat()
-                                  setChatMenuOpen(false)
-                                }}
-                                disabled={currentChat === null}
-                                className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-sm font-medium text-muted transition-colors hover:bg-muted-light hover:text-foreground disabled:opacity-50"
-                              >
-                                <Plus className="h-4 w-4" />
-                                Start a new chat
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                    </div>
                   </div>
                   {snapshots.length > 0 ? (
                     <div className="mt-3 space-y-2">
@@ -769,17 +690,114 @@ export default function ChannelAiSidebar({
                         triggerClassName="px-3 py-2"
                       />
                       <p className="text-xs text-muted">{channelName || 'Your channel'} | {currentSnapshot ? `${currentSnapshot.report_confidence}% confidence snapshot` : 'Select snapshot'}</p>
-                      {visibleMessages.length <= 1 ? (
-                        <div className="rounded-xl border border-border bg-muted-light px-3 py-3 text-xs leading-relaxed text-muted">
-                          Channel Advisor is for channel strategy, audience questions, and pricing context. For a live brand negotiation, use the Deal Assistant inside a deal instead.
-                        </div>
-                      ) : null}
                     </div>
                   ) : (
                     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-relaxed text-amber-800">
                       Upload analytics first so Channel Advisor can ground its answers in your real channel data.
                     </div>
                   )}
+                  <div className="relative mt-3" ref={chatMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setChatMenuOpen(prev => !prev)}
+                      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-border bg-muted-light px-3 py-2 text-sm font-medium transition-colors hover:bg-muted-light/80"
+                    >
+                      <span className="max-w-[180px] truncate">{currentChat?.title || 'New Chat'}</span>
+                      <ChevronDown className={`h-4 w-4 text-muted transition-transform ${chatMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {chatMenuOpen && (
+                      <div className="absolute left-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-white shadow-xl">
+                        <div className="max-h-80 overflow-y-auto py-2">
+                          <div className="px-2">
+                            {currentChat === null && (
+                              <div className="flex items-center gap-2 rounded-xl bg-primary/8 px-3 py-2 text-sm text-foreground">
+                                <span className="flex min-w-0 flex-1 items-center justify-between">
+                                  <span className="truncate font-medium">New Chat</span>
+                                  <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />
+                                </span>
+                              </div>
+                            )}
+                            {chats.map(chat => (
+                              <div
+                                key={chat.id}
+                                className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                  chat.id === currentChat?.id ? 'bg-primary/8 text-foreground' : 'hover:bg-muted-light'
+                                }`}
+                              >
+                                {renamingChatId === chat.id ? (
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={renameValue}
+                                    onChange={event => setRenameValue(event.target.value)}
+                                    onBlur={() => void submitRename(chat.id)}
+                                    onKeyDown={event => {
+                                      if (event.key === 'Enter') { event.preventDefault(); void submitRename(chat.id) }
+                                      if (event.key === 'Escape') { event.preventDefault(); setRenamingChatId(null) }
+                                    }}
+                                    onClick={event => event.stopPropagation()}
+                                    className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2 py-0.5 text-sm font-medium outline-none focus:border-primary"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void loadChat(chat)
+                                      setChatMenuOpen(false)
+                                    }}
+                                    className="flex min-w-0 flex-1 items-center justify-between text-left"
+                                  >
+                                    <span className="truncate font-medium">{chat.title}</span>
+                                    {chat.id === currentChat?.id && <Check className="ml-3 h-4 w-4 shrink-0 text-primary" />}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={event => {
+                                    event.stopPropagation()
+                                    setRenameValue(chat.title)
+                                    setRenamingChatId(chat.id)
+                                  }}
+                                  aria-label={`Rename ${chat.title}`}
+                                  className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-muted-light hover:text-foreground"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={event => {
+                                    event.stopPropagation()
+                                    void deleteChat(chat.id)
+                                  }}
+                                  disabled={deletingChatId === chat.id}
+                                  aria-label={`Delete ${chat.title}`}
+                                  className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-border p-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              createChat()
+                              setChatMenuOpen(false)
+                            }}
+                            disabled={currentChat === null}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-sm font-medium text-muted transition-colors hover:bg-muted-light hover:text-foreground disabled:opacity-50"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Start a new chat
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {!aiEnabled && (
                     <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-xs leading-relaxed text-red-700">
                       Channel Advisor is disabled for this account. AI features are currently turned off.

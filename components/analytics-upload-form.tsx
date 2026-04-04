@@ -376,7 +376,7 @@ export default function AnalyticsUploadForm() {
           bannerKey="analytics-upload-basics"
           eyebrow="Before you upload"
           title="Save one snapshot, then reuse it everywhere"
-          description="Content and Geography are the two reports you need to save a useful snapshot. We turn those exports into a saved channel context that powers pricing, deal prep, and Channel Advisor."
+          description="Once you upload your analytics, we'll save it as a snapshot. You can then use it to generate rate cards, prep deals, and power our AI assistants with channel-specific context."
         />
       </div>
 
