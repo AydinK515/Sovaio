@@ -16,6 +16,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   const router = useRouter()
   const { replayOnboarding, reopenChecklist, resetHints } = useOnboarding()
   const [supabase] = useState(() => createClient())
+  const [fullName, setFullName] = useState(profile?.full_name || '')
   const [channelName, setChannelName] = useState(profile?.channel_name || '')
   const [avatarPath, setAvatarPath] = useState(profile?.avatar_path || null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -68,11 +69,13 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
     resetStatus()
     setSavingProfile(true)
 
+    const trimmedFullName = fullName.trim()
     const trimmedChannelName = channelName.trim()
 
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
+        full_name: trimmedFullName || null,
         channel_name: trimmedChannelName || null,
       })
       .eq('id', user.id)
@@ -273,6 +276,16 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
 
           <div className="flex-1 space-y-4">
             <div>
+              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">Your Name</label>
+              <input
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">Channel Name</label>
               <input
                 value={channelName}
@@ -283,7 +296,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
             </div>
 
             <div className="rounded-xl bg-muted-light px-4 py-3 text-sm text-muted">
-              This channel name and profile photo are used for your creator profile inside the app and future sponsor-facing materials.
+              Your name, channel name, and profile photo are used for your creator profile inside the app and future sponsor-facing materials.
             </div>
 
             <button
@@ -311,7 +324,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
           </div>
           <div>
             <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Name</label>
-            <p className="text-sm">{profile?.full_name || 'Not set'}</p>
+            <p className="text-sm">{fullName.trim() || 'Not set'}</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Channel Name</label>
