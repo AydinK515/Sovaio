@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FileStack, MessageSquare, Pencil, Trash2 } from 'lucide-react'
-import OnboardingHint from '@/components/onboarding-hint'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload } from '@/lib/types'
@@ -281,14 +280,6 @@ export default function AnalyticsSnapshotViewer({
           <p className="mt-2 text-3xl font-bold">{dealCount + aiChatCount}</p>
           <p className="mt-2 text-sm text-muted">Deals and Channel Advisor chats currently grounded in this snapshot.</p>
         </div>
-      </div>
-
-      <div className="mt-8">
-        <OnboardingHint
-          hintKey={`snapshot-${snapshot.id}-next-step`}
-          title="This snapshot is the reusable source for the rest of the app"
-          description="If you want your first true pricing result, generate a rate card from this snapshot next. If you want strategy first, open Channel Advisor after choosing this snapshot there."
-        />
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
