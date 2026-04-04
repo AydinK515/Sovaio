@@ -4,12 +4,13 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import OnboardingHint from '@/components/onboarding-hint'
+import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { RateCard, Profile } from '@/lib/types'
 import { formatCurrency } from '@/lib/deal-chat'
-import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight, Pencil, Trash2 } from 'lucide-react'
+import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight, Pencil, Trash2, X } from 'lucide-react'
 import ConfirmationModal from '@/components/confirmation-modal'
 
 type AudienceSnapshot = {
@@ -37,6 +38,7 @@ export default function RateCardClient({
   performanceSnapshot: PerformanceSnapshotItem[]
 }) {
   const router = useRouter()
+  const { state: onboardingState, dismissHint } = useOnboarding()
   const exportRef = useRef<HTMLDivElement>(null)
   const previewViewportRef = useRef<HTMLDivElement>(null)
   const previewContentRef = useRef<HTMLDivElement>(null)
@@ -54,6 +56,7 @@ export default function RateCardClient({
   const [deletingCard, setDeletingCard] = useState(false)
   const [cardNameError, setCardNameError] = useState('')
   const [showDeleteCardModal, setShowDeleteCardModal] = useState(false)
+  const rangesHintKey = `rate-card-${rateCard.id}-ranges-tip`
 
   const [supabase] = useState(() => createClient())
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -480,41 +483,52 @@ export default function RateCardClient({
           </div>
         )}
 
-        <div className="mt-8 rounded-[28px] border border-primary/15 bg-[linear-gradient(135deg,rgba(254,243,199,0.45),rgba(255,255,255,0.98))] px-6 py-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fde7df] text-[#ef4444]">
-              <TrendingUp className="h-4 w-4" />
-            </div>
-            <h2 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-foreground sm:text-[1.3rem]">
-              How To Use These Ranges
-            </h2>
-          </div>
+        {!onboardingState.dismissed_hints[rangesHintKey] && (
+          <div className="relative mt-8 rounded-[28px] border border-primary/15 bg-[linear-gradient(135deg,rgba(254,243,199,0.45),rgba(255,255,255,0.98))] px-6 py-6 shadow-sm">
+            <button
+              type="button"
+              onClick={() => void dismissHint(rangesHintKey)}
+              className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-colors hover:bg-muted-light hover:text-foreground"
+              aria-label="Dismiss How To Use These Ranges"
+            >
+              <X className="h-4 w-4" />
+            </button>
 
-          <p className="mt-4 max-w-none text-sm leading-[1.45] text-slate-500 sm:text-[15px] sm:leading-[1.45]">
-            These numbers are not telling you to default to the bottom. In most normal negotiations, you should usually open in the upper-middle of the range and try to hold there unless the scope is especially light.
-          </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fde7df] text-[#ef4444]">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+              <h2 className="text-[1.15rem] font-semibold tracking-[-0.02em] text-foreground sm:text-[1.3rem]">
+                How To Use These Ranges
+              </h2>
+            </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-[24px] bg-white/70 px-4 py-4">
-              <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">Where To Start</p>
-              <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
-                Aim to quote above the midpoint when the brand fit is strong, the brief is standard, and you are not desperate to close quickly.
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/70 px-4 py-4">
-              <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">When To Push Higher</p>
-              <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
-                Push toward the top when they want tighter scripting, stronger placement, usage rights, exclusivity, extra revisions, or a fast turnaround.
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/70 px-4 py-4">
-              <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">About The Low End</p>
-              <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
-                The lower bound is still a fair rate, not a failure. It is the right outcome for lighter-scope deals, test budgets, or brands with less flexibility.
-              </p>
+            <p className="mt-4 max-w-none text-sm leading-[1.45] text-slate-500 sm:text-[15px] sm:leading-[1.45]">
+              These numbers are not telling you to default to the bottom. In most normal negotiations, you should usually open in the upper-middle of the range and try to hold there unless the scope is especially light.
+            </p>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <div className="rounded-[24px] bg-white/70 px-4 py-4">
+                <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">Where To Start</p>
+                <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
+                  Aim to quote above the midpoint when the brand fit is strong, the brief is standard, and you are not desperate to close quickly.
+                </p>
+              </div>
+              <div className="rounded-[24px] bg-white/70 px-4 py-4">
+                <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">When To Push Higher</p>
+                <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
+                  Push toward the top when they want tighter scripting, stronger placement, usage rights, exclusivity, extra revisions, or a fast turnaround.
+                </p>
+              </div>
+              <div className="rounded-[24px] bg-white/70 px-4 py-4">
+                <p className="text-xs font-mono uppercase tracking-[0.26em] text-slate-500 sm:text-[13px]">About The Low End</p>
+                <p className="mt-2.5 text-sm leading-[1.45] text-foreground sm:text-[15px] sm:leading-[1.45]">
+                  The lower bound is still a fair rate, not a failure. It is the right outcome for lighter-scope deals, test budgets, or brands with less flexibility.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Rate Tiers */}
         <div className={`mt-8 grid gap-4 ${visibleLiveRateTiers.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
