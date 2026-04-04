@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { normalizeAuthRedirectPath } from '@/lib/security'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -34,7 +35,10 @@ export async function middleware(request: NextRequest) {
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
-    url.searchParams.set('redirect', request.nextUrl.pathname)
+    url.searchParams.set(
+      'redirect',
+      normalizeAuthRedirectPath(`${request.nextUrl.pathname}${request.nextUrl.search}`)
+    )
     return NextResponse.redirect(url)
   }
 

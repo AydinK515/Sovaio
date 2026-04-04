@@ -1,4 +1,5 @@
 import type { Deal, RateCard } from '@/lib/types'
+import { sanitizeDealPromptText } from '@/lib/security'
 
 export const DEAL_TYPE_LABELS = {
   dedicated_video: 'Dedicated Video',
@@ -91,11 +92,12 @@ export function getOpeningMessage(
   deal: Pick<Deal, 'brand_name' | 'creator_ask' | 'deal_type' | 'deal_type_custom'>,
   rateCard?: Pick<RateCard, 'dedicated_video_low' | 'dedicated_video_high' | 'integration_60s_low' | 'integration_60s_high' | 'integration_30s_low' | 'integration_30s_high'> | null
 ) {
+  const safeBrandName = sanitizeDealPromptText(deal.brand_name) ?? 'this brand'
   const targetText = deal.creator_ask != null
     ? `You're targeting ${formatDealTarget(deal, rateCard)}${getDealTypeMessageFragment(deal)}.`
     : rateCard || deal.deal_type_custom?.trim()
       ? `You haven't set a creator ask yet, so we'll use your pricing context${getDealTypeMessageFragment(deal)} as the starting point.`
       : `You haven't set a creator ask yet, so we'll work from the negotiation context and set a target together.`
 
-  return `This is a fresh deal thread for ${deal.brand_name}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. ${targetText} Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
+  return `This is a fresh deal thread for ${safeBrandName}. I'm here to help with the live negotiation: evaluating the brand's messages, deciding whether to push back or accept, and drafting what to send next. ${targetText} Tell me what happened in the negotiation, and if you're quoting the brand, paste their exact words.`
 }

@@ -58,6 +58,7 @@ export async function getAnalyticsSnapshotContext(input: {
     ? await input.supabase
         .from('csv_uploads')
         .select('upload_type, parsed_data')
+        .eq('user_id', input.userId)
         .in('id', csvUploadIds)
     : { data: [] }
 

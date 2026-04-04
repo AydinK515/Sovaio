@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { normalizeAuthRedirectPath } from '@/lib/security'
 import { fetchOnboardingState, type OnboardingStateReader } from '@/lib/onboarding'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { captureServerEvent } from '@/lib/posthog-server'
@@ -7,7 +8,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
-  const redirect = searchParams.get('redirect') || '/dashboard'
+  const redirect = normalizeAuthRedirectPath(searchParams.get('redirect'))
 
   if (code) {
     const supabase = await createClient()
@@ -39,5 +40,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${redirect}`)
+  return NextResponse.redirect(new URL(redirect, origin))
 }

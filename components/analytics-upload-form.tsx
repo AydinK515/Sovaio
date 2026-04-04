@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
-import { strFromU8, unzipSync } from 'fflate'
+import { strFromU8, unzip } from 'fflate'
 import OnboardingRouteBanner from '@/components/onboarding-route-banner'
 import { useOnboarding } from '@/components/onboarding-provider'
 import { createClient } from '@/lib/supabase-browser'
@@ -26,6 +26,10 @@ interface ParsedFile {
   fileName: string
   quality: number
 }
+
+const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024
+const MAX_PARSED_ROWS_PER_UPLOAD = 5_000
+const MAX_ZIP_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 
 const TUTORIAL_STEPS = [
   {
@@ -184,18 +188,35 @@ export default function AnalyticsUploadForm() {
 
     const normalizedData = normalizeRows(results.data)
     if (normalizedData.length === 0) return null
+    const storedData = normalizedData.slice(0, MAX_PARSED_ROWS_PER_UPLOAD)
 
     return {
       type,
-      data: normalizedData,
-      rowCount: normalizedData.length,
+      data: storedData,
+      rowCount: storedData.length,
       fileName,
       quality: getQualityScore(headers, fileName, normalizedData.length),
     }
   }
 
   async function extractZipCandidates(file: File) {
-    const archive = unzipSync(new Uint8Array(await file.arrayBuffer()))
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const archive = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
+      unzip(bytes, (error, unzipped) => {
+        if (error || !unzipped) {
+          reject(error ?? new Error('Failed to unzip archive.'))
+          return
+        }
+
+        resolve(unzipped)
+      })
+    })
+    const totalUncompressedBytes = Object.values(archive).reduce((sum, entry) => sum + entry.byteLength, 0)
+
+    if (totalUncompressedBytes > MAX_ZIP_UNCOMPRESSED_BYTES) {
+      throw new Error('Archive expands beyond the allowed limit.')
+    }
+
     const parsed: ParsedFile[] = []
 
     for (const [entryName, bytes] of Object.entries(archive)) {
@@ -221,6 +242,16 @@ export default function AnalyticsUploadForm() {
         reason: 'unsupported_file_type',
       })
       setError('Please upload YouTube CSV files or exported .zip bundles.')
+      return
+    }
+
+    const oversizedFile = fileArray.find(file => file.size > MAX_UPLOAD_FILE_SIZE_BYTES)
+    if (oversizedFile) {
+      captureAnalyticsEvent(POSTHOG_EVENTS.analyticsUploadValidationFailed, {
+        reason: 'file_too_large',
+        file_name: oversizedFile.name,
+      })
+      setError('Files must be 20 MB or smaller.')
       return
     }
 

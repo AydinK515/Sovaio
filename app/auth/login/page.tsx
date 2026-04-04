@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
+import { buildAuthCallbackUrl, normalizeAuthRedirectPath } from '@/lib/security'
 import { createClient } from '@/lib/supabase-browser'
 
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/dashboard'
+  const redirect = normalizeAuthRedirectPath(searchParams.get('redirect'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -44,7 +45,7 @@ function LoginForm() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${redirect}` },
+      options: { emailRedirectTo: buildAuthCallbackUrl(window.location.origin, redirect) },
     })
 
     if (error) {
