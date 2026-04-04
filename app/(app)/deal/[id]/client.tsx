@@ -10,6 +10,7 @@ import type { AnalyticsSnapshot, Deal, DealChat, DealMessage, RateCard } from '@
 import { DEAL_TYPE_LABELS, formatCurrency, formatDealTarget, getOpeningMessage } from '@/lib/deal-chat'
 import { Send, Square, Copy, Check, CheckCircle2, XCircle, Pause, Trophy, MessageSquare, ArrowLeft, Plus, ChevronDown, Trash2, Maximize2, Minimize2, Pencil } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
+import ConfirmationModal from '@/components/confirmation-modal'
 
 function renderMarkdown(text: string) {
   const lines = text.split('\n')
@@ -211,6 +212,7 @@ export default function DealClient({
   const [updatingSnapshot, setUpdatingSnapshot] = useState(false)
   const [deletingDeal, setDeletingDeal] = useState(false)
   const [dealActionError, setDealActionError] = useState('')
+  const [showDeleteDealModal, setShowDeleteDealModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
@@ -796,12 +798,7 @@ export default function DealClient({
   async function deleteDeal() {
     if (deletingDeal) return
 
-    const confirmed = window.confirm(
-      `Delete the ${deal.brand_name} deal? This will permanently remove the deal and its chat history.`
-    )
-
-    if (!confirmed) return
-
+    setShowDeleteDealModal(false)
     setDeletingDeal(true)
     setDealActionError('')
 
@@ -833,6 +830,18 @@ export default function DealClient({
 
   return (
     <div className="flex flex-col py-8">
+      <ConfirmationModal
+        open={showDeleteDealModal}
+        title="Delete deal?"
+        message={`Delete the ${deal.brand_name} deal? This will permanently remove the deal and its chat history.`}
+        confirmLabel="Delete Deal"
+        tone="danger"
+        pending={deletingDeal}
+        onClose={() => setShowDeleteDealModal(false)}
+        onConfirm={() => {
+          void deleteDeal()
+        }}
+      />
       {chatFullscreen && (
         <div
           className="fixed inset-0 z-30 bg-slate-950/20 backdrop-blur-[2px]"
@@ -917,7 +926,7 @@ export default function DealClient({
               )}
               <button
                 type="button"
-                onClick={() => void deleteDeal()}
+                onClick={() => setShowDeleteDealModal(true)}
                 disabled={deletingDeal}
                 className="w-full flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
               >

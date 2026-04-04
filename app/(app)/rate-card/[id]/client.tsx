@@ -10,6 +10,7 @@ import type { AnalyticsSnapshot, RateCard, Profile } from '@/lib/types'
 import { formatCurrency, getDealTypeRange, getOpeningMessage } from '@/lib/deal-chat'
 import { Copy, Check, Download, TrendingUp, Sparkles, FileText, ChevronDown, ImageIcon, FileDown, ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
+import ConfirmationModal from '@/components/confirmation-modal'
 
 type AudienceSnapshot = {
   genderSplit: string
@@ -63,6 +64,7 @@ export default function RateCardClient({
   const [savingCardName, setSavingCardName] = useState(false)
   const [deletingCard, setDeletingCard] = useState(false)
   const [cardNameError, setCardNameError] = useState('')
+  const [showDeleteCardModal, setShowDeleteCardModal] = useState(false)
 
   const [supabase] = useState(() => createClient())
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -423,12 +425,7 @@ export default function RateCardClient({
   }
 
   async function deleteCard() {
-    const confirmed = window.confirm(
-      `Delete "${cardName}"? Existing deals will keep their data, but they will no longer be linked to this rate card.`
-    )
-
-    if (!confirmed) return
-
+    setShowDeleteCardModal(false)
     setDeletingCard(true)
     setCardNameError('')
 
@@ -459,6 +456,18 @@ export default function RateCardClient({
   ]
   return (
         <div className="py-8">
+      <ConfirmationModal
+        open={showDeleteCardModal}
+        title="Delete rate card?"
+        message={`Delete "${cardName}"? Existing deals will keep their data, but they will no longer be linked to this rate card.`}
+        confirmLabel="Delete Rate Card"
+        tone="danger"
+        pending={deletingCard}
+        onClose={() => setShowDeleteCardModal(false)}
+        onConfirm={() => {
+          void deleteCard()
+        }}
+      />
       <div
         aria-hidden="true"
         className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] opacity-0"
@@ -530,7 +539,7 @@ export default function RateCardClient({
               </button>
               <button
                 type="button"
-                onClick={() => void deleteCard()}
+                onClick={() => setShowDeleteCardModal(true)}
                 disabled={deletingCard}
                 aria-label={`Delete ${cardName}`}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"

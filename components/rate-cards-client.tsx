@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import type { AnalyticsSnapshot, RateCard } from '@/lib/types'
+import ConfirmationModal from '@/components/confirmation-modal'
 
 function formatCurrency(n: number) {
   return `$${n.toLocaleString()}`
@@ -55,6 +56,7 @@ export default function RateCardsClient({
   const [draftName, setDraftName] = useState('')
   const [pendingRateCardId, setPendingRateCardId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<RateCard | null>(null)
 
   useEffect(() => {
     setRateCards(initialRateCards)
@@ -102,12 +104,7 @@ export default function RateCardsClient({
     const rateCard = rateCards.find(item => item.id === rateCardId)
     if (!rateCard) return
 
-    const confirmed = window.confirm(
-      `Delete "${rateCard.name || rateCard.niche || 'Untitled rate card'}"? Existing deals will keep their data, but they will no longer be linked to this rate card.`
-    )
-
-    if (!confirmed) return
-
+    setDeleteTarget(null)
     setPendingRateCardId(rateCardId)
     setError('')
 
@@ -121,6 +118,7 @@ export default function RateCardsClient({
       }
 
       setRateCards(current => current.filter(rateCardItem => rateCardItem.id !== rateCardId))
+      setDeleteTarget(null)
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to delete rate card.')
@@ -131,6 +129,21 @@ export default function RateCardsClient({
 
   return (
     <div className="mt-8">
+      <ConfirmationModal
+        open={deleteTarget !== null}
+        title="Delete rate card?"
+        message={deleteTarget
+          ? `Delete "${deleteTarget.name || deleteTarget.niche || 'Untitled rate card'}"? Existing deals will keep their data, but they will no longer be linked to this rate card.`
+          : ''}
+        confirmLabel="Delete Rate Card"
+        tone="danger"
+        pending={deleteTarget !== null && pendingRateCardId === deleteTarget.id}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return
+          void deleteRateCard(deleteTarget.id)
+        }}
+      />
       {error && <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>}
 
       {latestCard && (
@@ -221,7 +234,7 @@ export default function RateCardsClient({
                           </button>
                           <button
                             type="button"
-                            onClick={() => void deleteRateCard(rateCard.id)}
+                            onClick={() => setDeleteTarget(rateCard)}
                             disabled={pendingRateCardId === rateCard.id}
                             aria-label={`Delete ${rateCardName}`}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"

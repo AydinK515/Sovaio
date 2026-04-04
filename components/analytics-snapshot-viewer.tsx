@@ -7,6 +7,7 @@ import { FileStack, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES, type AnalyticsSnapshot, type CsvUpload } from '@/lib/types'
+import ConfirmationModal from '@/components/confirmation-modal'
 
 type CsvDataMap = Record<string, Record<string, unknown>[]>
 
@@ -72,6 +73,7 @@ export default function AnalyticsSnapshotViewer({
   const [draftName, setDraftName] = useState(snapshot.name)
   const [pendingAction, setPendingAction] = useState<'rename' | 'delete' | null>(null)
   const [actionError, setActionError] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
     setSnapshotName(snapshot.name)
@@ -131,12 +133,7 @@ export default function AnalyticsSnapshotViewer({
   }
 
   async function handleDeleteSnapshot() {
-    const confirmed = window.confirm(
-      `Delete "${snapshotName}"? Existing rate cards and deals will keep their data, but they will no longer be linked to this snapshot.`
-    )
-
-    if (!confirmed) return
-
+    setShowDeleteModal(false)
     setPendingAction('delete')
     setActionError('')
 
@@ -171,6 +168,18 @@ export default function AnalyticsSnapshotViewer({
         <span className="text-muted">/</span>
         <span className="text-muted">{snapshotName}</span>
       </div>
+      <ConfirmationModal
+        open={showDeleteModal}
+        title="Delete analytics snapshot?"
+        message={`Delete "${snapshotName}"? Existing rate cards and deals will keep their data, but they will no longer be linked to this snapshot.`}
+        confirmLabel="Delete Snapshot"
+        tone="danger"
+        pending={pendingAction === 'delete'}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          void handleDeleteSnapshot()
+        }}
+      />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -220,7 +229,7 @@ export default function AnalyticsSnapshotViewer({
               </button>
               <button
                 type="button"
-                onClick={() => void handleDeleteSnapshot()}
+                onClick={() => setShowDeleteModal(true)}
                 disabled={pendingAction === 'delete'}
                 aria-label={`Delete ${snapshotName}`}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"

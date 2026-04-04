@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import type { AnalyticsSnapshot } from '@/lib/types'
+import ConfirmationModal from '@/components/confirmation-modal'
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -21,6 +22,7 @@ export default function AnalyticsSnapshotsClient({
   const [draftName, setDraftName] = useState('')
   const [pendingSnapshotId, setPendingSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<AnalyticsSnapshot | null>(null)
   const latestSnapshot = snapshots[0] ?? null
 
   useEffect(() => {
@@ -65,12 +67,7 @@ export default function AnalyticsSnapshotsClient({
     const snapshot = snapshots.find((item) => item.id === snapshotId)
     if (!snapshot) return
 
-    const confirmed = window.confirm(
-      `Delete "${snapshot.name}"? Existing rate cards and deals will keep their data, but they will no longer be linked to this snapshot.`
-    )
-
-    if (!confirmed) return
-
+    setDeleteTarget(null)
     setPendingSnapshotId(snapshotId)
     setError('')
 
@@ -84,6 +81,7 @@ export default function AnalyticsSnapshotsClient({
       }
 
       setSnapshots((current) => current.filter((snapshotItem) => snapshotItem.id !== snapshotId))
+      setDeleteTarget(null)
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to delete snapshot.')
@@ -109,6 +107,21 @@ export default function AnalyticsSnapshotsClient({
 
   return (
     <div className="mt-8">
+      <ConfirmationModal
+        open={deleteTarget !== null}
+        title="Delete analytics snapshot?"
+        message={deleteTarget
+          ? `Delete "${deleteTarget.name}"? Existing rate cards and deals will keep their data, but they will no longer be linked to this snapshot.`
+          : ''}
+        confirmLabel="Delete Snapshot"
+        tone="danger"
+        pending={deleteTarget !== null && pendingSnapshotId === deleteTarget.id}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return
+          void deleteSnapshot(deleteTarget.id)
+        }}
+      />
       {error && <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>}
 
       {latestSnapshot && (
@@ -202,7 +215,7 @@ export default function AnalyticsSnapshotsClient({
                         </button>
                         <button
                           type="button"
-                          onClick={() => void deleteSnapshot(snapshot.id)}
+                          onClick={() => setDeleteTarget(snapshot)}
                           disabled={pendingSnapshotId === snapshot.id}
                           aria-label={`Delete ${snapshot.name}`}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
