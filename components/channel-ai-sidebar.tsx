@@ -6,7 +6,7 @@ import { getChannelAssistantOpeningMessage } from '@/lib/channel-ai'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import type { AnalyticsSnapshot, ChannelAiChat, ChannelAiMessage } from '@/lib/types'
-import { Bot, Check, ChevronDown, MessageSquare, Pencil, Plus, Send, Square, Trash2, X } from 'lucide-react'
+import { Bot, Check, ChevronDown, CircleHelp, Pencil, Plus, Send, Square, Trash2, X } from 'lucide-react'
 import FancySelect from '@/components/fancy-select'
 
 function renderMarkdown(text: string) {
@@ -625,14 +625,10 @@ export default function ChannelAiSidebar({
             <div className="border-b border-border px-5 py-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-white">
-                      <MessageSquare className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="text-sm font-semibold">Channel Advisor</h2>
-                      <p className="text-xs text-muted">For your channel stats, sponsorship positioning, and analytics-backed context</p>
-                      <div className="relative mt-2" ref={chatMenuRef}>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-semibold">Channel Advisor</h2>
+                    <p className="text-xs text-muted">For your channel stats, sponsorship positioning, and analytics-backed context</p>
+                    <div className="relative mt-2" ref={chatMenuRef}>
                         <button
                           type="button"
                           onClick={() => setChatMenuOpen(prev => !prev)}
@@ -733,11 +729,25 @@ export default function ChannelAiSidebar({
                             </div>
                           </div>
                         )}
-                      </div>
                     </div>
                   </div>
                   {snapshots.length > 0 ? (
                     <div className="mt-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">Analytics Context</p>
+                        <div className="group relative">
+                          <button
+                            type="button"
+                            aria-label="Explain analytics context"
+                            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+                          >
+                            <CircleHelp className="h-4 w-4" />
+                          </button>
+                          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-border bg-white px-3 py-2 text-xs leading-relaxed text-muted opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                            Pick which analytics snapshot Channel Advisor should use to ground its answers in your real channel data.
+                          </div>
+                        </div>
+                      </div>
                       <FancySelect
                         value={currentChat?.analytics_snapshot_id ?? selectedSnapshotId}
                         onChange={(nextValue) => void updateSnapshot(nextValue)}
