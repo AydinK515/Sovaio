@@ -18,9 +18,13 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   const [supabase] = useState(() => createClient())
   const [fullName, setFullName] = useState(profile?.full_name || '')
   const [channelName, setChannelName] = useState(profile?.channel_name || '')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordNonce, setPasswordNonce] = useState('')
   const [avatarPath, setAvatarPath] = useState(profile?.avatar_path || null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showSignOutModal, setShowSignOutModal] = useState(false)
@@ -28,6 +32,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   const [signingOut, setSigningOut] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [awaitingPasswordNonce, setAwaitingPasswordNonce] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -166,6 +171,65 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
+  }
+
+  async function handleSavePassword() {
+    resetStatus()
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    setSavingPassword(true)
+
+    const { error: updateError } = await supabase.auth.updateUser(
+      awaitingPasswordNonce
+        ? {
+            password: newPassword,
+            nonce: passwordNonce.trim(),
+          }
+        : {
+            password: newPassword,
+          }
+    )
+
+    setSavingPassword(false)
+
+    if (updateError) {
+      const errorCode =
+        typeof updateError === 'object' && updateError && 'code' in updateError
+          ? String(updateError.code)
+          : ''
+
+      if (errorCode === 'reauthentication_needed') {
+        setAwaitingPasswordNonce(true)
+
+        const { error: reauthError } = await supabase.auth.reauthenticate()
+
+        if (reauthError) {
+          setError(reauthError.message)
+          return
+        }
+
+        setMessage('We emailed you a verification code. Enter it below, then click Change Password again.')
+        return
+      }
+
+      setError(updateError.message)
+      return
+    }
+
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordNonce('')
+    setAwaitingPasswordNonce(false)
+    setMessage('Password updated.')
   }
 
   async function handleDelete() {
@@ -373,13 +437,65 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
           <Shield className="w-5 h-5 text-muted" />
           <h2 className="text-lg font-semibold">Security</h2>
         </div>
-        <button
-          onClick={() => setShowSignOutModal(true)}
-          disabled={signingOut}
-          className="px-4 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted-light transition-colors"
-        >
-          {signingOut ? 'Signing Out...' : 'Sign Out'}
-        </button>
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Enter a new password"
+                className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Re-enter your new password"
+                className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            {awaitingPasswordNonce && (
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1.5">Email Verification Code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={passwordNonce}
+                  onChange={(event) => setPasswordNonce(event.target.value)}
+                  placeholder="Enter the code from your email"
+                  className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+                <p className="mt-2 text-xs text-muted">
+                  Supabase asked for reauthentication before changing your password.
+                </p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleSavePassword()}
+              disabled={savingPassword}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-hover transition-colors disabled:opacity-60"
+            >
+              {savingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
+              {savingPassword ? 'Updating...' : 'Change Password'}
+            </button>
+          </div>
+
+          <div className="border-t border-border pt-6">
+            <button
+              onClick={() => setShowSignOutModal(true)}
+              disabled={signingOut}
+              className="px-4 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted-light transition-colors"
+            >
+              {signingOut ? 'Signing Out...' : 'Sign Out'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="mt-6 bg-white rounded-2xl border border-border p-6">
