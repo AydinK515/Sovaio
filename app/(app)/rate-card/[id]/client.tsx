@@ -997,31 +997,21 @@ function ExportRateCardContent({
           <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>
             What&apos;s Included
           </div>
-          <div
-            style={{
-              marginTop: '12px',
-              borderRadius: '24px',
-              backgroundColor: 'rgba(255,255,255,0.72)',
-              padding: '18px 24px',
-              border: '1px solid rgba(255,255,255,0.82)',
-            }}
-          >
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: '10px', fontSize: '18px', lineHeight: 1.55, color: '#334155' }}>
-              {[
-                'In-video sponsorship placement sized to the package selected',
-                'Brand talking points delivered in my normal style',
-                'One standard brand review pass for factual notes',
-                'Final quote confirmed around scope, usage, and timeline',
-              ].map((item) => (
-                <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <span style={{ fontSize: '22px', lineHeight: 1, color: '#0f172a', transform: 'translateY(2px)' }}>
-                    •
-                  </span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ul style={{ margin: '12px 0 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: '10px', fontSize: '18px', lineHeight: 1.55, color: '#334155' }}>
+            {[
+              'In-video sponsorship placement sized to the package selected',
+              'Brand talking points delivered in my normal style',
+              'One standard brand review pass for factual notes',
+              'Final quote confirmed around scope, usage, and timeline',
+            ].map((item) => (
+              <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <span style={{ fontSize: '22px', lineHeight: 1, color: '#0f172a', transform: 'translateY(2px)' }}>
+                  •
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
