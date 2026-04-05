@@ -56,6 +56,7 @@ export default function WelcomeClient({
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const profileStepIndex = 1
 
   useEffect(() => {
     let cancelled = false
@@ -198,9 +199,9 @@ export default function WelcomeClient({
                   </div>
                   {step === 1 ? (
                     <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted">
-                      <span className={`h-2 w-2 rounded-full ${step === 0 ? 'bg-primary' : 'bg-border-dark'}`} />
-                      <span className={`h-2 w-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-border-dark'}`} />
-                      <span className={`h-2 w-2 rounded-full ${step === 2 ? 'bg-primary' : 'bg-border-dark'}`} />
+                      <span className={`h-2 w-2 rounded-full ${profileStepIndex === 0 ? 'bg-primary' : 'bg-border-dark'}`} />
+                      <span className={`h-2 w-2 rounded-full ${profileStepIndex === 1 ? 'bg-primary' : 'bg-border-dark'}`} />
+                      <span className={`h-2 w-2 rounded-full ${profileStepIndex === 2 ? 'bg-primary' : 'bg-border-dark'}`} />
                     </div>
                   ) : null}
                 </div>
