@@ -40,15 +40,13 @@ export default function RateCardClient({
   const router = useRouter()
   const { state: onboardingState, dismissHint } = useOnboarding()
   const exportRef = useRef<HTMLDivElement>(null)
-  const previewViewportRef = useRef<HTMLDivElement>(null)
-  const previewContentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [downloadingFormat, setDownloadingFormat] = useState<'png' | 'pdf' | null>(null)
   const [expandedRangeInfo, setExpandedRangeInfo] = useState<'dedicated_video' | 'integration_60s' | 'integration_30s' | null>(null)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
-  const [previewScale, setPreviewScale] = useState(1)
-  const [previewHeight, setPreviewHeight] = useState(0)
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
+  const [previewRendering, setPreviewRendering] = useState(false)
   const [cardName, setCardName] = useState(rateCard.name || rateCard.niche || 'Untitled rate card')
   const [editingCardName, setEditingCardName] = useState(false)
   const [draftCardName, setDraftCardName] = useState(rateCard.name || rateCard.niche || 'Untitled rate card')
@@ -117,25 +115,45 @@ export default function RateCardClient({
   useEffect(() => {
     if (!showPreviewModal) return
 
-    const viewport = previewViewportRef.current
-    const content = previewContentRef.current
-    if (!viewport || !content) return
+    let cancelled = false
 
-    const updatePreviewScale = () => {
-      const availableWidth = viewport.clientWidth - 24
-      const nextScale = Math.min(availableWidth / 1400, 1)
-      setPreviewScale(nextScale)
-      setPreviewHeight(content.scrollHeight * nextScale)
+    async function renderPreviewImage() {
+      setPreviewRendering(true)
+
+      try {
+        const canvas = await renderExportCanvas()
+        if (!canvas || cancelled) return
+
+        setPreviewImageUrl(canvas.toDataURL('image/png'))
+      } finally {
+        if (!cancelled) {
+          setPreviewRendering(false)
+        }
+      }
     }
 
-    updatePreviewScale()
+    void renderPreviewImage()
 
-    const resizeObserver = new ResizeObserver(() => updatePreviewScale())
-    resizeObserver.observe(viewport)
-    resizeObserver.observe(content)
-
-    return () => resizeObserver.disconnect()
-  }, [showPreviewModal, avatarUrl, profile?.channel_name, rateCard])
+    return () => {
+      cancelled = true
+    }
+  }, [
+    showPreviewModal,
+    avatarUrl,
+    profile?.channel_name,
+    rateCard.id,
+    rateCard.name,
+    rateCard.niche,
+    rateCard.subscriber_count,
+    rateCard.dedicated_video_low,
+    rateCard.dedicated_video_high,
+    rateCard.integration_60s_low,
+    rateCard.integration_60s_high,
+    rateCard.integration_30s_low,
+    rateCard.integration_30s_high,
+    rateCard.offers_dedicated_videos,
+    rateCard.has_sponsorships,
+  ])
 
   const liveRateTiers = [
     {
@@ -183,7 +201,7 @@ export default function RateCardClient({
   }
 
   async function renderExportCanvas() {
-    const html2canvas = (await import('html2canvas')).default
+    const { toCanvas } = await import('html-to-image')
 
     const element = exportRef.current
     if (!element) return
@@ -212,10 +230,10 @@ export default function RateCardClient({
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
-    return html2canvas(element, {
+    return toCanvas(element, {
       backgroundColor: '#ffffff',
-      scale: 2,
-      useCORS: true,
+      pixelRatio: 2,
+      cacheBust: true,
     })
   }
 
@@ -732,7 +750,7 @@ export default function RateCardClient({
             <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-5">
               <div>
                 <h2 className="text-xl font-bold">Rate Card Preview</h2>
-                <p className="mt-1 text-sm text-muted">This is exactly what your exported PNG and PDF will look like.</p>
+                <p className="mt-1 text-sm text-muted">This preview is rendered from the same export pipeline used for your PNG and PDF downloads.</p>
               </div>
               <button
                 onClick={() => setShowPreviewModal(false)}
@@ -763,26 +781,23 @@ export default function RateCardClient({
 
             <div className="overflow-y-auto bg-slate-100 p-4 md:p-6">
               <div className="mx-auto rounded-[32px] border border-border bg-white p-3 shadow-sm md:p-4">
-                <div ref={previewViewportRef} className="w-full">
-                  <div style={{ height: previewHeight || undefined }}>
-                    <div
-                      style={{
-                        width: '1400px',
-                        transform: `scale(${previewScale})`,
-                        transformOrigin: 'top left',
-                      }}
-                    >
-                      <ExportRateCardContent
-                        containerRef={previewContentRef}
-                        rateCard={rateCard}
-                        profile={profile}
-                        audienceSnapshot={audienceSnapshot}
-                        performanceSnapshot={performanceSnapshot}
-                        avatarUrl={avatarUrl}
-                        exportAddOns={exportAddOns}
-                      />
+                <div className="w-full">
+                  {previewRendering ? (
+                    <div className="flex min-h-[24rem] items-center justify-center rounded-[24px] bg-slate-50 text-sm text-muted">
+                      Rendering preview...
                     </div>
-                  </div>
+                  ) : previewImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewImageUrl}
+                      alt="Rendered rate card preview"
+                      className="block w-full h-auto rounded-[24px]"
+                    />
+                  ) : (
+                    <div className="flex min-h-[24rem] items-center justify-center rounded-[24px] bg-slate-50 text-sm text-muted">
+                      Preview unavailable. Try reopening the modal.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
