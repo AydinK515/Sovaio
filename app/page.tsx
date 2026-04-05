@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { MarketingNav, Footer } from '@/components/navbar'
 import { createClient } from '@/lib/supabase-server'
@@ -36,27 +37,87 @@ export default async function LandingPage() {
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary-light via-white to-white" />
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
-            <div className="max-w-3xl">
-              <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
-                Know your worth.{' '}
-                <span className="text-primary">Prove it.</span>
-                <br />Close the deal.
-              </h1>
-              <p className="mt-6 text-lg md:text-xl text-muted max-w-2xl leading-relaxed">
-                Upload your YouTube Studio analytics. Get a data-backed sponsorship rate card with a ready-to-send pitch email. Then let AI guide your negotiation to close.
-              </p>
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link
-                  href="/auth/signup"
-                  className="inline-flex items-center justify-center gap-2 bg-primary text-white font-semibold px-8 py-4 rounded-xl hover:bg-primary-hover transition-colors text-lg"
-                >
-                  Get My Rate Card
-                  <ArrowRight className="w-5 h-5" />
-                </Link>
+            <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+              <div className="max-w-3xl">
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
+                  Know your worth.{' '}
+                  <span className="text-primary">Prove it.</span>
+                  <br />Close the deal.
+                </h1>
+                <p className="mt-6 text-lg md:text-xl text-muted max-w-2xl leading-relaxed">
+                  Upload your YouTube Studio analytics. Get a data-backed sponsorship rate card with a ready-to-send pitch email. Then let AI guide your negotiation to close.
+                </p>
+                <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                  <Link
+                    href="/auth/signup"
+                    className="inline-flex items-center justify-center gap-2 bg-primary text-white font-semibold px-8 py-4 rounded-xl hover:bg-primary-hover transition-colors text-lg"
+                  >
+                    Get My Rate Card
+                    <ArrowRight className="w-5 h-5" />
+                  </Link>
+                </div>
+                <p className="mt-4 text-sm text-muted">
+                  Creators using Sovaio close deals for <span className="font-semibold text-foreground">up to 40% more</span>.
+                </p>
               </div>
-              <p className="mt-4 text-sm text-muted">
-                Creators using Sovaio close deals for <span className="font-semibold text-foreground">up to 40% more</span>.
-              </p>
+
+              <div className="relative mx-auto w-full max-w-[520px]">
+                <div className="absolute -left-6 top-8 h-28 w-28 rounded-full bg-primary/10 blur-3xl" />
+                <div className="absolute -right-8 bottom-10 h-32 w-32 rounded-full bg-slate-900/8 blur-3xl" />
+                <div className="relative overflow-hidden rounded-[30px] border border-slate-200 bg-white/95 shadow-[0_32px_80px_rgba(15,23,42,0.16)] backdrop-blur">
+                  <div className="border-b border-slate-200 bg-slate-950 px-5 py-4 text-white">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Channel Advisor</p>
+                      <h2 className="mt-1 text-lg font-semibold">AI trained on your channel context</h2>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-5 sm:p-6">
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-slate-900 px-4 py-3 text-sm leading-relaxed text-white shadow-sm">
+                        Hey, I got offered <span className="font-semibold">$2,000</span> for a 60-second integration. Based on my channel, is that actually worth taking?
+                      </div>
+                    </div>
+
+                    <div className="flex justify-start">
+                      <div className="max-w-[90%] rounded-[22px] rounded-bl-md border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 shadow-sm">
+                            <Image
+                              src="/sovaiologotransparent.png"
+                              alt="Sovaio"
+                              width={28}
+                              height={28}
+                              className="h-7 w-7 object-contain"
+                            />
+                          </div>
+                          <p className="text-base font-semibold text-slate-900">Sovaio AI</p>
+                        </div>
+                        <p className="mt-2 leading-relaxed">
+                          Based on your <span className="font-medium text-slate-900">142K median views</span>, <span className="font-medium text-slate-900">61% US/UK/CA/AU audience</span>, and your current <span className="font-medium text-slate-900">finance CPM tier</span>, I&apos;d treat $2,000 as a soft offer, not a yes.
+                        </p>
+                        <div className="mt-4 grid gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-3">
+                          <div>
+                            <p className="font-semibold uppercase tracking-wide text-slate-900">Snapshot</p>
+                            <p className="mt-1">93% confidence</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold uppercase tracking-wide text-slate-900">Suggested move</p>
+                            <p className="mt-1">Counter at $3,100</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold uppercase tracking-wide text-slate-900">Why</p>
+                            <p className="mt-1">Strong geo + repeatable views</p>
+                          </div>
+                        </div>
+                        <p className="mt-4 leading-relaxed">
+                          I&apos;d reply with a confident counter anchored in your audience quality and recent view floor, then leave room to land above your true minimum.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
