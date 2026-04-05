@@ -172,6 +172,18 @@ export async function POST(req: Request) {
       return aiDisabledResponse
     }
 
+    const { data: allowed, error: usageError } = await supabase
+      .rpc('increment_ai_daily_usage', { p_daily_limit: 100 })
+
+    if (usageError) {
+      console.error('Failed to check AI daily usage', usageError)
+      return new Response('Failed to check usage limits.', { status: 500 })
+    }
+
+    if (!allowed) {
+      return new Response('DAILY_LIMIT_REACHED', { status: 429 })
+    }
+
     await captureServerEvent({
       client: posthog,
       distinctId: user.id,
@@ -325,8 +337,6 @@ For pitch_email:
 - Keep placeholders only for information that is truly unknown or brand-specific, such as [Brand Name] or [Contact Name].
 - Do not invent achievements, campaigns, or stats that are not in the provided data.`
 
-    console.log('\n=== generate-rate-card SYSTEM PROMPT ===\n', system, '\n=== USER PROMPT ===\n', prompt, '\n========================================\n')
-
     const result = await generateObject({
       model: openai('gpt-5-mini'),
       schema: RateCardSchema,
@@ -334,8 +344,6 @@ For pitch_email:
       prompt,
     })
     const { object } = result
-
-    console.log('\n=== generate-rate-card RESPONSE ===\n', JSON.stringify(object, null, 2), '\n===================================\n')
 
     await captureServerEvent({
       client: posthog,
