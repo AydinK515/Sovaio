@@ -6,7 +6,7 @@ import { useState, Suspense } from 'react'
 import BrandLogo from '@/components/brand-logo'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
-import { buildAuthCallbackUrl, normalizeAuthRedirectPath } from '@/lib/security'
+import { normalizeAuthRedirectPath } from '@/lib/security'
 import { createClient } from '@/lib/supabase-browser'
 
 function LoginForm() {
@@ -17,7 +17,6 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [magicLinkSent, setMagicLinkSent] = useState(false)
 
   const supabase = createClient()
 
@@ -37,39 +36,6 @@ function LoginForm() {
       router.push(redirect)
       router.refresh()
     }
-  }
-
-  async function handleMagicLink() {
-    setError('')
-    if (!email) { setError('Enter your email first'); return }
-    setLoading(true)
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: buildAuthCallbackUrl(window.location.origin, redirect) },
-    })
-
-    if (error) {
-      setError(error.message)
-    } else {
-      captureAnalyticsEvent(POSTHOG_EVENTS.authMagicLinkRequested, {
-        email,
-      })
-      setMagicLinkSent(true)
-    }
-    setLoading(false)
-  }
-
-  if (magicLinkSent) {
-    return (
-      <div className="text-center">
-        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-        </div>
-        <h2 className="text-xl font-semibold">Check your email</h2>
-        <p className="mt-2 text-sm text-muted">We sent a magic link to <strong>{email}</strong></p>
-      </div>
-    )
   }
 
   return (
@@ -110,20 +76,6 @@ function LoginForm() {
         className="w-full py-3 rounded-xl bg-primary text-white font-medium text-sm hover:bg-primary-hover transition-colors disabled:opacity-50"
       >
         {loading ? 'Signing in...' : 'Sign In'}
-      </button>
-
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-        <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-muted">or</span></div>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleMagicLink}
-        disabled={loading}
-        className="w-full py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted-light transition-colors disabled:opacity-50"
-      >
-        Send Magic Link
       </button>
     </form>
   )

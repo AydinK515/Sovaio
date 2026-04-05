@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Footer, MarketingNav } from '@/components/navbar'
+import { createClient } from '@/lib/supabase-server'
 
 type LegalPageProps = {
   title: string
@@ -8,10 +9,34 @@ type LegalPageProps = {
   children: React.ReactNode
 }
 
-export function LegalPage({ title, summary, effectiveDate, children }: LegalPageProps) {
+export async function LegalPage({ title, summary, effectiveDate, children }: LegalPageProps) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  let avatarUrl: string | null = null
+  let channelName: string | null = null
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('channel_name, avatar_path')
+      .eq('id', user.id)
+      .single()
+
+    channelName = profile?.channel_name ?? null
+
+    if (profile?.avatar_path) {
+      const { data: signedAvatar } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(profile.avatar_path, 60 * 60)
+
+      avatarUrl = signedAvatar?.signedUrl ?? null
+    }
+  }
+
   return (
     <>
-      <MarketingNav />
+      <MarketingNav isLoggedIn={Boolean(user)} avatarUrl={avatarUrl} channelName={channelName} />
       <main className="flex-1 bg-muted-light">
         <section className="border-b border-border bg-white">
           <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-16 sm:px-6 lg:px-8">
