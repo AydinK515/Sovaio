@@ -899,7 +899,8 @@ export default function DealClient({
 
   const visibleMessages = getVisibleMessages()
   const displayChat = currentChat ?? getDraftChat(deal)
-  const showTemplateQuestions = currentChat === null && messages.length === 0 && deal.status === 'negotiating' && !aiTyping
+  const hasCreatorMessages = messages.some(message => message.role === 'creator')
+  const showTemplateQuestions = !hasCreatorMessages && deal.status === 'negotiating' && !aiTyping
   const currentSnapshot = snapshots.find(snapshot => snapshot.id === deal.analytics_snapshot_id) ?? null
   const snapshotOptions = snapshots.map((snapshot) => ({
     value: snapshot.id,
