@@ -56,7 +56,7 @@ export default function WelcomeClient({
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const profileStepIndex = 1
+  const profileStepIndex: number = 1
 
   useEffect(() => {
     let cancelled = false
