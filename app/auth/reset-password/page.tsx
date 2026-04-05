@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import BrandLogo from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase-browser'
+import { buildAuthCallbackUrl } from '@/lib/security'
 
 type ResetMode = 'request' | 'update'
 
@@ -55,7 +56,7 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+      redirectTo: buildAuthCallbackUrl(window.location.origin, '/auth/reset-password?type=recovery'),
     })
 
     if (error) {

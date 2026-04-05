@@ -81,7 +81,7 @@ export default function OnboardingChecklist({
       <div className="mt-4 space-y-3">
         {items.map((item) => {
           const isComplete = item.status === 'complete'
-          const itemClassName = `group flex items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+          const itemClassName = `group flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
             isComplete
               ? 'border-emerald-200 bg-emerald-50/70'
               : item.status === 'active'

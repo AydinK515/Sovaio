@@ -1,10 +1,33 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { MarketingNav, Footer } from '@/components/navbar'
 import { createClient } from '@/lib/supabase-server'
+import { normalizeAuthRedirectPath } from '@/lib/security'
 import { ArrowRight, ChevronDown, Upload, BarChart3, MessageSquare } from 'lucide-react'
 
-export default async function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const resolvedSearchParams = await searchParams
+  const code = typeof resolvedSearchParams.code === 'string' ? resolvedSearchParams.code : null
+  const authRedirect = normalizeAuthRedirectPath(
+    typeof resolvedSearchParams.redirect === 'string'
+      ? resolvedSearchParams.redirect
+      : '/auth/reset-password?type=recovery'
+  )
+
+  if (code) {
+    const callbackParams = new URLSearchParams({
+      code,
+      redirect: authRedirect,
+    })
+
+    redirect(`/auth/callback?${callbackParams.toString()}`)
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -263,8 +286,8 @@ export default async function LandingPage() {
                     Paste the brand&apos;s offer. Get back the exact reply — calibrated to your data, not generic advice. Know when to push, when to accept, when to walk.
                   </p>
                 </div>
-                <div className="mt-8 inline-flex items-center gap-2 text-primary text-sm font-bold">
-                  AI trained on your channel <ArrowRight className="w-4 h-4" />
+                <div className="mt-8 inline-flex text-primary text-sm font-bold">
+                  AI trained on your channel
                 </div>
               </div>
 
