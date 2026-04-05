@@ -126,6 +126,29 @@ export default function GenerateRateCardClient({
   )
   const activePhaseIndex = loadingProgress < 33 ? 0 : loadingProgress < 66 ? 1 : 2
   const activePhase = GENERATION_PHASES[activePhaseIndex]
+  const normalizedLoadingProgress = Math.min(loadingProgress, 100) / 100
+  const writingRows = [
+    { startX: 0, travelX: 40, startY: 0 },
+    { startX: 5, travelX: 50, startY: 18 },
+    { startX: 8, travelX: 44, startY: 36 },
+    { startX: 12, travelX: 38, startY: 54 },
+  ] as const
+  const activeWritingRowIndex = Math.min(Math.floor(normalizedLoadingProgress * writingRows.length), writingRows.length - 1)
+  const activeWritingRow = writingRows[activeWritingRowIndex]
+  const rowProgress = Math.min(
+    Math.max((normalizedLoadingProgress - activeWritingRowIndex / writingRows.length) * writingRows.length, 0),
+    1,
+  )
+  const pencilTranslateX = activeWritingRow.startX + activeWritingRow.travelX * rowProgress
+  const pencilTranslateY = activeWritingRow.startY + Math.sin(normalizedLoadingProgress * 24) * 1.6
+  const writingLineWidths = writingRows.map((row, index) => {
+    const lineProgress = Math.min(
+      Math.max((normalizedLoadingProgress - index / writingRows.length) * writingRows.length, 0),
+      1,
+    )
+
+    return `${12 + row.travelX * lineProgress}%`
+  })
   const needsSponsorshipHistory = hasSponsorships === true
   const generatedRateCardName = useMemo(
     () => buildRateCardName({ niche }),
@@ -341,15 +364,15 @@ export default function GenerateRateCardClient({
       <div className="flex min-h-[calc(100dvh-16rem)] items-center justify-center py-8">
         <div className="mx-auto w-full max-w-3xl rounded-[2rem] border border-border bg-white p-8 shadow-sm md:p-12">
           <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
-            <div className="relative h-28 w-36">
-              <div className="absolute inset-x-3 bottom-0 top-3 rounded-[1.6rem] border border-slate-200 bg-linear-to-b from-white via-white to-slate-50 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)]" />
-              <div className="absolute left-9 right-9 top-10 h-1.5 rounded-full bg-slate-200" />
-              <div className="absolute left-9 right-11 top-15 h-1.5 rounded-full bg-slate-200" />
-              <div className="absolute left-9 right-14 top-20 h-1.5 rounded-full bg-slate-200" />
+            <div className="relative h-40 w-40">
+              <div className="absolute inset-x-4 bottom-0 top-3 rounded-[1.8rem] border border-slate-200 bg-linear-to-b from-white via-white to-slate-50 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)]" />
+              <div className="absolute left-10 right-12 top-17 h-1.5 rounded-full bg-slate-200" />
+              <div className="absolute left-10 right-14 top-23 h-1.5 rounded-full bg-slate-200" />
+              <div className="absolute left-10 right-16 top-29 h-1.5 rounded-full bg-slate-200" />
               <div
-                className="absolute left-10 top-7 h-14 w-4 rounded-full bg-primary shadow-[0_10px_20px_-12px_rgba(239,68,68,0.9)] transition-transform duration-150"
+                className="absolute left-10 top-6 h-14 w-4 rounded-full bg-primary shadow-[0_10px_20px_-12px_rgba(239,68,68,0.9)] transition-transform duration-150"
                 style={{
-                  transform: `translateX(${loadingProgress * 0.72}px) translateY(${Math.sin(loadingProgress / 8) * 3}px) rotate(32deg)`,
+                  transform: `translateX(${pencilTranslateX}px) translateY(${pencilTranslateY}px) rotate(32deg)`,
                 }}
               >
                 <div className="absolute left-1/2 top-[-6px] h-3 w-3 -translate-x-1/2 rounded-t-full bg-amber-200" />
@@ -357,11 +380,19 @@ export default function GenerateRateCardClient({
               </div>
               <div
                 className="absolute left-11 top-22 h-0.5 rounded-full bg-primary/35 transition-all duration-150"
-                style={{ width: `${18 + loadingProgress * 0.7}px` }}
+                style={{ width: writingLineWidths[0] }}
               />
               <div
-                className="absolute left-11 top-17 h-0.5 rounded-full bg-primary/20 transition-all duration-150"
-                style={{ width: `${10 + loadingProgress * 0.45}px` }}
+                className="absolute left-11 top-28 h-0.5 rounded-full bg-primary/30 transition-all duration-150"
+                style={{ width: writingLineWidths[1] }}
+              />
+              <div
+                className="absolute left-11 top-34 h-0.5 rounded-full bg-primary/24 transition-all duration-150"
+                style={{ width: writingLineWidths[2] }}
+              />
+              <div
+                className="absolute left-11 top-40 h-0.5 rounded-full bg-primary/18 transition-all duration-150"
+                style={{ width: writingLineWidths[3] }}
               />
             </div>
 
@@ -398,7 +429,14 @@ export default function GenerateRateCardClient({
 
             <div className="mt-8 w-full">
               <div className="mb-2 flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-                <span>{activePhase.title}</span>
+                <span className="inline-flex items-center gap-2">
+                  <span>{activePhase.title}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-current animate-[pulse-dot_1.1s_ease-in-out_infinite]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-current animate-[pulse-dot_1.1s_ease-in-out_0.2s_infinite]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-current animate-[pulse-dot_1.1s_ease-in-out_0.4s_infinite]" />
+                  </span>
+                </span>
                 <span>{Math.floor(loadingProgress)}%</span>
               </div>
               <div className="relative h-3 overflow-hidden rounded-full bg-slate-200">

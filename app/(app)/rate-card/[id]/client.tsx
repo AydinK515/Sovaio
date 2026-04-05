@@ -885,7 +885,7 @@ function ExportRateCardContent({
         {(avatarUrl || profile?.channel_name) && (
           <div style={{ display: 'flex', alignItems: 'center', alignSelf: 'center', gap: '16px', minHeight: '120px' }}>
             {profile?.channel_name && (
-              <div style={{ display: 'flex', alignItems: 'center', minHeight: '120px', fontSize: '36px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap', letterSpacing: '-0.03em', lineHeight: 1, transform: 'translateY(-8px)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', minHeight: '120px', fontSize: '36px', fontWeight: 700, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap', letterSpacing: '-0.03em', lineHeight: 1 }}>
                 {profile.channel_name}
               </div>
             )}
