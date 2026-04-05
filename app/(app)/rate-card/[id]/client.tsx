@@ -875,12 +875,20 @@ function ExportRateCardContent({
               </div>
             )}
             {avatarUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt={profile?.channel_name ?? 'Channel avatar'}
-                style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-                crossOrigin="anonymous"
+              <div
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  borderRadius: '999px',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  backgroundColor: '#f8fafc',
+                  backgroundImage: `url("${avatarUrl}")`,
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: 'cover',
+                }}
+                aria-label={profile?.channel_name ?? 'Channel avatar'}
               />
             )}
           </div>
@@ -971,39 +979,33 @@ function ExportRateCardContent({
             color: '#0f172a',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '999px',
-                backgroundColor: '#fde7df',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <TrendingUp size={26} color="#ef4444" />
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>What&apos;s Included</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a' }}>
+            What&apos;s Included
           </div>
           <div
             style={{
-              marginTop: '20px',
+              marginTop: '12px',
               borderRadius: '24px',
               backgroundColor: 'rgba(255,255,255,0.72)',
-              padding: '22px 24px',
+              padding: '18px 24px',
               border: '1px solid rgba(255,255,255,0.82)',
             }}
           >
-            <div style={{ display: 'grid', gap: '14px', fontSize: '18px', lineHeight: 1.65, color: '#334155' }}>
-              <div>One in-video sponsorship placement sized to the package selected</div>
-              <div>Brand talking points delivered in my normal style</div>
-              <div>Description link placement when included in campaign scope</div>
-              <div>One standard brand review pass for factual or compliance notes</div>
-              <div>Final quote confirmed based on scope, usage rights, exclusivity, and timeline</div>
-            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: '10px', fontSize: '18px', lineHeight: 1.55, color: '#334155' }}>
+              {[
+                'In-video sponsorship placement sized to the package selected',
+                'Brand talking points delivered in my normal style',
+                'One standard brand review pass for factual notes',
+                'Final quote confirmed around scope, usage, and timeline',
+              ].map((item) => (
+                <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <span style={{ fontSize: '22px', lineHeight: 1, color: '#0f172a', transform: 'translateY(2px)' }}>
+                    •
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
