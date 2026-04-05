@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "Stop Leaving Money on the Table",
+    title: "Sovaio | Stop Leaving Money on the Table",
     description,
     url: "https://sovaio.com",
     siteName: "Sovaio",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Stop Leaving Money on the Table",
+    title: "Sovaio | Stop Leaving Money on the Table",
     description,
     images: [
       {

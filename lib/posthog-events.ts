@@ -52,6 +52,7 @@ export const POSTHOG_EVENTS = {
   aiRequestFailed: 'ai_request_failed',
   aiRequestRateLimited: 'ai_request_rate_limited',
   aiRequestAborted: 'ai_request_aborted',
+  feedbackSubmitted: 'feedback_submitted',
 } as const
 
 export type PostHogEventName = (typeof POSTHOG_EVENTS)[keyof typeof POSTHOG_EVENTS]

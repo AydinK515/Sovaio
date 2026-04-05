@@ -7,10 +7,11 @@ import { useOnboarding } from '@/components/onboarding-provider'
 import { captureAnalyticsEvent, resetAnalytics } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { createClient } from '@/lib/supabase-browser'
-import { User, Trash2, Shield, Upload, Camera, Loader2, Sparkles, RotateCcw } from 'lucide-react'
+import { User, Trash2, Shield, Upload, Camera, Loader2, Sparkles, RotateCcw, MessageSquareMore } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { Profile } from '@/lib/types'
 import ConfirmationModal from '@/components/confirmation-modal'
+import FeedbackModal from '@/components/feedback-modal'
 
 type StatusScope = 'profile' | 'security' | 'danger' | null
 
@@ -30,6 +31,7 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showSignOutModal, setShowSignOutModal] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [message, setMessage] = useState('')
@@ -278,6 +280,11 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
 
   return (
     <div className="py-8 max-w-2xl">
+      <FeedbackModal
+        open={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        userEmail={user.email}
+      />
       <ConfirmationModal
         open={showSignOutModal}
         title="Sign out?"
@@ -477,6 +484,26 @@ export default function SettingsClient({ user, profile }: { user: SupabaseUser; 
               {signingOut ? 'Signing Out...' : 'Sign Out'}
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-white rounded-2xl border border-border p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <MessageSquareMore className="w-5 h-5 text-muted" />
+          <h2 className="text-lg font-semibold">Feedback</h2>
+        </div>
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Found something broken, confusing, or missing? Open the feedback form and send it through with your account context attached.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowFeedbackModal(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          >
+            <MessageSquareMore className="h-4 w-4" />
+            Send Feedback
+          </button>
         </div>
       </div>
 
