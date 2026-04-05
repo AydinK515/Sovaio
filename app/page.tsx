@@ -8,7 +8,7 @@ import { ArrowRight, ChevronDown, Upload, BarChart3, MessageSquare } from 'lucid
 import type { Metadata } from 'next'
 
 const description =
-  "Upload your YouTube Studio analytics, get a data-backed sponsorship rate card, and negotiate better brand deals with AI that knows your exact numbers. Join 1,200+ creators closing bigger deals."
+  "Upload your YouTube Studio analytics, get a data-backed sponsorship rate card, and negotiate better brand deals with AI that knows your exact numbers. Join creators closing bigger deals."
 
 export const metadata: Metadata = {
   title: {
@@ -154,7 +154,7 @@ export default async function LandingPage({
                 </div>
 
                 <p className="mt-6 text-sm text-white/50">
-                  <span className="text-white font-semibold">1,200+</span> creators closed bigger deals this month
+                  So many creators are already closing bigger deals with Sovaio
                 </p>
 
               </div>
