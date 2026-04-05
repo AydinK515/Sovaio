@@ -74,10 +74,12 @@ async function upsertState(
   state: OnboardingState,
   nextValues: Partial<OnboardingState>
 ) {
+  const now = new Date().toISOString()
   const payload: Record<string, unknown> = {
     ...state,
     ...nextValues,
     user_id: state.user_id,
+    updated_at: now,
   }
 
   const onboardingTable = supabase.from('onboarding_states') as {

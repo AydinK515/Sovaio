@@ -88,15 +88,10 @@ export default function WelcomeClient({
   async function saveProfileDetails() {
     const trimmedChannelName = channelName.trim()
 
-    if (!trimmedChannelName) {
-      setProfileError('Add your channel name so we can personalize your workspace.')
-      return false
-    }
-
     const { error } = await supabase
       .from('profiles')
       .update({
-        channel_name: trimmedChannelName,
+        channel_name: trimmedChannelName || null,
         avatar_path: avatarPath,
       })
       .eq('id', initialState.user_id)
@@ -188,27 +183,26 @@ export default function WelcomeClient({
     router.refresh()
   }
 
-  async function skipWelcome() {
-    setSubmitting(true)
-    await updateOnboardingState({ action: 'skip_welcome' })
-    captureAnalyticsEvent(POSTHOG_EVENTS.onboardingSkipped, {
-      source: isReplay ? 'replay' : 'first_run',
-    })
-    router.push('/dashboard')
-    router.refresh()
-  }
-
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(254,242,242,0.95),rgba(255,255,255,1)_52%)] px-4 py-10">
-      <div className="mx-auto max-w-5xl">
+      <div className={`mx-auto ${step === 1 ? 'max-w-3xl' : 'max-w-5xl'}`}>
         <div className="overflow-hidden rounded-[36px] border border-border bg-white/95 shadow-[0_30px_90px_-54px_rgba(15,23,42,0.38)] backdrop-blur">
-          <div className="grid min-h-[720px] lg:grid-cols-[1.05fr_0.95fr]">
-            <section className="relative overflow-hidden border-b border-border px-6 py-8 md:px-10 md:py-10 lg:border-b-0 lg:border-r">
+          <div className={`grid min-h-[720px] ${step === 1 ? 'lg:grid-cols-1' : 'lg:grid-cols-[1.05fr_0.95fr]'}`}>
+            <section className={`relative overflow-hidden border-b border-border px-6 py-8 md:px-10 md:py-10 ${step === 1 ? '' : 'lg:border-b-0 lg:border-r'}`}>
               <div className="absolute inset-x-10 top-0 h-32 rounded-full bg-[radial-gradient(circle,rgba(220,38,38,0.08),transparent_72%)] blur-3xl" />
-              <div className="relative">
-                <div className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {isReplay ? 'Replay onboarding' : 'Welcome to Sovaio'}
+              <div className={`relative ${step === 1 ? 'mx-auto w-full max-w-3xl' : ''}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {isReplay ? 'Replay onboarding' : 'Welcome to Sovaio'}
+                  </div>
+                  {step === 1 ? (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted">
+                      <span className={`h-2 w-2 rounded-full ${step === 0 ? 'bg-primary' : 'bg-border-dark'}`} />
+                      <span className={`h-2 w-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-border-dark'}`} />
+                      <span className={`h-2 w-2 rounded-full ${step === 2 ? 'bg-primary' : 'bg-border-dark'}`} />
+                    </div>
+                  ) : null}
                 </div>
 
                 {step === 0 ? (
@@ -292,6 +286,26 @@ export default function WelcomeClient({
                         </div>
                       </div>
                     </div>
+                    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => setStep(0)}
+                        disabled={submitting}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border px-5 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
+                      </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      disabled={submitting || uploadingAvatar}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                      >
+                      Continue
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -342,17 +356,10 @@ export default function WelcomeClient({
               </div>
             </section>
 
+            {step !== 1 ? (
             <section className="flex flex-col justify-between bg-[linear-gradient(180deg,rgba(248,250,252,0.82),#ffffff)] px-6 py-8 md:px-8 md:py-10">
               <div>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-                      {step === 0 ? 'Overview' : 'Tailor the path'}
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold text-foreground">
-                      {step === 0 ? 'Start simple' : 'Choose your starting point'}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-end gap-4">
                   <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted">
                     <span className={`h-2 w-2 rounded-full ${step === 0 ? 'bg-primary' : 'bg-border-dark'}`} />
                     <span className={`h-2 w-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-border-dark'}`} />
@@ -360,9 +367,15 @@ export default function WelcomeClient({
                   </div>
                 </div>
 
-                <div className="mt-8 rounded-[32px] border border-border bg-white p-5 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.28)]">
+                <div className={`mt-8 ${step === 1 ? 'min-h-[420px]' : 'rounded-[32px] border border-border bg-white p-5 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.28)]'}`}>
                   {step === 0 ? (
                     <>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                        Overview
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold text-foreground">
+                        Start simple
+                      </p>
                       <p className="text-sm font-semibold text-foreground">What Sovaio actually does</p>
                       <div className="mt-4 space-y-4">
                         <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
@@ -386,34 +399,15 @@ export default function WelcomeClient({
                       </div>
                     </>
                   ) : step === 1 ? (
-                    <>
-                      <p className="text-sm font-semibold text-foreground">Why do this now?</p>
-                      <div className="mt-4 space-y-4">
-                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
-                          <p className="text-sm font-semibold text-foreground">Your workspace feels branded from day one</p>
-                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                            Adding your channel identity here saves a trip to settings and gives Sovaio the right context before you start creating assets.
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
-                          <p className="text-sm font-semibold text-foreground">Rate cards and exports look more complete</p>
-                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                            Your channel name is reused across the product, and your photo helps everything feel tied to one creator identity.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setStep(2)}
-                        disabled={submitting || uploadingAvatar}
-                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-                      >
-                        Continue
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    </>
+                    <div className="min-h-[420px]" />
                   ) : (
                     <>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                        Tailor the path
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold text-foreground">
+                        Choose your starting point
+                      </p>
                       <p className="text-sm font-semibold text-foreground">Recommended next move</p>
                       <div className="mt-4 rounded-[28px] border border-primary/20 bg-primary-light px-4 py-5">
                         <p className="text-lg font-semibold text-foreground">
@@ -469,19 +463,9 @@ export default function WelcomeClient({
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 ) : null}
-
-                {!isReplay ? (
-                  <button
-                    type="button"
-                    onClick={() => void skipWelcome()}
-                    disabled={submitting}
-                    className="inline-flex items-center justify-center rounded-2xl border border-border px-5 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
-                  >
-                    Skip for now
-                  </button>
-                ) : null}
               </div>
             </section>
+            ) : null}
           </div>
         </div>
       </div>
