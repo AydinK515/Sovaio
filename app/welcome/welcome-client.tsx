@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import Image from 'next/image'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, ArrowRight, BarChart3, BriefcaseBusiness, Compass, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BarChart3, BriefcaseBusiness, Camera, Compass, Loader2, Sparkles, Upload } from 'lucide-react'
 import { updateOnboardingState } from '@/lib/onboarding-client'
 import type { OnboardingPath, OnboardingState } from '@/lib/onboarding'
+import type { Profile } from '@/lib/types'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
+import { createClient } from '@/lib/supabase-browser'
 
 const OPTIONS: Array<{
   value: OnboardingPath
@@ -36,18 +39,132 @@ const OPTIONS: Array<{
 
 export default function WelcomeClient({
   initialState,
+  initialProfile,
 }: {
   initialState: OnboardingState
+  initialProfile: Profile | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isReplay = searchParams.get('mode') === 'replay'
+  const supabase = useMemo(() => createClient(), [])
   const [step, setStep] = useState(0)
   const [selectedPath, setSelectedPath] = useState<OnboardingPath>(initialState.welcome_path ?? 'price_my_channel')
+  const [channelName, setChannelName] = useState(initialProfile?.channel_name ?? '')
+  const [avatarPath, setAvatarPath] = useState(initialProfile?.avatar_path ?? null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [profileError, setProfileError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAvatar() {
+      if (!avatarPath) {
+        setAvatarUrl(null)
+        return
+      }
+
+      const { data, error } = await supabase.storage.from('avatars').createSignedUrl(avatarPath, 60 * 60)
+
+      if (cancelled) return
+
+      if (error || !data?.signedUrl) {
+        setAvatarUrl(null)
+        return
+      }
+
+      setAvatarUrl(data.signedUrl)
+    }
+
+    void loadAvatar()
+
+    return () => {
+      cancelled = true
+    }
+  }, [avatarPath, supabase])
+
+  async function saveProfileDetails() {
+    const trimmedChannelName = channelName.trim()
+
+    if (!trimmedChannelName) {
+      setProfileError('Add your channel name so we can personalize your workspace.')
+      return false
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        channel_name: trimmedChannelName,
+        avatar_path: avatarPath,
+      })
+      .eq('id', initialState.user_id)
+
+    if (error) {
+      setProfileError(error.message)
+      return false
+    }
+
+    setProfileError('')
+    return true
+  }
+
+  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) return
+
+    setProfileError('')
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setProfileError('Please upload a JPG, PNG, or WebP image.')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Profile photo must be 5MB or smaller.')
+      return
+    }
+
+    setUploadingAvatar(true)
+
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const nextPath = `${initialState.user_id}/avatar-${Date.now()}.${extension}`
+
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(nextPath, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type,
+    })
+
+    if (uploadError) {
+      setUploadingAvatar(false)
+      setProfileError(uploadError.message)
+      return
+    }
+
+    if (avatarPath) {
+      await supabase.storage.from('avatars').remove([avatarPath])
+    }
+
+    setAvatarPath(nextPath)
+    setUploadingAvatar(false)
+  }
+
   async function finishWelcome() {
+    setProfileError('')
     setSubmitting(true)
+
+    const profileSaved = await saveProfileDetails()
+
+    if (!profileSaved) {
+      setSubmitting(false)
+      setStep(1)
+      return
+    }
 
     await updateOnboardingState({
       action: 'complete_welcome',
@@ -103,10 +220,83 @@ export default function WelcomeClient({
                       Sovaio helps YouTube creators turn channel analytics into clear sponsor pricing, stronger negotiation decisions, and better positioning. The product teaches itself once you have one saved snapshot.
                     </p>
                   </>
+                ) : step === 1 ? (
+                  <>
+                    <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+                      Step 2 of 3
+                    </p>
+                    <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+                      Set up your channel profile
+                    </h1>
+                    <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
+                      Add the channel name and profile image you want Sovaio to use across your workspace, rate cards, and sponsor-facing assets.
+                    </p>
+
+                    <div className="mt-8 rounded-[28px] border border-border bg-white p-5 shadow-[0_20px_45px_-36px_rgba(15,23,42,0.18)]">
+                      <div className="flex flex-col gap-6 md:flex-row">
+                        <div className="shrink-0">
+                          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-[28px] border border-border bg-muted-light">
+                            {avatarUrl ? (
+                              <Image
+                                src={avatarUrl}
+                                alt={channelName ? `${channelName} avatar` : 'Channel avatar'}
+                                width={112}
+                                height={112}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="px-3 text-center">
+                                <Camera className="mx-auto h-7 w-7 text-muted" />
+                                <p className="mt-2 text-[11px] uppercase tracking-wider text-muted">No photo</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted-light">
+                            {uploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                            {uploadingAvatar ? 'Uploading...' : 'Upload photo'}
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              onChange={handleAvatarUpload}
+                              disabled={uploadingAvatar || submitting}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="mt-2 text-xs text-muted">JPG, PNG, or WebP up to 5MB.</p>
+                        </div>
+
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium uppercase tracking-[0.18em] text-muted">
+                            Channel name
+                          </label>
+                          <input
+                            value={channelName}
+                            onChange={(event) => {
+                              setChannelName(event.target.value)
+                              if (profileError) {
+                                setProfileError('')
+                              }
+                            }}
+                            placeholder="Enter your YouTube channel name"
+                            className="mt-2 w-full rounded-2xl border border-border px-4 py-3 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                          <p className="mt-2 text-sm leading-relaxed text-muted">
+                            This shows up in your workspace and helps make exports and sponsor-facing assets feel like they belong to your brand.
+                          </p>
+                          {profileError ? (
+                            <p className="mt-3 rounded-2xl border border-red-200 bg-primary-light px-4 py-3 text-sm text-primary">
+                              {profileError}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-muted">
-                      Step 2 of 2
+                      Step 3 of 3
                     </p>
                     <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-5xl">
                       What brought you to Sovaio?
@@ -166,6 +356,7 @@ export default function WelcomeClient({
                   <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-medium text-muted">
                     <span className={`h-2 w-2 rounded-full ${step === 0 ? 'bg-primary' : 'bg-border-dark'}`} />
                     <span className={`h-2 w-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-border-dark'}`} />
+                    <span className={`h-2 w-2 rounded-full ${step === 2 ? 'bg-primary' : 'bg-border-dark'}`} />
                   </div>
                 </div>
 
@@ -193,6 +384,33 @@ export default function WelcomeClient({
                           </p>
                         </div>
                       </div>
+                    </>
+                  ) : step === 1 ? (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">Why do this now?</p>
+                      <div className="mt-4 space-y-4">
+                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
+                          <p className="text-sm font-semibold text-foreground">Your workspace feels branded from day one</p>
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                            Adding your channel identity here saves a trip to settings and gives Sovaio the right context before you start creating assets.
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-muted-light px-4 py-4">
+                          <p className="text-sm font-semibold text-foreground">Rate cards and exports look more complete</p>
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                            Your channel name is reused across the product, and your photo helps everything feel tied to one creator identity.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStep(2)}
+                        disabled={submitting || uploadingAvatar}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                      >
+                        Continue
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
                     </>
                   ) : (
                     <>
@@ -228,10 +446,10 @@ export default function WelcomeClient({
               </div>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                {step === 1 ? (
+                {step > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setStep(0)}
+                    onClick={() => setStep((current) => Math.max(current - 1, 0))}
                     disabled={submitting}
                     className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border px-5 py-3 text-sm font-medium transition-colors hover:bg-muted-light disabled:opacity-60"
                   >

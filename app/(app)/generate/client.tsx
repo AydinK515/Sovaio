@@ -126,29 +126,21 @@ export default function GenerateRateCardClient({
   )
   const activePhaseIndex = loadingProgress < 33 ? 0 : loadingProgress < 66 ? 1 : 2
   const activePhase = GENERATION_PHASES[activePhaseIndex]
+  // Document writing animation
   const normalizedLoadingProgress = Math.min(loadingProgress, 100) / 100
-  const writingRows = [
-    { startX: 0, travelX: 40, startY: 0 },
-    { startX: 5, travelX: 50, startY: 18 },
-    { startX: 8, travelX: 44, startY: 36 },
-    { startX: 12, travelX: 38, startY: 54 },
+  const docLines = [
+    { maxWidth: 88 },
+    { maxWidth: 72 },
+    { maxWidth: 95 },
+    { maxWidth: 60 },
+    { maxWidth: 82 },
+    { maxWidth: 50 },
+    { maxWidth: 78 },
+    { maxWidth: 65 },
   ] as const
-  const activeWritingRowIndex = Math.min(Math.floor(normalizedLoadingProgress * writingRows.length), writingRows.length - 1)
-  const activeWritingRow = writingRows[activeWritingRowIndex]
-  const rowProgress = Math.min(
-    Math.max((normalizedLoadingProgress - activeWritingRowIndex / writingRows.length) * writingRows.length, 0),
-    1,
-  )
-  const pencilTranslateX = activeWritingRow.startX + activeWritingRow.travelX * rowProgress
-  const pencilTranslateY = activeWritingRow.startY + Math.sin(normalizedLoadingProgress * 24) * 1.6
-  const writingLineWidths = writingRows.map((row, index) => {
-    const lineProgress = Math.min(
-      Math.max((normalizedLoadingProgress - index / writingRows.length) * writingRows.length, 0),
-      1,
-    )
-
-    return `${12 + row.travelX * lineProgress}%`
-  })
+  const totalLines = docLines.length
+  const activeLineIndex = Math.min(Math.floor(normalizedLoadingProgress * totalLines), totalLines - 1)
+  const lineProgress = (normalizedLoadingProgress * totalLines) % 1
   const needsSponsorshipHistory = hasSponsorships === true
   const generatedRateCardName = useMemo(
     () => buildRateCardName({ niche }),
@@ -364,36 +356,38 @@ export default function GenerateRateCardClient({
       <div className="flex min-h-[calc(100dvh-16rem)] items-center justify-center py-8">
         <div className="mx-auto w-full max-w-3xl rounded-[2rem] border border-border bg-white p-8 shadow-sm md:p-12">
           <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
-            <div className="relative h-40 w-40">
-              <div className="absolute inset-x-4 bottom-0 top-3 rounded-[1.8rem] border border-slate-200 bg-linear-to-b from-white via-white to-slate-50 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)]" />
-              <div className="absolute left-10 right-12 top-17 h-1.5 rounded-full bg-slate-200" />
-              <div className="absolute left-10 right-14 top-23 h-1.5 rounded-full bg-slate-200" />
-              <div className="absolute left-10 right-16 top-29 h-1.5 rounded-full bg-slate-200" />
-              <div
-                className="absolute left-10 top-6 h-14 w-4 rounded-full bg-primary shadow-[0_10px_20px_-12px_rgba(239,68,68,0.9)] transition-transform duration-150"
-                style={{
-                  transform: `translateX(${pencilTranslateX}px) translateY(${pencilTranslateY}px) rotate(32deg)`,
-                }}
-              >
-                <div className="absolute left-1/2 top-[-6px] h-3 w-3 -translate-x-1/2 rounded-t-full bg-amber-200" />
-                <div className="absolute bottom-[-8px] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[10px] border-x-transparent border-t-slate-700" />
+
+            {/* Document writing animation */}
+            <div className="mx-auto w-56 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-[0_18px_40px_-20px_rgba(15,23,42,0.18)]">
+              {/* Doc title placeholder */}
+              <div className="mb-4 h-3 w-32 rounded-full bg-slate-300" />
+              {/* Text lines */}
+              <div className="space-y-2.5">
+                {docLines.map((line, index) => {
+                  const isActive = index === activeLineIndex
+                  const isDone = index < activeLineIndex
+                  const width = isDone
+                    ? line.maxWidth
+                    : isActive
+                      ? Math.round(line.maxWidth * lineProgress)
+                      : 0
+
+                  return (
+                    <div key={index} className="flex items-center gap-1">
+                      <div
+                        className="h-2 rounded-full bg-slate-200 transition-[width] duration-100"
+                        style={{ width: `${width}%` }}
+                      />
+                      {isActive && (
+                        <div
+                          className="h-3.5 w-px bg-primary"
+                          style={{ animation: 'cursor-blink 0.9s step-end infinite' }}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-              <div
-                className="absolute left-11 top-22 h-0.5 rounded-full bg-primary/35 transition-all duration-150"
-                style={{ width: writingLineWidths[0] }}
-              />
-              <div
-                className="absolute left-11 top-28 h-0.5 rounded-full bg-primary/30 transition-all duration-150"
-                style={{ width: writingLineWidths[1] }}
-              />
-              <div
-                className="absolute left-11 top-34 h-0.5 rounded-full bg-primary/24 transition-all duration-150"
-                style={{ width: writingLineWidths[2] }}
-              />
-              <div
-                className="absolute left-11 top-40 h-0.5 rounded-full bg-primary/18 transition-all duration-150"
-                style={{ width: writingLineWidths[3] }}
-              />
             </div>
 
             <h1 className="mt-7 text-3xl font-bold tracking-tight text-foreground md:text-4xl">

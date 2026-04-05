@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { fetchOnboardingState, type OnboardingStateReader } from '@/lib/onboarding'
+import type { Profile } from '@/lib/types'
 import WelcomeClient from './welcome-client'
 
 export default async function WelcomePage() {
@@ -13,5 +14,11 @@ export default async function WelcomePage() {
     redirect('/dashboard')
   }
 
-  return <WelcomeClient initialState={state} />
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  return <WelcomeClient initialState={state} initialProfile={(profile as Profile | null) ?? null} />
 }

@@ -100,6 +100,12 @@ html.deal-chat-fullscreen .channel-ai-launcher {
 }
 .animate-float { animation: float 6s ease-in-out infinite; }
 
+/* Cursor blink */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* Fade in up with delay support */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(24px); }
