@@ -115,6 +115,11 @@ export function AppNav({ hasAnalytics }: { hasAnalytics: boolean }) {
     { href: '/settings', label: 'Settings' },
   ]
 
+  function openChannelAdvisor() {
+    window.dispatchEvent(new Event('open-channel-advisor'))
+    setOpen(false)
+  }
+
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-border">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -138,7 +143,7 @@ export function AppNav({ hasAnalytics }: { hasAnalytics: boolean }) {
             ))}
           </div>
 
-          <button className="md:hidden" onClick={() => setOpen(!open)}>
+          <button type="button" className="md:hidden" onClick={() => setOpen(!open)}>
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -146,6 +151,13 @@ export function AppNav({ hasAnalytics }: { hasAnalytics: boolean }) {
 
       {open && (
         <div className="md:hidden border-t border-border bg-white px-4 py-4 space-y-3">
+          <button
+            type="button"
+            onClick={openChannelAdvisor}
+            className="block text-sm text-muted"
+          >
+            Channel Advisor
+          </button>
           {links.map(l => (
             <Link key={l.href} href={l.href} className="block text-sm text-muted" onClick={() => setOpen(false)}>{l.label}</Link>
           ))}

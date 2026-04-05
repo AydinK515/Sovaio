@@ -13,7 +13,7 @@ import { buildAnalyticsSnapshotName } from '@/lib/analytics-context'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES } from '@/lib/types'
-import { BarChart3, CheckCircle2, Circle, ExternalLink, FileText, Info, Upload, X } from 'lucide-react'
+import { BarChart3, CheckCircle2, ChevronDown, Circle, ExternalLink, FileText, Info, Upload, X } from 'lucide-react'
 import step1Image from '@/public/Step 1.jpg'
 import step2Image from '@/public/step 2.jpg'
 import step3Image from '@/public/Step 3.jpg'
@@ -103,6 +103,66 @@ export default function AnalyticsUploadForm() {
   ].filter((value): value is string => Boolean(value))
   const canSaveSnapshot = missingRequiredFields.length === 0
   const showFieldErrors = submitAttempted
+
+  function renderDataSourcesList(badgeClassName: string) {
+    return CSV_TYPES.map(csvType => {
+      const uploaded = parsedFiles.some(file => file.type === csvType.key)
+      return (
+        <div key={csvType.key} className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-start gap-2">
+            {uploaded ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            ) : (
+              <Circle className="mt-0.5 h-4 w-4 shrink-0 text-border-dark" />
+            )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`text-sm ${uploaded ? 'font-medium text-foreground' : 'text-muted'}`}>{csvType.label}</span>
+                {csvType.required ? (
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Required</span>
+                ) : (
+                  <span className={badgeClassName}>+{csvType.confidence}%</span>
+                )}
+              </div>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted">{csvType.description}</p>
+            </div>
+          </div>
+        </div>
+      )
+    })
+  }
+
+  function renderSnapshotConfidenceCard(className: string) {
+    return (
+      <div className={className}>
+        <div className="mb-4 flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">Snapshot Confidence</h3>
+        </div>
+        <p className="mb-4 text-xs text-muted">Upload more reports to improve the snapshot quality before you generate a rate card or start a deal.</p>
+        <div className="mb-3 h-3 w-full overflow-hidden rounded-full bg-border">
+          <div className={`${barColor} h-3 rounded-full transition-all duration-500`} style={{ width: `${confidence}%` }} />
+        </div>
+        <div className="flex justify-between text-xs">
+          <span className={`font-medium ${confidenceColor}`}>{confidenceLabel}</span>
+          <span className="text-muted">{confidence}%</span>
+        </div>
+
+        <details className="group mt-5 rounded-xl border border-border bg-slate-50 p-4 md:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Data Sources</p>
+              <p className="mt-1 text-xs text-muted">See which reports are included in this snapshot.</p>
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-4 space-y-3">
+            {renderDataSourcesList('rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-muted')}
+          </div>
+        </details>
+      </div>
+    )
+  }
 
   useEffect(() => {
     captureAnalyticsEvent(POSTHOG_EVENTS.onboardingStepViewed, {
@@ -508,6 +568,8 @@ export default function AnalyticsUploadForm() {
             </div>
           )}
 
+          {renderSnapshotConfidenceCard('rounded-2xl border border-border bg-white p-6 md:hidden')}
+
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
@@ -571,50 +633,13 @@ export default function AnalyticsUploadForm() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-white p-6">
-            <div className="mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Snapshot Confidence</h3>
-            </div>
-            <p className="mb-4 text-xs text-muted">Upload more reports to improve the snapshot quality before you generate a rate card or start a deal.</p>
-            <div className="mb-3 h-3 w-full overflow-hidden rounded-full bg-border">
-              <div className={`${barColor} h-3 rounded-full transition-all duration-500`} style={{ width: `${confidence}%` }} />
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className={`font-medium ${confidenceColor}`}>{confidenceLabel}</span>
-              <span className="text-muted">{confidence}%</span>
-            </div>
-          </div>
+          {renderSnapshotConfidenceCard('hidden rounded-2xl border border-border bg-white p-6 md:block')}
 
-          <div className="rounded-2xl border border-border bg-white p-6">
+          <div className="hidden rounded-2xl border border-border bg-white p-6 md:block">
             <h3 className="mb-1 font-semibold">Data Sources</h3>
             <p className="mb-4 text-xs text-muted">Required reports must be uploaded before you can save a usable snapshot.</p>
             <div className="space-y-3">
-              {CSV_TYPES.map(csvType => {
-                const uploaded = parsedFiles.some(file => file.type === csvType.key)
-                return (
-                  <div key={csvType.key} className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-start gap-2">
-                      {uploaded ? (
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                      ) : (
-                        <Circle className="mt-0.5 h-4 w-4 shrink-0 text-border-dark" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className={`text-sm ${uploaded ? 'font-medium text-foreground' : 'text-muted'}`}>{csvType.label}</span>
-                          {csvType.required ? (
-                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Required</span>
-                          ) : (
-                            <span className="rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted">+{csvType.confidence}%</span>
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-[11px] leading-snug text-muted">{csvType.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {renderDataSourcesList('rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted')}
             </div>
           </div>
         </div>
