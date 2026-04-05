@@ -53,8 +53,8 @@ export async function LegalPage({ title, summary, effectiveDate, children }: Leg
               <p className="font-semibold text-foreground">Questions?</p>
               <p className="mt-2 text-muted">
                 Contact us at{' '}
-                <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-                  support@sovaio.com
+                <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+                  team@sovaio.com
                 </a>
                 . You can also return to the{' '}
                 <Link className="text-primary hover:text-primary-hover" href="/">

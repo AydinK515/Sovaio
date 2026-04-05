@@ -62,8 +62,8 @@ export default function PrivacyPolicyPage() {
           </li>
           <li>
             Communications you send to us, including support requests sent to{' '}
-            <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-              support@sovaio.com
+            <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+              team@sovaio.com
             </a>
             .
           </li>
@@ -155,8 +155,8 @@ export default function PrivacyPolicyPage() {
           <li>
             You can request account deletion by using any in-product deletion feature we make
             available or by contacting{' '}
-            <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-              support@sovaio.com
+            <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+              team@sovaio.com
             </a>
             .
           </li>
@@ -178,8 +178,8 @@ export default function PrivacyPolicyPage() {
         </p>
         <p>
           If you want to exercise a privacy request, contact{' '}
-          <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-            support@sovaio.com
+          <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+            team@sovaio.com
           </a>{' '}
           and include enough information for us to evaluate and respond.
         </p>
@@ -198,8 +198,8 @@ export default function PrivacyPolicyPage() {
           Sovaio is not directed to children under 13, and we do not knowingly collect personal
           information from children under 13. If you believe a child under 13 has provided personal
           information to us, contact{' '}
-          <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-            support@sovaio.com
+          <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+            team@sovaio.com
           </a>{' '}
           so we can investigate.
         </p>

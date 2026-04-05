@@ -47,7 +47,7 @@ export default function TermsOfServicePage() {
           <li>You must be able to form a binding contract in order to use Sovaio.</li>
           <li>You are responsible for providing accurate account information and keeping your credentials secure.</li>
           <li>You are responsible for all activity that occurs under your account.</li>
-          <li>You must promptly notify us at <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">support@sovaio.com</a> if you believe your account has been compromised.</li>
+          <li>You must promptly notify us at <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">team@sovaio.com</a> if you believe your account has been compromised.</li>
         </ul>
       </LegalSection>
 
@@ -154,8 +154,8 @@ export default function TermsOfServicePage() {
         <p>
           You may stop using the service at any time. If available in the product, you may also
           delete your account through your settings or by contacting{' '}
-          <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-            support@sovaio.com
+          <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+            team@sovaio.com
           </a>
           .
         </p>
@@ -212,8 +212,8 @@ export default function TermsOfServicePage() {
       <LegalSection title="15. Contact">
         <p>
           If you have questions about these Terms, contact{' '}
-          <a className="text-primary hover:text-primary-hover" href="mailto:support@sovaio.com">
-            support@sovaio.com
+          <a className="text-primary hover:text-primary-hover" href="mailto:team@sovaio.com">
+            team@sovaio.com
           </a>
           .
         </p>
