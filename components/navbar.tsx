@@ -165,9 +165,8 @@ export function Footer() {
             <p className="text-xs text-muted">sovaio.com</p>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="#" className="text-xs text-muted hover:text-foreground transition-colors">FAQ</Link>
-            <Link href="#" className="text-xs text-muted hover:text-foreground transition-colors">Terms</Link>
-            <Link href="#" className="text-xs text-muted hover:text-foreground transition-colors">Privacy</Link>
+            <Link href="/terms-of-service" className="text-xs text-muted hover:text-foreground transition-colors">Terms</Link>
+            <Link href="/privacy-policy" className="text-xs text-muted hover:text-foreground transition-colors">Privacy</Link>
           </div>
           <p className="text-xs text-muted">&copy; {new Date().getFullYear()} Sovaio. All rights reserved.</p>
         </div>

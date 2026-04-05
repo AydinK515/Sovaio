@@ -74,7 +74,7 @@ export default async function LandingPage() {
                   icon: Upload,
                   step: '01',
                   title: 'Upload Your Analytics',
-                  description: 'Export CSVs from YouTube Studio and drop them in. We parse everything locally — your raw files are never stored.',
+                  description: 'Export CSVs from YouTube Studio and drop them in. We parse the files in your browser and store the structured analytics data needed to generate your reports.',
                 },
                 {
                   icon: BarChart3,
@@ -111,7 +111,7 @@ export default async function LandingPage() {
               <div className="bg-white rounded-2xl p-8 border border-border">
                 <Shield className="w-8 h-8 text-primary mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Privacy First</h3>
-                <p className="text-sm text-muted">CSVs are parsed in your browser. We extract metrics and discard the files immediately. No raw data ever hits our servers.</p>
+                <p className="text-sm text-muted">CSV files are parsed in your browser. We do not store the original uploaded files, but we do store the structured analytics data needed to generate snapshots, rate cards, and advice.</p>
               </div>
               <div className="bg-white rounded-2xl p-8 border border-border">
                 <Zap className="w-8 h-8 text-primary mb-4" />
@@ -175,12 +175,12 @@ export default async function LandingPage() {
         </section>
 
         {/* FAQ */}
-        <section className="py-20 md:py-28 bg-muted-light">
+        <section id="faq" className="py-20 md:py-28 bg-muted-light">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
             <div className="space-y-4">
               {[
-                { q: 'Is my YouTube data safe?', a: 'Absolutely. Your CSV files are parsed entirely in your browser. We only store the extracted metrics — never the raw files. Your data is encrypted in transit and at rest.' },
+                { q: 'Is my YouTube data safe?', a: 'We parse your CSV files in your browser and do not store the original file uploads themselves. We do store the structured analytics data needed to generate snapshots, rate cards, and AI guidance, and that data is protected in transit and at rest.' },
                 { q: 'How accurate are the rate estimates?', a: 'Our rates are generated from your actual channel analytics combined with current market benchmarks for your niche. The more data you upload, the higher your Report Confidence score and the more precise your rates.' },
                 { q: 'What if the brand says no to my rate?', a: "That's exactly what our Negotiation AI is built for. It will advise you on whether to counter, compromise, or walk away — and give you the exact words to say." },
                 { q: 'Do I need to connect my YouTube account?', a: 'No. We deliberately avoid API connections. You export CSVs directly from YouTube Studio, which gives you full control over what data you share.' },
