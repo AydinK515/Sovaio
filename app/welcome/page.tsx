@@ -3,6 +3,12 @@ import { createClient } from '@/lib/supabase-server'
 import { fetchOnboardingState, type OnboardingStateReader } from '@/lib/onboarding'
 import type { Profile } from '@/lib/types'
 import WelcomeClient from './welcome-client'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome',
+  robots: { index: false, follow: false },
+}
 
 export default async function WelcomePage() {
   const supabase = await createClient()

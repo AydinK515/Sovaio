@@ -4,11 +4,23 @@ import { LegalPage, LegalSection } from '@/components/legal-page'
 const effectiveDate = 'April 4, 2026'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Sovaio',
+  title: 'Privacy Policy',
   description:
     'Learn what information Sovaio collects, how we use it, and the choices available to users.',
   alternates: {
     canonical: '/privacy-policy',
+  },
+  openGraph: {
+    title: 'Privacy Policy | Sovaio',
+    description: 'Learn what information Sovaio collects, how we use it, and the choices available to users.',
+    url: 'https://sovaio.com/privacy-policy',
+    images: [{ url: '/sovaiobanner.png', width: 1536, height: 1024, alt: 'Sovaio' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Privacy Policy | Sovaio',
+    description: 'Learn what information Sovaio collects, how we use it, and the choices available to users.',
+    images: ['/sovaiobanner.png'],
   },
 }
 

@@ -5,6 +5,49 @@ import { MarketingNav, Footer } from '@/components/navbar'
 import { createClient } from '@/lib/supabase-server'
 import { normalizeAuthRedirectPath } from '@/lib/security'
 import { ArrowRight, ChevronDown, Upload, BarChart3, MessageSquare } from 'lucide-react'
+import type { Metadata } from 'next'
+
+const description =
+  "Upload your YouTube Studio analytics, get a data-backed sponsorship rate card, and negotiate better brand deals with AI that knows your exact numbers. Join 1,200+ creators closing bigger deals."
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "Sovaio | Stop Leaving Money on the Table",
+  },
+  description,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Stop Leaving Money on the Table",
+    description,
+    url: "https://sovaio.com",
+    siteName: "Sovaio",
+    type: "website",
+    locale: "en_US",
+    images: [
+      {
+        url: "/sovaiolandingpage.PNG",
+        width: 2355,
+        height: 1349,
+        alt: "Sovaio — stop leaving money on the table. Get a data-backed sponsorship rate card and AI deal guidance.",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Stop Leaving Money on the Table",
+    description,
+    images: [
+      {
+        url: "/sovaiolandingpage.PNG",
+        width: 2355,
+        height: 1349,
+        alt: "Sovaio — stop leaving money on the table. Get a data-backed sponsorship rate card and AI deal guidance.",
+      },
+    ],
+  },
+}
 
 export default async function LandingPage({
   searchParams,

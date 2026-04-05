@@ -18,31 +18,66 @@ const siteDescription =
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://sovaio.com"),
-  title: "Sovaio | YouTube sponsorship pricing and deal guidance",
+  title: {
+    template: "%s | Sovaio",
+    default: "Sovaio | YouTube Sponsorship Pricing & AI Deal Guidance",
+  },
   description: siteDescription,
+  keywords: [
+    "YouTube sponsorship",
+    "sponsorship rate card",
+    "YouTube analytics",
+    "brand deal negotiation",
+    "creator monetization",
+    "YouTube CPM",
+    "influencer pricing",
+    "YouTube creator tools",
+    "AI deal guidance",
+    "sponsorship valuation",
+  ],
+  authors: [{ name: "Sovaio", url: "https://sovaio.com" }],
+  creator: "Sovaio",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Sovaio",
+    title: "Sovaio | YouTube Sponsorship Pricing & AI Deal Guidance",
     description: siteDescription,
     url: "https://sovaio.com",
     siteName: "Sovaio",
     type: "website",
+    locale: "en_US",
     images: [
       {
-        url: "/sovaiobanner.png",
-        width: 1536,
-        height: 1024,
-        alt: "Sovaio banner",
+        url: "/sovaiolandingpage.PNG",
+        width: 2355,
+        height: 1349,
+        alt: "Sovaio — stop leaving money on the table. Get a data-backed sponsorship rate card and AI deal guidance.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sovaio",
+    title: "Sovaio | YouTube Sponsorship Pricing & AI Deal Guidance",
     description: siteDescription,
-    images: ["/sovaiobanner.png"],
+    images: [
+      {
+        url: "/sovaiolandingpage.PNG",
+        width: 2355,
+        height: 1349,
+        alt: "Sovaio — stop leaving money on the table. Get a data-backed sponsorship rate card and AI deal guidance.",
+      },
+    ],
   },
   icons: {
     icon: [

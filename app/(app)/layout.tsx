@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import { AppNav, Footer } from '@/components/navbar'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 import ChannelAiSidebar from '@/components/channel-ai-sidebar'
 import OnboardingShell from '@/components/onboarding-shell'
 import { OnboardingProvider } from '@/components/onboarding-provider'

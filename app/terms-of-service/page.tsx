@@ -5,11 +5,23 @@ import { LegalPage, LegalSection } from '@/components/legal-page'
 const effectiveDate = 'April 4, 2026'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | Sovaio',
+  title: 'Terms of Service',
   description:
     'Read the terms that govern access to and use of the Sovaio website and creator tools.',
   alternates: {
     canonical: '/terms-of-service',
+  },
+  openGraph: {
+    title: 'Terms of Service | Sovaio',
+    description: 'Read the terms that govern access to and use of the Sovaio website and creator tools.',
+    url: 'https://sovaio.com/terms-of-service',
+    images: [{ url: '/sovaiobanner.png', width: 1536, height: 1024, alt: 'Sovaio' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Terms of Service | Sovaio',
+    description: 'Read the terms that govern access to and use of the Sovaio website and creator tools.',
+    images: ['/sovaiobanner.png'],
   },
 }
 
