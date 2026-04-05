@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, User, X } from 'lucide-react'
 import BrandLogo from '@/components/brand-logo'
+import FeedbackModal from '@/components/feedback-modal'
 
 interface MarketingNavProps {
   isLoggedIn?: boolean
@@ -165,22 +166,38 @@ export function AppNav({ hasAnalytics }: { hasAnalytics: boolean }) {
   )
 }
 
-export function Footer() {
+export function Footer({ showFeedback = false }: { showFeedback?: boolean }) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+
   return (
-    <footer className="border-t border-border bg-muted-light mt-auto">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex flex-col items-center gap-1 sm:items-start">
-            <BrandLogo href="/" size="sm" imageClassName="max-h-8 w-auto" />
-            <p className="text-xs text-muted">sovaio.com</p>
+    <>
+      <footer className="border-t border-border bg-muted-light mt-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col items-center gap-1 sm:items-start">
+              <BrandLogo href="/" size="sm" imageClassName="max-h-8 w-auto" />
+              <p className="text-xs text-muted">sovaio.com</p>
+            </div>
+            <div className="flex items-center gap-6">
+              {showFeedback ? (
+                <button
+                  type="button"
+                  onClick={() => setFeedbackOpen(true)}
+                  className="text-xs text-muted hover:text-foreground transition-colors"
+                >
+                  Leave Feedback
+                </button>
+              ) : null}
+              <Link href="/terms-of-service" className="text-xs text-muted hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/privacy-policy" className="text-xs text-muted hover:text-foreground transition-colors">Privacy</Link>
+            </div>
+            <p className="text-xs text-muted">&copy; {new Date().getFullYear()} Sovaio. All rights reserved.</p>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/terms-of-service" className="text-xs text-muted hover:text-foreground transition-colors">Terms</Link>
-            <Link href="/privacy-policy" className="text-xs text-muted hover:text-foreground transition-colors">Privacy</Link>
-          </div>
-          <p className="text-xs text-muted">&copy; {new Date().getFullYear()} Sovaio. All rights reserved.</p>
         </div>
-      </div>
-    </footer>
+      </footer>
+      {showFeedback ? (
+        <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      ) : null}
+    </>
   )
 }

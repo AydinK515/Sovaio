@@ -77,7 +77,7 @@ export default function FeedbackModal({
     const trimmedMessage = feedbackMessage.trim()
 
     if (trimmedMessage.length < 10) {
-      setError('Please share a bit more detail so I can actually act on it.')
+      setError('Please share a bit more detail so we can actually act on it.')
       return
     }
 
@@ -165,7 +165,7 @@ export default function FeedbackModal({
 
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
-              What should I know?
+              What should we know?
             </label>
             <textarea
               value={feedbackMessage}

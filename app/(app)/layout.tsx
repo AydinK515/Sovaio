@@ -74,7 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>
-          <Footer />
+          <Footer showFeedback />
         </div>
         <ChannelAiSidebar
           aiEnabled={aiEnabled}
