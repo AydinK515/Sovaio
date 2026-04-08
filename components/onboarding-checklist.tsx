@@ -40,8 +40,9 @@ export default function OnboardingChecklist({
   }
 
   return (
-    <section className={`rounded-[28px] border border-border bg-white shadow-[0_18px_50px_-36px_rgba(15,23,42,0.3)] ${compact ? 'p-4' : 'p-6'}`}>
-      <div className="flex items-start justify-between gap-4">
+    <section className="overflow-hidden rounded-[28px] border border-border bg-white shadow-[0_18px_50px_-36px_rgba(15,23,42,0.3)]">
+      <div className={compact ? 'max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain p-4 pr-3' : 'p-6'}>
+        <div className="flex items-start justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
             <Sparkles className="h-3.5 w-3.5" />
@@ -71,29 +72,51 @@ export default function OnboardingChecklist({
         >
           <X className="h-4 w-4" />
         </button>
-      </div>
+        </div>
 
-      <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-muted-light px-4 py-3">
-        <p className="text-sm font-medium text-foreground">Progress</p>
-        <p className="text-sm text-muted">{completedCount} of {totalCount} complete</p>
-      </div>
+        <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl bg-muted-light px-4 py-3">
+          <p className="text-sm font-medium text-foreground">Progress</p>
+          <p className="text-sm text-muted">{completedCount} of {totalCount} complete</p>
+        </div>
 
-      <div className="mt-4 space-y-3">
-        {items.map((item) => {
-          const isComplete = item.status === 'complete'
-          const itemClassName = `group flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
-            isComplete
-              ? 'border-emerald-200 bg-emerald-50/70'
-              : item.status === 'active'
-                ? 'border-border bg-white hover:border-primary/25 hover:bg-primary-light/40'
-                : 'border-border bg-slate-50 text-muted'
-          }`
+        <div className="mt-4 space-y-3">
+          {items.map((item) => {
+            const isComplete = item.status === 'complete'
+            const itemClassName = `group flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+              isComplete
+                ? 'border-emerald-200 bg-emerald-50/70'
+                : item.status === 'active'
+                  ? 'border-border bg-white hover:border-primary/25 hover:bg-primary-light/40'
+                  : 'border-border bg-slate-50 text-muted'
+            }`
 
-          if (item.id === 'ask_channel_ai') {
+            if (item.id === 'ask_channel_ai') {
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleItemClick(item.id)}
+                  className={itemClassName}
+                >
+                  <div className="mt-0.5 shrink-0">
+                    {isComplete ? (
+                      <CheckCircle2 className="h-5 w-5 text-success" />
+                    ) : (
+                      <CircleDashed className={`h-5 w-5 ${item.status === 'active' ? 'text-primary' : 'text-border-dark'}`} />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{item.description}</p>
+                  </div>
+                </button>
+              )
+            }
+
             return (
-              <button
+              <Link
                 key={item.id}
-                type="button"
+                href={item.href}
                 onClick={() => handleItemClick(item.id)}
                 className={itemClassName}
               >
@@ -108,31 +131,10 @@ export default function OnboardingChecklist({
                   <p className="text-sm font-semibold text-foreground">{item.title}</p>
                   <p className="mt-1 text-sm leading-relaxed text-muted">{item.description}</p>
                 </div>
-              </button>
+              </Link>
             )
-          }
-
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              onClick={() => handleItemClick(item.id)}
-              className={itemClassName}
-            >
-              <div className="mt-0.5 shrink-0">
-                {isComplete ? (
-                  <CheckCircle2 className="h-5 w-5 text-success" />
-                ) : (
-                  <CircleDashed className={`h-5 w-5 ${item.status === 'active' ? 'text-primary' : 'text-border-dark'}`} />
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{item.description}</p>
-              </div>
-            </Link>
-          )
-        })}
+          })}
+        </div>
       </div>
     </section>
   )
