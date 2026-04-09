@@ -804,7 +804,7 @@ export default function AnalyticsUploadForm() {
             <h3 className="font-semibold">Choose snapshot settings</h3>
           </div>
           <p className="mt-2 text-sm text-muted md:ml-9">
-            These settings control which data gets included in the generated report links below.
+            These settings control what data you want us to include in this snapshot.
           </p>
 
           <div className="mt-5 space-y-6 md:ml-9">
@@ -838,7 +838,7 @@ export default function AnalyticsUploadForm() {
             <div>
               <p className="text-sm font-medium text-foreground">Snapshot range</p>
               <p className="mt-0.5 text-xs text-muted">
-                Recent ranges usually give a cleaner signal. Go further back if you post less often
+                Select the Youtube analytics date range to use for this snapshot. Go further back if you post less often
                 or want a fuller view of your channel.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -1151,7 +1151,7 @@ export default function AnalyticsUploadForm() {
               Custom snapshot range
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              How many days back should these report links go from today?
+              How many days back should this snapshot go to?
             </p>
 
             <label className="mt-5 block text-xs font-medium uppercase tracking-[0.18em] text-muted">
