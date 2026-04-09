@@ -129,7 +129,7 @@ export default function AnalyticsUploadForm() {
   const [channelId, setChannelId] = useState<string | null>(null)
   const [channelIdError, setChannelIdError] = useState('')
   const [includeShorts, setIncludeShorts] = useState(false)
-  const [snapshotRange, setSnapshotRange] = useState<SnapshotRangeValue>('4_weeks')
+  const [snapshotRange, setSnapshotRange] = useState<SnapshotRangeValue>('quarter')
   const [customDaysBack, setCustomDaysBack] = useState(30)
   const [customDaysDraft, setCustomDaysDraft] = useState('30')
   const [customRangeError, setCustomRangeError] = useState('')
