@@ -175,9 +175,8 @@ export const NICHES = [
 ] as const
 
 export const CSV_TYPES = [
-  { key: 'content' as const, label: 'Top Content', required: true, confidence: 35, description: 'Average views per video — the primary input everything is priced off', studioPath: 'Analytics > Content' },
-  { key: 'geography' as const, label: 'Top Geographies', required: true, confidence: 30, description: 'Where your viewers are — US/UK/CA audience can 2–3× your rate vs developing markets', studioPath: 'Analytics > Audience > Geography' },
-  { key: 'demographics' as const, label: 'Audience Demographics', required: false, confidence: 20, description: 'Age and gender breakdown — 18–34 male with disposable income commands meaningfully higher rates', studioPath: 'Analytics > Audience > Age and gender' },
-  { key: 'audience_growth' as const, label: 'Audience Size & Growth', required: false, confidence: 10, description: 'Subscriber trajectory and viewer loyalty — useful context but weakest rate signal', studioPath: 'Analytics > Audience > Audience size and growth' },
-  { key: 'traffic_sources' as const, label: 'Traffic Sources', required: false, confidence: 5, description: 'How viewers find your content — organic search signals intent but brands rarely price off this', studioPath: 'Analytics > Reach > Traffic source' },
+  { key: 'content' as const, label: 'Content Breakdown', required: true, confidence: 40, description: 'Per-video views, watch time, and revenue — the primary input everything is priced off', studioPath: 'Analytics > Content' },
+  { key: 'geography' as const, label: 'Audience Geography', required: true, confidence: 35, description: 'Where your viewers are — US/UK/CA audience can 2–3× your rate vs developing markets', studioPath: 'Analytics > Audience > Geography' },
+  { key: 'age' as const, label: 'Audience Age', required: false, confidence: 15, description: 'Age distribution — 18–34 with disposable income commands meaningfully higher rates', studioPath: 'Analytics > Audience > Age and gender' },
+  { key: 'gender' as const, label: 'Audience Gender', required: false, confidence: 10, description: 'Gender split — useful demographic context for brand matching', studioPath: 'Analytics > Audience > Age and gender' },
 ] as const

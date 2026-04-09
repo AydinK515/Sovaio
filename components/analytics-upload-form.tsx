@@ -30,6 +30,7 @@ interface ParsedFile {
   rowCount: number
   fileName: string
   quality: number
+  subscriberCount?: number
 }
 
 const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024
@@ -157,11 +158,10 @@ export default function AnalyticsUploadForm() {
   const confidence = (() => {
     let score = 0
     const types = parsedFiles.map(file => file.type)
-    if (types.includes('content')) score += 35
-    if (types.includes('geography')) score += 30
-    if (types.includes('demographics')) score += 20
-    if (types.includes('audience_growth')) score += 10
-    if (types.includes('traffic_sources')) score += 5
+    if (types.includes('content')) score += 40
+    if (types.includes('geography')) score += 35
+    if (types.includes('age')) score += 15
+    if (types.includes('gender')) score += 10
     return score
   })()
 
@@ -279,47 +279,31 @@ export default function AnalyticsUploadForm() {
   function detectCsvType(headers: string[], fileName: string): string | null {
     const h = headers.map(s => s.toLowerCase().trim())
     const lowerFileName = fileName.toLowerCase()
+
     const hasVideoTitle = h.some(x => x.includes('video title'))
     const hasContentId = h.includes('content')
-    const hasViews = h.some(x => x === 'views' || x.includes('views'))
+    const hasViews = h.some(x => x === 'views' || x === 'views (%)')
     const hasWatchTime = h.some(x => x.includes('watch time'))
     const hasSubscribers = h.some(x => x.includes('subscribers'))
-    const hasDate = h.includes('date')
-    const hasCountry = h.some(x => x.includes('country') || x.includes('geography'))
-    const hasAge = h.some(x => x.includes('age'))
-    const hasGender = h.some(x => x.includes('gender'))
-    const hasTrafficSource = h.some(
-      x => x.includes('traffic source') || x.includes('source type'),
-    )
-    const hasRetention = h.some(
-      x =>
-        x.includes('retention') ||
-        x.includes('average percentage viewed') ||
-        x.includes('average view duration'),
-    )
-    const hasMonthlyAudience = h.some(x => x.includes('monthly audience'))
-    const has28DayViewers = h.some(
-      x =>
-        x.includes('28-day') &&
-        (x.includes('viewer') || x.includes('new') || x.includes('casual') || x.includes('regular')),
-    )
-    const isSubscriberTimeline =
-      hasDate && hasSubscribers && !hasVideoTitle && !hasContentId && !hasViews && !hasWatchTime && h.length <= 2
+    const hasGeography = h.some(x => x === 'geography' || x.includes('country'))
+    // Use specific "viewer age" / "viewer gender" to avoid false matches on
+    // columns like "average percentage viewed (%)" which contains "age"
+    const hasViewerAge = h.some(x => x.includes('viewer age'))
+    const hasViewerGender = h.some(x => x.includes('viewer gender'))
 
-    if (hasMonthlyAudience || has28DayViewers || isSubscriberTimeline) return 'audience_growth'
+    // Skip chart/totals rollup files that aren't the detailed table export
     if (
       (lowerFileName.includes('totals') || lowerFileName.includes('chart data')) &&
-      hasDate &&
-      hasViews &&
       !hasVideoTitle
     )
       return null
-    if (hasAge || hasGender) return 'demographics'
-    if (hasCountry) return 'geography'
-    if (hasTrafficSource) return 'traffic_sources'
-    if (hasRetention) return 'retention'
+
+    if (hasViewerGender) return 'gender'
+    if (hasViewerAge) return 'age'
+    if (hasGeography) return 'geography'
     if ((hasVideoTitle || hasContentId) && (hasViews || hasWatchTime || hasSubscribers))
       return 'content'
+
     return null
   }
 
@@ -333,9 +317,9 @@ export default function AnalyticsUploadForm() {
     if (lowerFileName.includes('totals')) score -= 500
     if (h.some(x => x.includes('video title'))) score += 100
     if (h.some(x => x.includes('watch time'))) score += 50
-    if (h.some(x => x.includes('country') || x.includes('geography'))) score += 50
-    if (h.some(x => x.includes('28-day') && x.includes('new'))) score += 200
-    if (h.some(x => x === 'subscribers') && h.includes('date')) score += 100
+    if (h.some(x => x.includes('geography') || x.includes('country'))) score += 50
+    if (h.some(x => x.includes('viewer age'))) score += 75
+    if (h.some(x => x.includes('viewer gender'))) score += 50
 
     return score
   }
@@ -347,10 +331,30 @@ export default function AnalyticsUploadForm() {
       )
       if (values.length === 0) return false
 
+      // Filter out summary/total rows across all report types
       const content = String(row['Content'] ?? '').trim().toLowerCase()
       const title = String(row['Video title'] ?? '').trim().toLowerCase()
-      return content !== 'total' && title !== 'total'
+      const geography = String(row['Geography'] ?? '').trim().toLowerCase()
+      return content !== 'total' && title !== 'total' && geography !== 'total'
     })
+  }
+
+  function extractSubscriberCountFromTotalRow(rows: Record<string, unknown>[]): number | undefined {
+    // The Total summary row appears at the top of Content and Geography exports.
+    // Content: row where Content === 'Total' → Subscribers column = cumulative total
+    // Geography: row where Geography === 'Total' → Subscribers column = cumulative total
+    for (const row of rows) {
+      const isContentTotal = String(row['Content'] ?? '').trim().toLowerCase() === 'total'
+      const isGeographyTotal = String(row['Geography'] ?? '').trim().toLowerCase() === 'total'
+      if (isContentTotal || isGeographyTotal) {
+        const raw = row['Subscribers']
+        if (raw !== undefined && raw !== null && raw !== '') {
+          const count = parseInt(String(raw).replace(/[, ]/g, ''))
+          if (!isNaN(count) && count > 0) return count
+        }
+      }
+    }
+    return undefined
   }
 
   function parseCsvText(fileName: string, text: string): ParsedFile | null {
@@ -364,6 +368,9 @@ export default function AnalyticsUploadForm() {
     const type = detectCsvType(headers, fileName)
     if (!type) return null
 
+    // Extract subscriber count from the Total row before filtering it out
+    const subscriberCount = extractSubscriberCountFromTotalRow(results.data)
+
     const normalizedData = normalizeRows(results.data)
     if (normalizedData.length === 0) return null
     const storedData = normalizedData.slice(0, MAX_PARSED_ROWS_PER_UPLOAD)
@@ -374,6 +381,7 @@ export default function AnalyticsUploadForm() {
       rowCount: storedData.length,
       fileName,
       quality: getQualityScore(headers, fileName, normalizedData.length),
+      subscriberCount,
     }
   }
 
@@ -400,7 +408,11 @@ export default function AnalyticsUploadForm() {
     const parsed: ParsedFile[] = []
 
     for (const [entryName, entryBytes] of Object.entries(archive)) {
-      if (!entryName.toLowerCase().endsWith('.csv')) continue
+      const lowerEntry = entryName.toLowerCase()
+      if (!lowerEntry.endsWith('.csv')) continue
+      // Chart data files are enormous time-series blobs (up to 120k+ rows) with
+      // no pricing value — drop them before decoding bytes
+      if (lowerEntry.includes('chart data')) continue
       const text = strFromU8(entryBytes)
       const candidate = parseCsvText(`${file.name} > ${entryName}`, text)
       if (candidate) parsed.push(candidate)
@@ -413,7 +425,10 @@ export default function AnalyticsUploadForm() {
     setError('')
     const fileArray = Array.from(files).filter(file => {
       const lower = file.name.toLowerCase()
-      return lower.endsWith('.csv') || lower.endsWith('.zip')
+      if (!lower.endsWith('.csv') && !lower.endsWith('.zip')) return false
+      // Drop directly-uploaded chart data files the same way we drop them from zips
+      if (lower.includes('chart data')) return false
+      return true
     })
 
     if (fileArray.length === 0) {
@@ -463,12 +478,8 @@ export default function AnalyticsUploadForm() {
       setSubscriberCount(prev => {
         if (prev) return prev
         for (const candidate of candidates) {
-          if (candidate.data.length === 0) continue
-          const lastRow = candidate.data[candidate.data.length - 1]
-          const subs = lastRow['Subscribers']
-          if (subs !== undefined && subs !== null && subs !== '') {
-            const count = parseInt(String(subs).replace(/[, ]/g, ''))
-            if (!isNaN(count) && count > 100) return count.toLocaleString()
+          if (candidate.subscriberCount && candidate.subscriberCount > 0) {
+            return candidate.subscriberCount.toLocaleString()
           }
         }
         return prev
