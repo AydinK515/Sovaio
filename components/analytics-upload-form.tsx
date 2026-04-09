@@ -112,11 +112,31 @@ export default function AnalyticsUploadForm() {
   const [channelIdError, setChannelIdError] = useState('')
   const [includeShorts, setIncludeShorts] = useState(true)
   const [snapshotRange, setSnapshotRange] = useState<SnapshotRangeValue>('4_weeks')
+  const [showUrlPopover, setShowUrlPopover] = useState(false)
+  const urlPopoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showUrlPopover) return
+    function handleClickOutside(event: MouseEvent) {
+      if (urlPopoverRef.current && !urlPopoverRef.current.contains(event.target as Node)) {
+        setShowUrlPopover(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showUrlPopover])
 
   function handleStudioUrlChange(url: string) {
     setStudioUrl(url)
     if (!url.trim()) {
       setChannelId(null)
+      setChannelIdError('')
+      return
+    }
+    // Accept a bare channel ID as well as a full Studio URL
+    const bareId = url.trim().match(/^(UC[A-Za-z0-9_-]+)$/)
+    if (bareId) {
+      setChannelId(bareId[1])
       setChannelIdError('')
       return
     }
@@ -601,7 +621,7 @@ export default function AnalyticsUploadForm() {
 
         {/* ── Section 1: Paste URL ──────────────────────────────────────────── */}
         <div className="mt-8">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
               1
             </span>
@@ -612,10 +632,40 @@ export default function AnalyticsUploadForm() {
                 Channel found
               </span>
             )}
+            {/* Why popover */}
+            <div ref={urlPopoverRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setShowUrlPopover(v => !v)}
+                className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-foreground"
+              >
+                <ChevronDown className={`h-3 w-3 transition-transform ${showUrlPopover ? 'rotate-180' : ''}`} />
+                Why do I need this?
+              </button>
+              {showUrlPopover && (
+                <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-white p-4 shadow-lg">
+                  <p className="mb-2 text-xs font-semibold text-foreground">Why we need your Studio URL</p>
+                  <p className="text-xs leading-relaxed text-muted">
+                    Your URL contains your <span className="font-medium text-foreground">channel ID</span> — a unique code like <span className="font-mono text-foreground">UCad0x…</span>. We use it to build direct links to the exact report pages in your Studio so you don&apos;t have to navigate there manually.
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted">
+                    We don&apos;t use it to access your channel or make any requests on your behalf. The URL is parsed locally in your browser — nothing is sent anywhere.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <p className="mt-2 ml-9 text-sm text-muted">
-            Open YouTube Studio, go to Analytics, and copy the URL from your browser&apos;s address
-            bar.
+            <a
+              href="https://studio.youtube.com/channel/UC"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-foreground hover:text-primary transition-colors"
+            >
+              Open YouTube Studio
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            {' '}and copy the URL from your browser&apos;s address bar.
           </p>
 
           {/* Browser bar mockup */}
@@ -629,9 +679,8 @@ export default function AnalyticsUploadForm() {
               <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border bg-white px-2.5 py-1">
                 <Lock className="h-3 w-3 shrink-0 text-success" />
                 <span className="truncate font-mono text-[11px] text-muted">
-                  studio.youtube.com/channel/
+                  https://studio.youtube.com/channel/
                   <span className="font-semibold text-primary">UCad0xYHB_RLgRWGMPC5DCdw</span>
-                  /analytics/tab-overview/period-default
                 </span>
               </div>
             </div>
@@ -642,7 +691,7 @@ export default function AnalyticsUploadForm() {
               type="url"
               value={studioUrl}
               onChange={e => handleStudioUrlChange(e.target.value)}
-              placeholder="https://studio.youtube.com/channel/UC.../analytics/..."
+              placeholder="https://studio.youtube.com/channel/UC..."
               className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                 channelIdError ? 'border-primary' : channelId ? 'border-success' : 'border-border'
               }`}
