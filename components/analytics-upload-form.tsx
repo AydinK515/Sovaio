@@ -632,6 +632,8 @@ export default function AnalyticsUploadForm() {
         ? parseInt(subscriberCount.replace(/,/g, ''))
         : null
       const reportTypes = parsedFiles.map(file => file.type)
+      const persistedSnapshotRange =
+        snapshotRange === 'custom' ? `custom:${customDaysBack}` : snapshotRange
 
       const { data: snapshot, error: snapshotError } = await supabase
         .from('analytics_snapshots')
@@ -641,6 +643,8 @@ export default function AnalyticsUploadForm() {
           csv_upload_ids: uploadIds,
           report_confidence: confidence,
           subscriber_count: snapshotSubscriberCount,
+          include_shorts: includeShorts,
+          snapshot_range: persistedSnapshotRange,
           report_types: reportTypes,
         })
         .select('id')

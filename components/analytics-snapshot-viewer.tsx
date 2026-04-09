@@ -45,6 +45,28 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatSnapshotRange(value: string | null) {
+  switch (value) {
+    case '4_weeks':
+      return 'Last 28 days'
+    case 'quarter':
+      return 'Last 90 days'
+    case 'year':
+      return 'Last 365 days'
+    case 'lifetime':
+      return 'Lifetime'
+    default:
+      if (typeof value === 'string' && value.startsWith('custom:')) {
+        const parsedDaysBack = Number.parseInt(value.slice('custom:'.length), 10)
+        return Number.isFinite(parsedDaysBack) && parsedDaysBack > 0
+          ? `Custom (${parsedDaysBack} days back)`
+          : 'Custom'
+      }
+
+      return 'Not specified'
+  }
+}
+
 export default function AnalyticsSnapshotViewer({
   snapshot,
   csvData,
@@ -86,6 +108,12 @@ export default function AnalyticsSnapshotViewer({
   const paginatedRows = selectedRows.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
   const totalRows = Object.values(csvData).reduce((sum, rows) => sum + rows.length, 0)
   const selectedMeta = REPORT_TYPE_META[selectedReportType as CsvUpload['upload_type']]
+  const snapshotRangeLabel = formatSnapshotRange(snapshot.snapshot_range)
+  const shortsLabel = snapshot.include_shorts === null
+    ? 'Not specified'
+    : snapshot.include_shorts
+      ? 'Includes Shorts'
+      : 'Long-form only'
 
   useEffect(() => {
     captureAnalyticsEvent(POSTHOG_EVENTS.analyticsSnapshotViewed, {
@@ -281,6 +309,27 @@ export default function AnalyticsSnapshotViewer({
           <p className="mt-2 text-sm text-muted">Deals and Channel Advisor chats currently grounded in this snapshot.</p>
         </div>
       </div>
+
+      <section className="mt-6 rounded-3xl border border-border bg-white p-6">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-xl font-semibold">Snapshot settings</h2>
+            <p className="mt-1 text-sm text-muted">
+              These are the exact settings that were used when this analytics snapshot was created.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">Analytics range</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{snapshotRangeLabel}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">Content types</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{shortsLabel}</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-3xl border border-border bg-white p-6">

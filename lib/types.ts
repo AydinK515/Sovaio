@@ -20,6 +20,8 @@ export interface AnalyticsSnapshot {
   csv_upload_ids: string[]
   report_confidence: number
   subscriber_count: number | null
+  include_shorts: boolean | null
+  snapshot_range: string | null
   report_types: string[]
   created_at: string
   updated_at: string

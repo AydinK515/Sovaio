@@ -18,11 +18,42 @@ export function invalidateAnalyticsSnapshotContext(snapshotId: string) {
   analyticsContextCache.delete(snapshotId)
 }
 
+function formatSnapshotRange(snapshot: AnalyticsSnapshot) {
+  const value = snapshot.snapshot_range
+
+  switch (value) {
+    case '4_weeks':
+      return 'Last 28 days'
+    case 'quarter':
+      return 'Last 90 days'
+    case 'year':
+      return 'Last 365 days'
+    case 'lifetime':
+      return 'Lifetime'
+    default:
+      if (typeof value === 'string' && value.startsWith('custom:')) {
+        const parsedDaysBack = Number.parseInt(value.slice('custom:'.length), 10)
+        return Number.isFinite(parsedDaysBack) && parsedDaysBack > 0
+          ? `Custom (${parsedDaysBack} days back)`
+          : 'Custom'
+      }
+
+      return null
+  }
+}
+
 function buildCompactFacts(snapshot: AnalyticsSnapshot, csvSummary: string) {
+  const snapshotRangeLabel = formatSnapshotRange(snapshot)
   const facts = [
     `Selected analytics snapshot: ${snapshot.name}`,
     `- Report confidence: ${snapshot.report_confidence}%`,
     snapshot.subscriber_count ? `- Subscribers: ${snapshot.subscriber_count.toLocaleString()}` : null,
+    snapshotRangeLabel ? `- Snapshot range: ${snapshotRangeLabel}` : null,
+    snapshot.include_shorts === null
+      ? null
+      : snapshot.include_shorts
+        ? '- Includes YouTube Shorts: Yes'
+        : '- Includes YouTube Shorts: No (long-form only)',
     snapshot.report_types.length > 0 ? `- Included reports: ${snapshot.report_types.join(', ')}` : null,
     csvSummary || null,
   ].filter((value): value is string => Boolean(value))
