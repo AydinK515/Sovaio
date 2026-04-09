@@ -261,7 +261,11 @@ If geography data is missing, do NOT assume a premium. Use 1.0x and note the ass
 - 1-3 sponsorships: 1.0x
 - 4-10 sponsorships: 1.1-1.2x
 - 10+ sponsorships: 1.2-1.4x
-- If prior avg deal amount is known, use that as a hard rate floor - new rates should not be below it.
+- If prior avg deal amount is known, use sponsorship count to decide how hard the floor should be:
+- 1 sponsorship: treat the avg deal amount as a soft anchor, not a hard floor. The generated range should still include that avg deal amount, but the low end can land modestly below it if the analytics justify it.
+- 2-3 sponsorships: treat the avg deal amount as a semi-firm floor. The low end can be slightly below it, but keep the avg deal amount inside the final range.
+- 4-10 sponsorships: treat the avg deal amount as an effective floor. New rates should usually not fall below it unless the analytics are meaningfully weaker than the past context suggests.
+- 10+ sponsorships: treat the avg deal amount as a hard floor - new rates should not be below it.
 
 ## STEP 5 - Engagement quality modifier (+/-15-20%)
 The YouTube Studio CSV does not export video length, so true retention % (watch time / video length) cannot be computed. Do not attempt to infer retention from raw watch hours alone - it is uninterpretable without knowing video duration.
@@ -297,7 +301,9 @@ Output rules:
 - Every high value must be >= its matching low value.
 - dedicated_video > integration_60s > integration_30s.
 - Channels without prior sponsorships must not receive an experience premium.
-- If prior avg deal amount is known, it is the rate floor.
+- If prior avg deal amount is known and there are 1-3 prior sponsorships, keep that avg deal amount somewhere inside the generated range even if the low end is allowed to be lower.
+- If prior avg deal amount is known and there are 4-10 prior sponsorships, treat it as the effective floor in most cases.
+- If prior avg deal amount is known and there are 10+ prior sponsorships, it is the hard floor.
 - Keep the explanation grounded in the actual data - name the specific factors that drove the numbers.
 - The explanation must stay qualitative. Do not include any raw numbers, dollar amounts, CPM bands, percentages, multipliers, ranges, parentheses with figures, or intermediate math.
 - In the explanation, describe the factors in plain English instead, for example: strong premium-market audience, modest view volume for the niche, first-time sponsor discount, or strong engagement signals.`
