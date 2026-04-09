@@ -655,7 +655,7 @@ export default function AnalyticsUploadForm() {
                 Why do I need this?
               </button>
               {showUrlPopover && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-white p-4 shadow-lg">
+                <div className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-border bg-white p-4 shadow-lg md:left-0 md:right-auto md:w-72">
                   <p className="mb-2 text-xs font-semibold text-foreground">Why we need your Studio URL</p>
                   <p className="text-xs leading-relaxed text-muted">
                     Your URL contains your <span className="font-medium text-foreground">channel ID</span> — a unique code like <span className="font-mono text-foreground">UCad0x…</span>. We use it to build direct links to the exact report pages in your Studio so you don&apos;t have to navigate there manually.
@@ -764,10 +764,8 @@ export default function AnalyticsUploadForm() {
             <div>
               <p className="text-sm font-medium text-foreground">Snapshot range</p>
               <p className="mt-0.5 text-xs text-muted">
-                More data isn&apos;t always better. If you post frequently, a recent range gives a
-                cleaner signal. If you post less often or make slower long-tail videos, going further
-                back can paint a fuller picture. There&apos;s no single right answer — pick what
-                best represents your channel.
+                Recent ranges usually give a cleaner signal. Go further back if you post less often
+                or want a fuller view of your channel.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {SNAPSHOT_RANGES.map(range => (
@@ -819,7 +817,7 @@ export default function AnalyticsUploadForm() {
                     {REQUIRED_REPORTS.map(report => (
                       <div
                         key={report.key}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-4 py-3"
+                        className="flex flex-col gap-4 rounded-xl border border-border bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -840,7 +838,7 @@ export default function AnalyticsUploadForm() {
                           href={generateReportUrl(channelId, snapshotRange, includeShorts, report.key)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+                          className="flex items-center gap-1.5 self-start rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-secondary-hover sm:shrink-0"
                         >
                           Open
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -1057,3 +1055,4 @@ export default function AnalyticsUploadForm() {
     </div>
   )
 }
+
