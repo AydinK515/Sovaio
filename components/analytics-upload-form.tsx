@@ -112,7 +112,7 @@ export default function AnalyticsUploadForm() {
   const [studioUrl, setStudioUrl] = useState('')
   const [channelId, setChannelId] = useState<string | null>(null)
   const [channelIdError, setChannelIdError] = useState('')
-  const [includeShorts, setIncludeShorts] = useState(true)
+  const [includeShorts, setIncludeShorts] = useState(false)
   const [snapshotRange, setSnapshotRange] = useState<SnapshotRangeValue>('4_weeks')
   const [showUrlPopover, setShowUrlPopover] = useState(false)
   const urlPopoverRef = useRef<HTMLDivElement>(null)
@@ -860,9 +860,9 @@ export default function AnalyticsUploadForm() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 rounded-xl border border-border bg-muted-light px-4 py-3">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-                  <p className="text-xs text-muted">
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-muted-light px-4 py-3">
+                  <Info className="h-4 w-4 shrink-0 text-muted" />
+                  <p className="text-xs leading-relaxed text-muted">
                     Inside each report, click the{' '}
                     <span className="font-medium text-foreground">Download</span> button (top right)
                     and export as CSV. Come back here and upload all the files in the next step.
