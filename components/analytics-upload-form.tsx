@@ -667,7 +667,7 @@ export default function AnalyticsUploadForm() {
               )}
             </div>
           </div>
-          <p className="mt-2 ml-9 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted md:ml-9">
             <a
               href="https://studio.youtube.com/channel/UC"
               target="_blank"
@@ -681,7 +681,7 @@ export default function AnalyticsUploadForm() {
           </p>
 
           {/* Browser bar mockup */}
-          <div className="mt-4 ml-9 overflow-hidden rounded-xl border border-border bg-slate-50">
+          <div className="mt-4 hidden overflow-hidden rounded-xl border border-border bg-slate-50 md:ml-9 md:block">
             <div className="flex items-center gap-2 border-b border-border bg-slate-100 px-3 py-2">
               <div className="flex gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-slate-300" />
@@ -698,7 +698,7 @@ export default function AnalyticsUploadForm() {
             </div>
           </div>
 
-          <div className="mt-3 ml-9">
+          <div className="mt-3 md:ml-9">
             <input
               type="url"
               value={studioUrl}
@@ -729,11 +729,11 @@ export default function AnalyticsUploadForm() {
             </span>
             <h3 className="font-semibold">Choose snapshot settings</h3>
           </div>
-          <p className="mt-2 ml-9 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted md:ml-9">
             These settings control which data gets included in the generated report links below.
           </p>
 
-          <div className="mt-5 ml-9 space-y-6">
+          <div className="mt-5 space-y-6 md:ml-9">
             {/* Include Shorts toggle */}
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -799,13 +799,13 @@ export default function AnalyticsUploadForm() {
             </span>
             <h3 className="font-semibold">Open and download required reports</h3>
           </div>
-          <p className="mt-2 ml-9 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted md:ml-9">
             Each link below opens the correct report in YouTube Studio with your settings
             pre-applied. Open each one, download the CSV export, then upload all the files in Step 4
             below.
           </p>
 
-          <div className="mt-5 ml-9">
+          <div className="mt-5 md:ml-9">
             {!channelId ? (
               <div className="rounded-xl border border-dashed border-border bg-slate-50 px-5 py-6 text-center">
                 <p className="text-sm text-muted">
