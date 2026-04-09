@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
@@ -813,37 +814,51 @@ export default function AnalyticsUploadForm() {
               </div>
             ) : (
               <div className="space-y-3">
-                {REQUIRED_REPORTS.map(report => (
-                  <div
-                    key={report.key}
-                    className="flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-sm font-medium text-foreground">{report.label}</span>
-                        {report.required ? (
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                            Required
-                          </span>
-                        ) : (
-                          <span className="rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted">
-                            Optional
-                          </span>
-                        )}
+                <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+                  <div className="space-y-3 min-w-0">
+                    {REQUIRED_REPORTS.map(report => (
+                      <div
+                        key={report.key}
+                        className="flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-medium text-foreground">{report.label}</span>
+                            {report.required ? (
+                              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                Required
+                              </span>
+                            ) : (
+                              <span className="rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                                Optional
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted">{report.description}</p>
+                        </div>
+                        <a
+                          href={generateReportUrl(channelId, snapshotRange, includeShorts, report.key)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+                        >
+                          Open
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted">{report.description}</p>
-                    </div>
-                    <a
-                      href={generateReportUrl(channelId, snapshotRange, includeShorts, report.key)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex shrink-0 items-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
-                    >
-                      Open
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                    ))}
                   </div>
-                ))}
+
+                  <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+                    <Image
+                      src="/DownloadReport.jpg"
+                      alt="YouTube Studio screenshot highlighting the Download CSV button"
+                      width={2145}
+                      height={1350}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                </div>
 
                 <div className="flex items-start gap-2 rounded-xl border border-border bg-muted-light px-4 py-3">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
