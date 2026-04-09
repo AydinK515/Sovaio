@@ -664,6 +664,8 @@ export default function AnalyticsUploadForm() {
         analytics_snapshot_id: snapshot.id,
         report_confidence: confidence,
         subscriber_count: snapshotSubscriberCount,
+        include_shorts: includeShorts,
+        snapshot_range: persistedSnapshotRange,
       })
       await completeStep('upload_analytics', {
         snapshot_id: snapshot.id,

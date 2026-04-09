@@ -109,8 +109,10 @@ async function maybeCompleteOnboarding(
   nextState: OnboardingState
 ) {
   if (previousState.completed_at || nextState.completed_at) return nextState
+  if (!nextState.snapshot_created) return nextState
   if (!nextState.rate_card_created) return nextState
-  if (!nextState.first_negotiation_message && !nextState.first_channel_advisor_message) return nextState
+  if (!nextState.deal_created) return nextState
+  if (!nextState.first_channel_advisor_message) return nextState
 
   const completedState = await upsertState(supabase, nextState, {
     completed_at: new Date().toISOString(),
