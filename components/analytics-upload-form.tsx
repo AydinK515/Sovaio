@@ -58,6 +58,21 @@ const REPORT_BASE_URLS = {
 
 type ReportKey = keyof typeof REPORT_BASE_URLS
 
+function getLocalStartOfDayTimestamp(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(0, 0, 0, 0)
+  return copy.getTime()
+}
+
+function buildCustomTimePeriod(daysBack: number) {
+  const safeDaysBack = Math.max(1, Math.floor(daysBack))
+  const end = new Date()
+  const start = new Date(end)
+  start.setDate(start.getDate() - safeDaysBack)
+
+  return `${getLocalStartOfDayTimestamp(start)},${getLocalStartOfDayTimestamp(end)}`
+}
+
 function generateReportUrl(
   channelId: string,
   timePeriod: string,
@@ -80,6 +95,7 @@ const SNAPSHOT_RANGES = [
   { label: 'Last 90 days', value: 'quarter' },
   { label: 'Last 365 days', value: 'year' },
   { label: 'Lifetime', value: 'lifetime' },
+  { label: 'Custom', value: 'custom' },
 ] as const
 
 type SnapshotRangeValue = (typeof SNAPSHOT_RANGES)[number]['value']
@@ -114,8 +130,15 @@ export default function AnalyticsUploadForm() {
   const [channelIdError, setChannelIdError] = useState('')
   const [includeShorts, setIncludeShorts] = useState(false)
   const [snapshotRange, setSnapshotRange] = useState<SnapshotRangeValue>('4_weeks')
+  const [customDaysBack, setCustomDaysBack] = useState(30)
+  const [customDaysDraft, setCustomDaysDraft] = useState('30')
+  const [customRangeError, setCustomRangeError] = useState('')
+  const [showCustomRangeModal, setShowCustomRangeModal] = useState(false)
   const [showUrlPopover, setShowUrlPopover] = useState(false)
   const urlPopoverRef = useRef<HTMLDivElement>(null)
+
+  const resolvedTimePeriod =
+    snapshotRange === 'custom' ? buildCustomTimePeriod(customDaysBack) : snapshotRange
 
   useEffect(() => {
     if (!showUrlPopover) return
@@ -127,6 +150,25 @@ export default function AnalyticsUploadForm() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showUrlPopover])
+
+  useEffect(() => {
+    if (!showCustomRangeModal) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeCustomRangeModal()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showCustomRangeModal])
 
   function handleStudioUrlChange(url: string) {
     setStudioUrl(url)
@@ -509,6 +551,31 @@ export default function AnalyticsUploadForm() {
     }
   }
 
+  function openCustomRangeModal() {
+    setCustomDaysDraft(String(customDaysBack))
+    setCustomRangeError('')
+    setShowCustomRangeModal(true)
+  }
+
+  function closeCustomRangeModal() {
+    setShowCustomRangeModal(false)
+    setCustomRangeError('')
+  }
+
+  function saveCustomRange() {
+    const parsed = Number.parseInt(customDaysDraft.trim(), 10)
+
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setCustomRangeError('Enter a whole number of days greater than 0.')
+      return
+    }
+
+    setCustomDaysBack(parsed)
+    setSnapshotRange('custom')
+    setShowCustomRangeModal(false)
+    setCustomRangeError('')
+  }
+
   function removeFile(type: string) {
     setParsedFiles(prev => prev.filter(file => file.type !== type))
     if (fileInputRef.current) {
@@ -779,14 +846,23 @@ export default function AnalyticsUploadForm() {
                   <button
                     key={range.value}
                     type="button"
-                    onClick={() => setSnapshotRange(range.value)}
+                    onClick={() => {
+                      if (range.value === 'custom') {
+                        openCustomRangeModal()
+                        return
+                      }
+
+                      setSnapshotRange(range.value)
+                    }}
                     className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                       snapshotRange === range.value
                         ? 'border-primary bg-primary text-white'
                         : 'border-border bg-white text-muted hover:text-foreground'
                     }`}
                   >
-                    {range.label}
+                    {range.value === 'custom' && snapshotRange === 'custom'
+                      ? `Custom (${customDaysBack} days)`
+                      : range.label}
                   </button>
                 ))}
               </div>
@@ -841,7 +917,7 @@ export default function AnalyticsUploadForm() {
                           <p className="mt-0.5 text-xs text-muted">{report.description}</p>
                         </div>
                         <a
-                          href={generateReportUrl(channelId, snapshotRange, includeShorts, report.key)}
+                          href={generateReportUrl(channelId, resolvedTimePeriod, includeShorts, report.key)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1.5 self-start rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-secondary-hover sm:shrink-0"
@@ -1058,6 +1134,69 @@ export default function AnalyticsUploadForm() {
           </div>
         </div>
       </div>
+
+      {showCustomRangeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+          onClick={closeCustomRangeModal}
+        >
+          <div
+            className="w-full max-w-lg rounded-[28px] border border-border bg-white p-6 shadow-2xl animate-pop-in md:p-7"
+            onClick={event => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="custom-range-modal-title"
+          >
+            <h3 id="custom-range-modal-title" className="text-2xl font-semibold text-foreground">
+              Custom snapshot range
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              How many days back should these report links go from today?
+            </p>
+
+            <label className="mt-5 block text-xs font-medium uppercase tracking-[0.18em] text-muted">
+              Days Back
+            </label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={customDaysDraft}
+              onChange={event => {
+                setCustomDaysDraft(event.target.value)
+                if (customRangeError) setCustomRangeError('')
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  saveCustomRange()
+                }
+              }}
+              className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            {customRangeError && (
+              <p className="mt-2 text-sm text-primary">{customRangeError}</p>
+            )}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeCustomRangeModal}
+                className="rounded-xl border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted-light"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveCustomRange}
+                className="rounded-xl bg-secondary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+              >
+                Use Custom Range
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
