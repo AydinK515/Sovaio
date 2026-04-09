@@ -501,11 +501,19 @@ export default function AnalyticsUploadForm() {
         reason: 'parse_failed',
       })
       setError('One of the uploaded files could not be unpacked or parsed.')
+    } finally {
+      // Allow re-selecting the same file after a removal or failed upload attempt.
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
   function removeFile(type: string) {
     setParsedFiles(prev => prev.filter(file => file.type !== type))
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   async function handleCreateSnapshot() {
@@ -625,10 +633,9 @@ export default function AnalyticsUploadForm() {
       <div className="mt-8 rounded-[28px] border border-border bg-white p-5 shadow-sm md:p-6">
         <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">Setup</p>
         <h2 className="mt-2 text-2xl font-semibold">Set up your YouTube Studio export</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          Complete the steps below, then upload your files. The required reports are{' '}
-          <span className="font-medium text-foreground">Content Breakdown</span> and{' '}
-          <span className="font-medium text-foreground">Audience Geography</span>.
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Complete the steps below, then upload your files. This is where you upload your YouTube
+          analytics so Sovaio knows how to price your channel.
         </p>
 
         {/* ── Section 1: Paste URL ──────────────────────────────────────────── */}
@@ -798,9 +805,8 @@ export default function AnalyticsUploadForm() {
             <h3 className="font-semibold">Open and download required reports</h3>
           </div>
           <p className="mt-2 text-sm text-muted md:ml-9">
-            Each link below opens the correct report in YouTube Studio with your settings
-            pre-applied. Open each one, download the CSV export, then upload all the files in Step 4
-            below.
+            Everything below is already set up for you. Just open each report, download the CSV,
+            and upload the files in Step 4.
           </p>
 
           <div className="mt-5 md:ml-9">
