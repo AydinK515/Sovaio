@@ -5,7 +5,6 @@ export function buildCsvSummary(csvData: Record<string, Record<string, unknown>[
   if (csvData.content && csvData.content.length > 0) {
     const rows = csvData.content
       .filter(row => String(row['Video title'] ?? '').trim() !== '')
-      .slice(0, 10)
 
     const totalViews = rows.reduce((sum, row) => sum + toNumber(row['Views'] ?? row['views']), 0)
     const totalWatchHours = rows.reduce((sum, row) => sum + toNumber(row['Watch time (hours)'] ?? row['watch time (hours)']), 0)
@@ -79,41 +78,52 @@ export function buildCsvSummary(csvData: Record<string, Record<string, unknown>[
     }
   }
 
-  // --- Demographics ---
-  if (csvData.demographics && csvData.demographics.length > 0) {
-    const rows = csvData.demographics
+  // --- Demographics (age + gender stored as separate types; legacy 'demographics' key also handled) ---
+  {
+    const ageRows = csvData.age ?? []
+    const genderRows = csvData.gender ?? []
+    // legacy: old snapshots stored both in a single 'demographics' key
+    const legacyRows = csvData.demographics ?? []
 
-    let malePct = 0, femalePct = 0
     const ageGroups: Record<string, number> = {}
+    let malePct = 0, femalePct = 0
 
-    for (const row of rows) {
-      const gender = String(row['Viewer gender'] ?? '').trim()
+    for (const row of [...ageRows, ...legacyRows]) {
       const age = String(row['Viewer age'] ?? '').trim()
       const viewsPct = toNumber(row['Views (%)'] ?? row['views (%)'])
-
-      if (gender === 'Male') malePct += viewsPct
-      if (gender === 'Female') femalePct += viewsPct
-      if (age) {
-        ageGroups[age] = (ageGroups[age] ?? 0) + viewsPct
-      }
+      if (age) ageGroups[age] = viewsPct
     }
 
-    const coreAudience1834 = (ageGroups['18–24 years'] ?? 0) + (ageGroups['18-24 years'] ?? 0)
-      + (ageGroups['25–34 years'] ?? 0) + (ageGroups['25-34 years'] ?? 0)
+    for (const row of [...genderRows, ...legacyRows]) {
+      const gender = String(row['Viewer gender'] ?? '').trim()
+      const viewsPct = toNumber(row['Views (%)'] ?? row['views (%)'])
+      if (gender === 'Male') malePct = viewsPct
+      if (gender === 'Female') femalePct = viewsPct
+    }
 
-    const topAgeGroups = Object.entries(ageGroups)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([age, pct]) => `${age}: ${pct.toFixed(1)}%`)
-      .join(', ')
+    const hasAge = Object.keys(ageGroups).length > 0
+    const hasGender = malePct > 0 || femalePct > 0
 
-    const genderSplit = malePct > 0 || femalePct > 0
-      ? ` (${malePct.toFixed(0)}% male / ${femalePct.toFixed(0)}% female)`
-      : ''
+    if (hasAge || hasGender) {
+      const coreAudience1834 =
+        (ageGroups['18–24 years'] ?? 0) + (ageGroups['18-24 years'] ?? 0) +
+        (ageGroups['25–34 years'] ?? 0) + (ageGroups['25-34 years'] ?? 0)
 
-    parts.push(
-      `Demographics: top age groups — ${topAgeGroups}${genderSplit}${coreAudience1834 > 0 ? `; 18–34 combined: ${coreAudience1834.toFixed(0)}%` : ''}.`
-    )
+      const topAgeGroups = Object.entries(ageGroups)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([age, pct]) => `${age}: ${pct.toFixed(1)}%`)
+        .join(', ')
+
+      const genderSplit = hasGender
+        ? ` (${malePct.toFixed(0)}% male / ${femalePct.toFixed(0)}% female)`
+        : ''
+
+      const agePart = hasAge ? `top age groups — ${topAgeGroups}` : ''
+      const core1834Part = coreAudience1834 > 0 ? `; 18–34 combined: ${coreAudience1834.toFixed(0)}%` : ''
+
+      parts.push(`Demographics:${agePart ? ` ${agePart}` : ''}${genderSplit}${core1834Part}.`)
+    }
   }
 
   // --- Geography ---
