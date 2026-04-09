@@ -90,7 +90,7 @@ function toNumber(value: unknown) {
 function getMedianViews(context: AnalyticsContext | null) {
   const rows = context?.csvData.content
     ?.filter(row => String(row['Video title'] ?? '').trim() !== '')
-    .slice(0, 10) ?? []
+    ?? []
 
   if (rows.length === 0) return null
 

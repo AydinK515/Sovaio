@@ -371,7 +371,7 @@ export default function DealClient({
 
   async function sendMessage(prefilledText?: string) {
     const trimmedInput = (prefilledText ?? input).trim()
-    if (!aiEnabled || !trimmedInput || sending) return
+    if (!aiEnabled || !trimmedInput || sending || aiTyping) return
 
     // Frontend guard: check per-chat creator message count before hitting the server.
     const creatorCount = messages.filter(m => m.role === 'creator').length
@@ -1379,7 +1379,7 @@ export default function DealClient({
                           key={question}
                           type="button"
                           onClick={() => sendMessage(question)}
-                          disabled={sending}
+                          disabled={sending || aiTyping}
                           className="rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted-light disabled:opacity-50"
                         >
                           {question}
@@ -1398,7 +1398,7 @@ export default function DealClient({
                         }
                       }}
                       placeholder="Tell me what happened in the negotiation..."
-                      disabled={!aiEnabled || sending}
+                      disabled={!aiEnabled || sending || aiTyping}
                       rows={1}
                       className="flex-1 px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 resize-none overflow-hidden"
                       style={{ minHeight: '44px', maxHeight: '160px' }}
@@ -1420,7 +1420,7 @@ export default function DealClient({
                     ) : (
                       <button
                         type="submit"
-                        disabled={!aiEnabled || !input.trim() || sending}
+                        disabled={!aiEnabled || !input.trim() || sending || aiTyping}
                         className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
                       >
                         <Send className="w-4 h-4" />

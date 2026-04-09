@@ -50,7 +50,6 @@ function getMedianViews(csvData: Record<string, Record<string, unknown>[]>) {
   const rows = Array.isArray(csvData.content)
     ? csvData.content
         .filter(row => String(row['Video title'] ?? '').trim() !== '')
-        .slice(0, 10)
     : []
 
   if (rows.length === 0) {

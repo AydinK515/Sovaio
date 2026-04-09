@@ -401,7 +401,7 @@ export default function ChannelAiSidebar({
 
   async function sendMessage(prefilledText?: string) {
     const trimmedInput = (prefilledText ?? input).trim()
-    if (!aiEnabled || !trimmedInput || sending) return
+    if (!aiEnabled || !trimmedInput || sending || aiTyping) return
 
     const creatorCount = messages.filter(message => message.role === 'creator').length
     if (creatorCount >= 30) {
@@ -895,7 +895,7 @@ export default function ChannelAiSidebar({
                           key={question}
                           type="button"
                           onClick={() => sendMessage(question)}
-                          disabled={sending}
+                          disabled={sending || aiTyping}
                           className="rounded-2xl border border-border bg-white px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted-light disabled:opacity-50"
                         >
                           {question}
@@ -921,7 +921,7 @@ export default function ChannelAiSidebar({
                             ? 'Ask about your channel, audience, or positioning...'
                             : 'Upload analytics first to use Channel Advisor'
                       }
-                      disabled={!aiEnabled || sending || snapshots.length === 0}
+                      disabled={!aiEnabled || sending || aiTyping || snapshots.length === 0}
                       rows={1}
                       className="flex-1 resize-none overflow-hidden rounded-xl border border-border px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                       style={{ minHeight: '44px', maxHeight: '160px' }}
@@ -937,7 +937,7 @@ export default function ChannelAiSidebar({
                     ) : (
                       <button
                         type="submit"
-                        disabled={!aiEnabled || !input.trim() || sending || snapshots.length === 0}
+                        disabled={!aiEnabled || !input.trim() || sending || aiTyping || snapshots.length === 0}
                         className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                       >
                         <Send className="h-4 w-4" />
