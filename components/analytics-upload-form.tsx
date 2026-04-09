@@ -1,8 +1,6 @@
 'use client'
 
-import Image from 'next/image'
-import { useEffect } from 'react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
 import { strFromU8, unzip } from 'fflate'
@@ -13,11 +11,18 @@ import { buildAnalyticsSnapshotName } from '@/lib/analytics-context'
 import { captureAnalyticsEvent } from '@/lib/posthog-client'
 import { POSTHOG_EVENTS } from '@/lib/posthog-events'
 import { CSV_TYPES } from '@/lib/types'
-import { BarChart3, CheckCircle2, ChevronDown, Circle, ExternalLink, FileText, Info, Upload, X } from 'lucide-react'
-import step1Image from '@/public/Step 1.jpg'
-import step2Image from '@/public/step 2.jpg'
-import step3Image from '@/public/Step 3.jpg'
-import step4Image from '@/public/Step 4.jpg'
+import {
+  BarChart3,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  ExternalLink,
+  FileText,
+  Info,
+  Lock,
+  Upload,
+  X,
+} from 'lucide-react'
 
 interface ParsedFile {
   type: string
@@ -31,40 +36,60 @@ const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024
 const MAX_PARSED_ROWS_PER_UPLOAD = 5_000
 const MAX_ZIP_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 
-const TUTORIAL_STEPS = [
-  {
-    id: 'step-1',
-    label: 'Step 1',
-    title: 'Open YouTube Studio Analytics',
-    description: 'From the left sidebar in YouTube Studio, click Analytics.',
-    image: step1Image,
-    alt: 'YouTube Studio sidebar highlighting the Analytics menu item.',
-  },
-  {
-    id: 'step-2',
-    label: 'Step 2',
-    title: 'Switch to Advanced mode',
-    description: 'Use the Advanced mode button in the top-right so you can export the detailed report tables.',
-    image: step2Image,
-    alt: 'YouTube Studio Analytics page highlighting the Advanced mode button.',
-  },
-  {
-    id: 'step-3',
-    label: 'Step 3',
-    title: 'Open the report picker',
-    description: 'Click the Report dropdown to choose which analytics table you want to export.',
-    image: step3Image,
-    alt: 'YouTube Studio advanced analytics view highlighting the report dropdown.',
-  },
-  {
-    id: 'step-4',
-    label: 'Step 4',
-    title: 'Download the right CSVs',
-    description: 'Select each report from the dropdown and download it one-by-one as CSV. You can also upload the full zipped export bundle here.',
-    image: step4Image,
-    alt: 'YouTube Studio report list and download button highlighting which CSVs to export.',
-  },
+// ─── URL helpers ─────────────────────────────────────────────────────────────
+
+function extractChannelId(url: string): string | null {
+  const match = url.match(/\/channel\/(UC[A-Za-z0-9_-]+)/)
+  return match ? match[1] : null
+}
+
+const REPORT_BASE_URLS = {
+  content:
+    'https://studio.youtube.com/channel/CHANNEL_ID/analytics/tab-overview/period-default/explore?entity_type=CHANNEL&entity_id=CHANNEL_ID&time_period=TIME_PERIOD&explore_type=TABLE_AND_CHART&metric=AVERAGE_WATCH_TIME&granularity=DAY&t_metrics=AVERAGE_WATCH_TIME&t_metrics=EXTERNAL_VIEWS&t_metrics=EXTERNAL_WATCH_TIME&t_metrics=SUBSCRIBERS_NET_CHANGE&t_metrics=TOTAL_ESTIMATED_EARNINGS&t_metrics=VIDEO_THUMBNAIL_IMPRESSIONS&t_metrics=VIDEO_THUMBNAIL_IMPRESSIONS_VTR&dimension=VIDEO&o_column=EXTERNAL_WATCH_TIME&o_direction=ANALYTICS_ORDER_DIRECTION_DESC',
+  geography:
+    'https://studio.youtube.com/channel/CHANNEL_ID/analytics/tab-overview/period-default/explore?entity_type=CHANNEL&entity_id=CHANNEL_ID&time_period=TIME_PERIOD&explore_type=TABLE_AND_CHART&metric=SUBSCRIBERS_NET_CHANGE&granularity=DAY&t_metrics=SUBSCRIBERS_NET_CHANGE&t_metrics=EXTERNAL_VIEWS&t_metrics=EXTERNAL_WATCH_TIME&t_metrics=AVERAGE_WATCH_TIME&dimension=COUNTRY&o_column=EXTERNAL_WATCH_TIME&o_direction=ANALYTICS_ORDER_DIRECTION_DESC',
+  age:
+    'https://studio.youtube.com/channel/CHANNEL_ID/analytics/tab-overview/period-default/explore?entity_type=CHANNEL&entity_id=CHANNEL_ID&time_period=TIME_PERIOD&explore_type=TABLE_AND_CHART&metric=EXTERNAL_VIEWS&granularity=DAY&t_metrics=EXTERNAL_VIEWS&t_metrics=AVERAGE_WATCH_TIME&t_metrics=AVERAGE_WATCH_PERCENTAGE&t_metrics=EXTERNAL_WATCH_TIME&dimension=VIEWER_AGE&o_column=EXTERNAL_WATCH_TIME&o_direction=ANALYTICS_ORDER_DIRECTION_DESC',
+  gender:
+    'https://studio.youtube.com/channel/CHANNEL_ID/analytics/tab-overview/period-default/explore?entity_type=CHANNEL&entity_id=CHANNEL_ID&time_period=TIME_PERIOD&explore_type=TABLE_AND_CHART&metric=EXTERNAL_VIEWS&granularity=DAY&t_metrics=EXTERNAL_VIEWS&t_metrics=AVERAGE_WATCH_TIME&t_metrics=AVERAGE_WATCH_PERCENTAGE&t_metrics=EXTERNAL_WATCH_TIME&dimension=VIEWER_GENDER&o_column=VIEWER_GENDER&o_direction=ANALYTICS_ORDER_DIRECTION_ASC',
+} as const
+
+type ReportKey = keyof typeof REPORT_BASE_URLS
+
+function generateReportUrl(
+  channelId: string,
+  timePeriod: string,
+  includeShorts: boolean,
+  reportKey: ReportKey,
+): string {
+  let url = REPORT_BASE_URLS[reportKey]
+    .replace(/CHANNEL_ID/g, channelId)
+    .replace('TIME_PERIOD', timePeriod)
+  if (!includeShorts) {
+    url += '&ur_dimensions=CREATOR_CONTENT_TYPE&ur_values=%27VIDEO_ON_DEMAND%27'
+  }
+  return url
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SNAPSHOT_RANGES = [
+  { label: 'Last 28 days', value: '4_weeks' },
+  { label: 'Last 90 days', value: 'quarter' },
+  { label: 'Last 365 days', value: 'year' },
+  { label: 'Lifetime', value: 'lifetime' },
 ] as const
+
+type SnapshotRangeValue = (typeof SNAPSHOT_RANGES)[number]['value']
+
+const REQUIRED_REPORTS: { key: ReportKey; label: string; description: string; required: boolean }[] = [
+  { key: 'content', label: 'Content Breakdown', description: 'Average watch time, views, and revenue per video', required: true },
+  { key: 'geography', label: 'Audience Geography', description: 'Country breakdown of your viewers', required: true },
+  { key: 'age', label: 'Audience Age', description: 'Age distribution for demographic context', required: false },
+  { key: 'gender', label: 'Audience Gender', description: 'Gender breakdown', required: false },
+]
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsUploadForm() {
   const router = useRouter()
@@ -72,14 +97,42 @@ export default function AnalyticsUploadForm() {
   const supabase = createClient()
   const { completeStep } = useOnboarding()
 
+  // Upload state
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([])
   const [snapshotName, setSnapshotName] = useState(buildAnalyticsSnapshotName())
   const [subscriberCount, setSubscriberCount] = useState('')
   const [dragActive, setDragActive] = useState(false)
-  const [activeTutorialStep, setActiveTutorialStep] = useState(0)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [submitAttempted, setSubmitAttempted] = useState(false)
+
+  // Setup flow state
+  const [studioUrl, setStudioUrl] = useState('')
+  const [channelId, setChannelId] = useState<string | null>(null)
+  const [channelIdError, setChannelIdError] = useState('')
+  const [includeShorts, setIncludeShorts] = useState(true)
+  const [snapshotRange, setSnapshotRange] = useState<SnapshotRangeValue>('4_weeks')
+
+  function handleStudioUrlChange(url: string) {
+    setStudioUrl(url)
+    if (!url.trim()) {
+      setChannelId(null)
+      setChannelIdError('')
+      return
+    }
+    const id = extractChannelId(url)
+    if (id) {
+      setChannelId(id)
+      setChannelIdError('')
+    } else {
+      setChannelId(null)
+      setChannelIdError(
+        'No channel ID found. Paste the full URL from your browser while on the YouTube Studio Analytics page.',
+      )
+    }
+  }
+
+  // ─── Confidence ────────────────────────────────────────────────────────────
 
   const confidence = (() => {
     let score = 0
@@ -92,17 +145,25 @@ export default function AnalyticsUploadForm() {
     return score
   })()
 
-  const hasRequiredTypes = ['content', 'geography'].every(type => parsedFiles.some(file => file.type === type))
-  const missingRequired = (['content', 'geography'] as const).filter(type => !parsedFiles.some(file => file.type === type))
+  const hasRequiredTypes = ['content', 'geography'].every(type =>
+    parsedFiles.some(file => file.type === type),
+  )
+  const missingRequired = (['content', 'geography'] as const).filter(
+    type => !parsedFiles.some(file => file.type === type),
+  )
   const confidenceLabel = confidence < 40 ? 'Low' : confidence < 70 ? 'Medium' : 'High'
-  const confidenceColor = confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
-  const barColor = confidence < 40 ? 'bg-primary' : confidence < 70 ? 'bg-warning' : 'bg-success'
+  const confidenceColor =
+    confidence < 40 ? 'text-primary' : confidence < 70 ? 'text-warning' : 'text-success'
+  const barColor =
+    confidence < 40 ? 'bg-primary' : confidence < 70 ? 'bg-warning' : 'bg-success'
   const missingRequiredFields = [
     !snapshotName.trim() ? 'Snapshot name' : null,
     ...missingRequired.map(type => CSV_TYPES.find(item => item.key === type)?.label ?? type),
   ].filter((value): value is string => Boolean(value))
   const canSaveSnapshot = missingRequiredFields.length === 0
   const showFieldErrors = submitAttempted
+
+  // ─── Render helpers ────────────────────────────────────────────────────────
 
   function renderDataSourcesList(badgeClassName: string) {
     return CSV_TYPES.map(csvType => {
@@ -117,9 +178,15 @@ export default function AnalyticsUploadForm() {
             )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className={`text-sm ${uploaded ? 'font-medium text-foreground' : 'text-muted'}`}>{csvType.label}</span>
+                <span
+                  className={`text-sm ${uploaded ? 'font-medium text-foreground' : 'text-muted'}`}
+                >
+                  {csvType.label}
+                </span>
                 {csvType.required ? (
-                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Required</span>
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    Required
+                  </span>
                 ) : (
                   <span className={badgeClassName}>+{csvType.confidence}%</span>
                 )}
@@ -139,9 +206,15 @@ export default function AnalyticsUploadForm() {
           <BarChart3 className="h-5 w-5 text-primary" />
           <h3 className="font-semibold">Snapshot Confidence</h3>
         </div>
-        <p className="mb-4 text-xs text-muted">Upload more reports to improve the snapshot quality before you generate a rate card or start a deal.</p>
+        <p className="mb-4 text-xs text-muted">
+          Upload more reports to improve the snapshot quality before you generate a rate card or
+          start a deal.
+        </p>
         <div className="mb-3 h-3 w-full overflow-hidden rounded-full bg-border">
-          <div className={`${barColor} h-3 rounded-full transition-all duration-500`} style={{ width: `${confidence}%` }} />
+          <div
+            className={`${barColor} h-3 rounded-full transition-all duration-500`}
+            style={{ width: `${confidence}%` }}
+          />
         </div>
         <div className="flex justify-between text-xs">
           <span className={`font-medium ${confidenceColor}`}>{confidenceLabel}</span>
@@ -152,7 +225,9 @@ export default function AnalyticsUploadForm() {
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Data Sources</p>
-              <p className="mt-1 text-xs text-muted">See which reports are included in this snapshot.</p>
+              <p className="mt-1 text-xs text-muted">
+                See which reports are included in this snapshot.
+              </p>
             </div>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted transition-transform group-open:rotate-180" />
           </summary>
@@ -163,6 +238,8 @@ export default function AnalyticsUploadForm() {
       </div>
     )
   }
+
+  // ─── Analytics + CSV parsing ───────────────────────────────────────────────
 
   useEffect(() => {
     captureAnalyticsEvent(POSTHOG_EVENTS.onboardingStepViewed, {
@@ -191,19 +268,38 @@ export default function AnalyticsUploadForm() {
     const hasCountry = h.some(x => x.includes('country') || x.includes('geography'))
     const hasAge = h.some(x => x.includes('age'))
     const hasGender = h.some(x => x.includes('gender'))
-    const hasTrafficSource = h.some(x => x.includes('traffic source') || x.includes('source type'))
-    const hasRetention = h.some(x => x.includes('retention') || x.includes('average percentage viewed') || x.includes('average view duration'))
+    const hasTrafficSource = h.some(
+      x => x.includes('traffic source') || x.includes('source type'),
+    )
+    const hasRetention = h.some(
+      x =>
+        x.includes('retention') ||
+        x.includes('average percentage viewed') ||
+        x.includes('average view duration'),
+    )
     const hasMonthlyAudience = h.some(x => x.includes('monthly audience'))
-    const has28DayViewers = h.some(x => x.includes('28-day') && (x.includes('viewer') || x.includes('new') || x.includes('casual') || x.includes('regular')))
-    const isSubscriberTimeline = hasDate && hasSubscribers && !hasVideoTitle && !hasContentId && !hasViews && !hasWatchTime && h.length <= 2
+    const has28DayViewers = h.some(
+      x =>
+        x.includes('28-day') &&
+        (x.includes('viewer') || x.includes('new') || x.includes('casual') || x.includes('regular')),
+    )
+    const isSubscriberTimeline =
+      hasDate && hasSubscribers && !hasVideoTitle && !hasContentId && !hasViews && !hasWatchTime && h.length <= 2
 
     if (hasMonthlyAudience || has28DayViewers || isSubscriberTimeline) return 'audience_growth'
-    if ((lowerFileName.includes('totals') || lowerFileName.includes('chart data')) && hasDate && hasViews && !hasVideoTitle) return null
+    if (
+      (lowerFileName.includes('totals') || lowerFileName.includes('chart data')) &&
+      hasDate &&
+      hasViews &&
+      !hasVideoTitle
+    )
+      return null
     if (hasAge || hasGender) return 'demographics'
     if (hasCountry) return 'geography'
     if (hasTrafficSource) return 'traffic_sources'
     if (hasRetention) return 'retention'
-    if ((hasVideoTitle || hasContentId) && (hasViews || hasWatchTime || hasSubscribers)) return 'content'
+    if ((hasVideoTitle || hasContentId) && (hasViews || hasWatchTime || hasSubscribers))
+      return 'content'
     return null
   }
 
@@ -225,8 +321,10 @@ export default function AnalyticsUploadForm() {
   }
 
   function normalizeRows(rows: Record<string, unknown>[]) {
-    return rows.filter((row) => {
-      const values = Object.values(row).filter(value => value !== null && value !== undefined && String(value).trim() !== '')
+    return rows.filter(row => {
+      const values = Object.values(row).filter(
+        value => value !== null && value !== undefined && String(value).trim() !== '',
+      )
       if (values.length === 0) return false
 
       const content = String(row['Content'] ?? '').trim().toLowerCase()
@@ -267,11 +365,13 @@ export default function AnalyticsUploadForm() {
           reject(error ?? new Error('Failed to unzip archive.'))
           return
         }
-
         resolve(unzipped)
       })
     })
-    const totalUncompressedBytes = Object.values(archive).reduce((sum, entry) => sum + entry.byteLength, 0)
+    const totalUncompressedBytes = Object.values(archive).reduce(
+      (sum, entry) => sum + entry.byteLength,
+      0,
+    )
 
     if (totalUncompressedBytes > MAX_ZIP_UNCOMPRESSED_BYTES) {
       throw new Error('Archive expands beyond the allowed limit.')
@@ -279,10 +379,9 @@ export default function AnalyticsUploadForm() {
 
     const parsed: ParsedFile[] = []
 
-    for (const [entryName, bytes] of Object.entries(archive)) {
+    for (const [entryName, entryBytes] of Object.entries(archive)) {
       if (!entryName.toLowerCase().endsWith('.csv')) continue
-
-      const text = strFromU8(bytes)
+      const text = strFromU8(entryBytes)
       const candidate = parseCsvText(`${file.name} > ${entryName}`, text)
       if (candidate) parsed.push(candidate)
     }
@@ -321,15 +420,16 @@ export default function AnalyticsUploadForm() {
     })
 
     try {
-      const extracted = await Promise.all(fileArray.map(async (file) => {
-        if (file.name.toLowerCase().endsWith('.zip')) {
-          return extractZipCandidates(file)
-        }
-
-        const text = await file.text()
-        const candidate = parseCsvText(file.name, text)
-        return candidate ? [candidate] : []
-      }))
+      const extracted = await Promise.all(
+        fileArray.map(async file => {
+          if (file.name.toLowerCase().endsWith('.zip')) {
+            return extractZipCandidates(file)
+          }
+          const text = await file.text()
+          const candidate = parseCsvText(file.name, text)
+          return candidate ? [candidate] : []
+        }),
+      )
 
       const candidates = extracted.flat()
       if (candidates.length === 0) {
@@ -385,8 +485,12 @@ export default function AnalyticsUploadForm() {
     }
 
     if (!hasRequiredTypes) {
-      const labels = missingRequired.map(type => CSV_TYPES.find(item => item.key === type)?.label).join(' and ')
-      setError(`"${labels}" ${missingRequired.length === 1 ? 'is' : 'are'} required before you can save an analytics snapshot.`)
+      const labels = missingRequired
+        .map(type => CSV_TYPES.find(item => item.key === type)?.label)
+        .join(' and ')
+      setError(
+        `"${labels}" ${missingRequired.length === 1 ? 'is' : 'are'} required before you can save an analytics snapshot.`,
+      )
       return
     }
 
@@ -394,24 +498,32 @@ export default function AnalyticsUploadForm() {
     setError('')
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
       const uploadIds: string[] = []
       for (const file of parsedFiles) {
-        const { data, error } = await supabase.from('csv_uploads').insert({
-          user_id: user.id,
-          upload_type: file.type,
-          parsed_data: file.data,
-          row_count: file.rowCount,
-        }).select('id').single()
+        const { data, error } = await supabase
+          .from('csv_uploads')
+          .insert({
+            user_id: user.id,
+            upload_type: file.type,
+            parsed_data: file.data,
+            row_count: file.rowCount,
+          })
+          .select('id')
+          .single()
 
         if (error) throw error
         uploadIds.push(data.id)
       }
 
       const nextSnapshotName = snapshotName.trim() || buildAnalyticsSnapshotName()
-      const snapshotSubscriberCount = subscriberCount ? parseInt(subscriberCount.replace(/,/g, '')) : null
+      const snapshotSubscriberCount = subscriberCount
+        ? parseInt(subscriberCount.replace(/,/g, ''))
+        : null
       const reportTypes = parsedFiles.map(file => file.type)
 
       const { data: snapshot, error: snapshotError } = await supabase
@@ -430,9 +542,10 @@ export default function AnalyticsUploadForm() {
       if (snapshotError) throw snapshotError
 
       if (snapshotSubscriberCount) {
-        await supabase.from('profiles').update({
-          subscriber_count: snapshotSubscriberCount,
-        }).eq('id', user.id)
+        await supabase
+          .from('profiles')
+          .update({ subscriber_count: snapshotSubscriberCount })
+          .eq('id', user.id)
       }
 
       captureAnalyticsEvent(POSTHOG_EVENTS.analyticsSnapshotCreated, {
@@ -457,10 +570,15 @@ export default function AnalyticsUploadForm() {
     setSaving(false)
   }
 
+  // ─── JSX ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="py-8">
-      <h1 className="text-3xl md:text-4xl font-bold">Upload Your Analytics</h1>
-      <p className="mt-2 text-muted">This is the first step. Once you save an analytics snapshot, you can generate rate cards and power both AI assistants with real channel context.</p>
+      <h1 className="text-3xl font-bold md:text-4xl">Upload Your Analytics</h1>
+      <p className="mt-2 text-muted">
+        Once you save an analytics snapshot, you can generate rate cards and power both AI
+        assistants with real channel context.
+      </p>
 
       <div className="mt-8">
         <OnboardingRouteBanner
@@ -471,65 +589,245 @@ export default function AnalyticsUploadForm() {
         />
       </div>
 
+      {/* ── Setup card ──────────────────────────────────────────────────────── */}
       <div className="mt-8 rounded-[28px] border border-border bg-white p-5 shadow-sm md:p-6">
-        <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">Tutorial</p>
-        <h2 className="mt-2 text-2xl font-semibold">How to get the right YouTube Studio files</h2>
+        <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">Setup</p>
+        <h2 className="mt-2 text-2xl font-semibold">Set up your YouTube Studio export</h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          Follow these four steps in YouTube Studio, then upload the CSVs here. The required reports are <span className="font-medium text-foreground">Content</span> and <span className="font-medium text-foreground">Geography</span>.
+          Complete the steps below, then upload your files. The required reports are{' '}
+          <span className="font-medium text-foreground">Content Breakdown</span> and{' '}
+          <span className="font-medium text-foreground">Audience Geography</span>.
         </p>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          {TUTORIAL_STEPS.map((step, index) => (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => setActiveTutorialStep(index)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${index === activeTutorialStep ? 'border-primary bg-primary text-white' : 'border-border bg-white text-muted hover:text-foreground'}`}
-            >
-              {step.label}
-            </button>
-          ))}
-        </div>
+        {/* ── Section 1: Paste URL ──────────────────────────────────────────── */}
+        <div className="mt-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
+              1
+            </span>
+            <h3 className="font-semibold">Paste your YouTube Studio URL</h3>
+            {channelId && (
+              <span className="flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Channel found
+              </span>
+            )}
+          </div>
+          <p className="mt-2 ml-9 text-sm text-muted">
+            Open YouTube Studio, go to Analytics, and copy the URL from your browser&apos;s address
+            bar.
+          </p>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_320px] lg:items-start">
-          <div className="overflow-hidden rounded-[24px] border border-border bg-slate-950/95">
-            <Image
-              src={TUTORIAL_STEPS[activeTutorialStep].image}
-              alt={TUTORIAL_STEPS[activeTutorialStep].alt}
-              className="h-auto w-full"
-              priority={activeTutorialStep === 0}
-            />
+          {/* Browser bar mockup */}
+          <div className="mt-4 ml-9 overflow-hidden rounded-xl border border-border bg-slate-50">
+            <div className="flex items-center gap-2 border-b border-border bg-slate-100 px-3 py-2">
+              <div className="flex gap-1.5">
+                <div className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+                <div className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+                <div className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border bg-white px-2.5 py-1">
+                <Lock className="h-3 w-3 shrink-0 text-success" />
+                <span className="truncate font-mono text-[11px] text-muted">
+                  studio.youtube.com/channel/
+                  <span className="font-semibold text-primary">UCad0xYHB_RLgRWGMPC5DCdw</span>
+                  /analytics/tab-overview/period-default
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="rounded-[24px] border border-border bg-slate-50 p-5">
-            <p className="text-xs font-mono uppercase tracking-[0.18em] text-muted">{TUTORIAL_STEPS[activeTutorialStep].label}</p>
-            <h3 className="mt-3 text-xl font-semibold">{TUTORIAL_STEPS[activeTutorialStep].title}</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted">{TUTORIAL_STEPS[activeTutorialStep].description}</p>
-            <a
-              href="https://studio.youtube.com/channel/UC/analytics"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-secondary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
-            >
-              Open YouTube Studio
-              <ExternalLink className="h-4 w-4" />
-            </a>
+          <div className="mt-3 ml-9">
+            <input
+              type="url"
+              value={studioUrl}
+              onChange={e => handleStudioUrlChange(e.target.value)}
+              placeholder="https://studio.youtube.com/channel/UC.../analytics/..."
+              className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                channelIdError ? 'border-primary' : channelId ? 'border-success' : 'border-border'
+              }`}
+            />
+            {channelIdError && (
+              <p className="mt-2 text-sm text-primary">{channelIdError}</p>
+            )}
+            {channelId && (
+              <p className="mt-2 text-sm text-success">
+                Channel ID: <span className="font-mono font-medium">{channelId}</span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-border" />
+
+        {/* ── Section 2: Snapshot settings ─────────────────────────────────── */}
+        <div className="mt-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
+              2
+            </span>
+            <h3 className="font-semibold">Choose snapshot settings</h3>
+          </div>
+          <p className="mt-2 ml-9 text-sm text-muted">
+            These settings control which data gets included in the generated report links below.
+          </p>
+
+          <div className="mt-5 ml-9 space-y-6">
+            {/* Include Shorts toggle */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Include YouTube Shorts</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  Turn this off if you want your analytics to reflect long-form videos only. Most
+                  sponsors care about non-Shorts views.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeShorts}
+                onClick={() => setIncludeShorts(v => !v)}
+                className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                  includeShorts ? 'bg-primary' : 'bg-border-dark'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                    includeShorts ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Snapshot range */}
+            <div>
+              <p className="text-sm font-medium text-foreground">Snapshot range</p>
+              <p className="mt-0.5 text-xs text-muted">
+                More data isn&apos;t always better. If you post frequently, a recent range gives a
+                cleaner signal. If you post less often or make slower long-tail videos, going further
+                back can paint a fuller picture. There&apos;s no single right answer — pick what
+                best represents your channel.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {SNAPSHOT_RANGES.map(range => (
+                  <button
+                    key={range.value}
+                    type="button"
+                    onClick={() => setSnapshotRange(range.value)}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                      snapshotRange === range.value
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-border bg-white text-muted hover:text-foreground'
+                    }`}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-border" />
+
+        {/* ── Section 3: Download reports ───────────────────────────────────── */}
+        <div className="mt-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
+              3
+            </span>
+            <h3 className="font-semibold">Open and download required reports</h3>
+          </div>
+          <p className="mt-2 ml-9 text-sm text-muted">
+            Each link below opens the correct report in YouTube Studio with your settings
+            pre-applied. Open each one, download the CSV export, then upload all the files in Step 4
+            below.
+          </p>
+
+          <div className="mt-5 ml-9">
+            {!channelId ? (
+              <div className="rounded-xl border border-dashed border-border bg-slate-50 px-5 py-6 text-center">
+                <p className="text-sm text-muted">
+                  Paste your YouTube Studio URL in Step 1 to generate your report links.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {REQUIRED_REPORTS.map(report => (
+                  <div
+                    key={report.key}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-medium text-foreground">{report.label}</span>
+                        {report.required ? (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                            Required
+                          </span>
+                        ) : (
+                          <span className="rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                            Optional
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted">{report.description}</p>
+                    </div>
+                    <a
+                      href={generateReportUrl(channelId, snapshotRange, includeShorts, report.key)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex shrink-0 items-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+                    >
+                      Open
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                ))}
+
+                <div className="flex items-start gap-2 rounded-xl border border-border bg-muted-light px-4 py-3">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+                  <p className="text-xs text-muted">
+                    Inside each report, click the{' '}
+                    <span className="font-medium text-foreground">Download</span> button (top right)
+                    and export as CSV. Come back here and upload all the files in the next step.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* ── Section 4: Upload + save ─────────────────────────────────────────── */}
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="space-y-8">
+          {/* Step label */}
+          <div className="flex items-center gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
+              4
+            </span>
+            <h3 className="font-semibold">Upload your exported files</h3>
+          </div>
+
+          {/* Drop zone */}
           <div
-            onDragOver={(event) => { event.preventDefault(); setDragActive(true) }}
+            onDragOver={event => {
+              event.preventDefault()
+              setDragActive(true)
+            }}
             onDragLeave={() => setDragActive(false)}
-            onDrop={(event) => {
+            onDrop={event => {
               event.preventDefault()
               setDragActive(false)
               void handleFiles(event.dataTransfer.files)
             }}
             onClick={() => fileInputRef.current?.click()}
-            className={`cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${dragActive ? 'border-primary bg-primary-light' : 'border-border bg-white hover:border-primary/30'}`}
+            className={`cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${
+              dragActive
+                ? 'border-primary bg-primary-light'
+                : 'border-border bg-white hover:border-primary/30'
+            }`}
           >
             <input
               ref={fileInputRef}
@@ -542,25 +840,43 @@ export default function AnalyticsUploadForm() {
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
               <Upload className="h-7 w-7 text-primary" />
             </div>
-            <p className="text-lg font-semibold">Drop your YouTube Studio exports here</p>
-            <p className="mt-2 text-sm text-muted">Upload raw CSVs or the zipped exports YouTube gives you. We&apos;ll unpack the right tables automatically.</p>
-            <button type="button" className="mt-4 rounded-xl bg-secondary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover">
+            <p className="text-lg font-semibold">Drop your downloaded reports here</p>
+            <p className="mt-2 text-sm text-muted">
+              Upload the CSVs you downloaded from the links above, or drop the full zipped export
+              bundle. We&apos;ll detect the right tables automatically.
+            </p>
+            <button
+              type="button"
+              className="mt-4 rounded-xl bg-secondary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-secondary-hover"
+            >
               Click to browse files
             </button>
           </div>
 
+          {/* Uploaded files list */}
           {parsedFiles.length > 0 && (
             <div className="space-y-3">
               {parsedFiles.map(file => (
-                <div key={file.type} className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
+                <div
+                  key={file.type}
+                  className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3"
+                >
                   <div className="flex items-center gap-3">
                     <FileText className="h-5 w-5 text-primary" />
                     <div>
-                      <p className="text-sm font-medium">{CSV_TYPES.find(item => item.key === file.type)?.label || file.type}</p>
-                      <p className="text-xs text-muted">{file.fileName} · {file.rowCount} rows</p>
+                      <p className="text-sm font-medium">
+                        {CSV_TYPES.find(item => item.key === file.type)?.label || file.type}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {file.fileName} · {file.rowCount} rows
+                      </p>
                     </div>
                   </div>
-                  <button type="button" onClick={() => removeFile(file.type)} className="p-1 text-muted hover:text-foreground">
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file.type)}
+                    className="p-1 text-muted hover:text-foreground"
+                  >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -570,6 +886,7 @@ export default function AnalyticsUploadForm() {
 
           {renderSnapshotConfidenceCard('rounded-2xl border border-border bg-white p-6 md:hidden')}
 
+          {/* Snapshot metadata */}
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
@@ -580,14 +897,20 @@ export default function AnalyticsUploadForm() {
                 type="text"
                 value={snapshotName}
                 onChange={event => setSnapshotName(event.target.value)}
-                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${showFieldErrors && !snapshotName.trim() ? 'border-primary' : 'border-border'}`}
+                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                  showFieldErrors && !snapshotName.trim() ? 'border-primary' : 'border-border'
+                }`}
               />
               {showFieldErrors && !snapshotName.trim() && (
-                <p className="mt-2 text-sm text-primary">Give this analytics snapshot a name before saving it.</p>
+                <p className="mt-2 text-sm text-primary">
+                  Give this analytics snapshot a name before saving it.
+                </p>
               )}
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">Subscriber Count</label>
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">
+                Subscriber Count
+              </label>
               <input
                 type="text"
                 value={subscriberCount}
@@ -598,7 +921,9 @@ export default function AnalyticsUploadForm() {
             </div>
           </div>
 
-          {error && <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>}
+          {error && (
+            <p className="rounded-lg bg-primary-light px-4 py-2 text-sm text-primary">{error}</p>
+          )}
           {!canSaveSnapshot && (
             <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted">
               Fill the required fields to continue: {missingRequiredFields.join(', ')}.
@@ -607,7 +932,10 @@ export default function AnalyticsUploadForm() {
 
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted-light p-4">
             <Info className="h-5 w-5 shrink-0 text-muted" />
-            <p className="text-xs text-muted">We never send raw CSV blobs to the model. We derive compact metrics and summaries from these files and use that context across the app.</p>
+            <p className="text-xs text-muted">
+              We never send raw CSV blobs to the model. We derive compact metrics and summaries from
+              these files and use that context across the app.
+            </p>
           </div>
 
           <button
@@ -632,14 +960,21 @@ export default function AnalyticsUploadForm() {
           )}
         </div>
 
+        {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
         <div className="space-y-6">
-          {renderSnapshotConfidenceCard('hidden rounded-2xl border border-border bg-white p-6 md:block')}
+          {renderSnapshotConfidenceCard(
+            'hidden rounded-2xl border border-border bg-white p-6 md:block',
+          )}
 
           <div className="hidden rounded-2xl border border-border bg-white p-6 md:block">
             <h3 className="mb-1 font-semibold">Data Sources</h3>
-            <p className="mb-4 text-xs text-muted">Required reports must be uploaded before you can save a usable snapshot.</p>
+            <p className="mb-4 text-xs text-muted">
+              Required reports must be uploaded before you can save a usable snapshot.
+            </p>
             <div className="space-y-3">
-              {renderDataSourcesList('rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted')}
+              {renderDataSourcesList(
+                'rounded bg-muted-light px-1.5 py-0.5 text-[10px] font-medium text-muted',
+              )}
             </div>
           </div>
         </div>
