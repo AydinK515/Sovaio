@@ -57,7 +57,15 @@ export interface OnboardingState {
 export interface CsvUpload {
   id: string
   user_id: string
-  upload_type: 'content' | 'audience_growth' | 'demographics' | 'geography' | 'traffic_sources' | 'retention'
+  upload_type:
+    | 'content'
+    | 'audience_growth'
+    | 'demographics'
+    | 'geography'
+    | 'traffic_sources'
+    | 'retention'
+    | 'age'
+    | 'gender'
   parsed_data: Record<string, unknown>
   row_count: number
   created_at: string

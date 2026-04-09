@@ -53,8 +53,12 @@ function buildAudienceSnapshot(csvUploads: Array<{ upload_type: string; parsed_d
     return fallback
   }
 
-  const demographicsRows = csvUploads
-    .filter(upload => upload.upload_type === 'demographics')
+  const ageRows = csvUploads
+    .filter(upload => upload.upload_type === 'age' || upload.upload_type === 'demographics')
+    .flatMap(upload => Array.isArray(upload.parsed_data) ? upload.parsed_data as Record<string, unknown>[] : [])
+
+  const genderRows = csvUploads
+    .filter(upload => upload.upload_type === 'gender' || upload.upload_type === 'demographics')
     .flatMap(upload => Array.isArray(upload.parsed_data) ? upload.parsed_data as Record<string, unknown>[] : [])
 
   const geographyRows = csvUploads
@@ -65,13 +69,18 @@ function buildAudienceSnapshot(csvUploads: Array<{ upload_type: string; parsed_d
   let femalePct = 0
   const ageGroups: Record<string, number> = {}
 
-  for (const row of demographicsRows) {
+  for (const row of genderRows) {
     const gender = String(row['Viewer gender'] ?? '').trim()
-    const age = normalizeAgeGroupLabel(String(row['Viewer age'] ?? '').trim())
     const viewsPct = toNumber(row['Views (%)'] ?? row['views (%)'])
 
     if (gender === 'Male') malePct += viewsPct
     if (gender === 'Female') femalePct += viewsPct
+  }
+
+  for (const row of ageRows) {
+    const age = normalizeAgeGroupLabel(String(row['Viewer age'] ?? '').trim())
+    const viewsPct = toNumber(row['Views (%)'] ?? row['views (%)'])
+
     if (age && viewsPct > 0) {
       ageGroups[age] = (ageGroups[age] ?? 0) + viewsPct
     }
@@ -122,7 +131,6 @@ function buildPerformanceSnapshot(
     .filter(upload => upload.upload_type === 'content')
     .flatMap(upload => Array.isArray(upload.parsed_data) ? upload.parsed_data as Record<string, unknown>[] : [])
     .filter(row => String(row['Video title'] ?? '').trim() !== '')
-    .slice(0, 10)
 
   const audienceGrowthRows = csvUploads
     .filter(upload => upload.upload_type === 'audience_growth')
