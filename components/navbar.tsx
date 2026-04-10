@@ -53,6 +53,7 @@ export function MarketingNav({ isLoggedIn = false, avatarUrl = null, channelName
 
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted hover:text-foreground transition-colors">Features</a>
+            <Link href="/blog" className="text-sm text-muted hover:text-foreground transition-colors">Blog</Link>
             {isLoggedIn ? (
               <div className="flex items-center gap-3">
                 <Link
@@ -85,6 +86,7 @@ export function MarketingNav({ isLoggedIn = false, avatarUrl = null, channelName
       {open && (
         <div className="md:hidden border-t border-border bg-white px-4 py-4 space-y-3">
           <a href="#features" className="block text-sm text-muted" onClick={() => setOpen(false)}>Features</a>
+          <Link href="/blog" className="block text-sm text-muted" onClick={() => setOpen(false)}>Blog</Link>
           {isLoggedIn ? (
             <div className="flex items-center justify-between gap-3">
               <Link href="/dashboard" className="block text-sm font-medium text-primary" onClick={() => setOpen(false)}>Dashboard</Link>
@@ -188,6 +190,7 @@ export function Footer({ showFeedback = false }: { showFeedback?: boolean }) {
                   Leave Feedback
                 </button>
               ) : null}
+              <Link href="/blog" className="text-xs text-muted hover:text-foreground transition-colors">Blog</Link>
               <Link href="/terms-of-service" className="text-xs text-muted hover:text-foreground transition-colors">Terms</Link>
               <Link href="/privacy-policy" className="text-xs text-muted hover:text-foreground transition-colors">Privacy</Link>
             </div>

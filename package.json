@@ -14,7 +14,9 @@
     "@posthog/ai": "^7.4.3",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.1",
+    "@tailwindcss/typography": "^0.5.19",
     "ai": "^6.0.141",
+    "gray-matter": "^4.0.3",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
@@ -24,7 +26,11 @@
     "posthog-js": "^1.364.6",
     "posthog-node": "^5.21.2",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "reading-time": "^1.5.0",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-html": "^16.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
