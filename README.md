@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sovaio
 
-## Getting Started
+Sovaio is a Next.js app for YouTube creators who want clearer sponsorship pricing and negotiation support from their own channel analytics.
 
-First, run the development server:
+Creators can upload YouTube Studio CSV exports, save them as reusable analytics snapshots, generate sponsorship rate cards, track brand deals, and use AI-assisted channel and negotiation guidance grounded in their saved data.
+
+## Tech Stack
+
+- Next.js App Router
+- React
+- TypeScript
+- Supabase Auth, database, and storage
+- OpenAI via the Vercel AI SDK and Responses API
+- PostHog product analytics
+- Tailwind CSS
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a local environment file with the required values:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SECRET_KEY=
+OPENAI_API_KEY=
+NEXT_PUBLIC_POSTHOG_KEY=
+NEXT_PUBLIC_POSTHOG_HOST=
+POSTHOG_HOST=
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `app/` - App Router pages, layouts, middleware-protected app routes, and API route handlers.
+- `components/` - Client-side product UI for uploads, rate cards, onboarding, deal workflows, and AI sidebars.
+- `lib/` - Supabase clients, analytics context building, AI access checks, PostHog helpers, and shared business logic.
+- `supabase/migrations/` - Database migration files included with this repo.
+- `content/blog/` - Markdown blog content used by the public blog routes.
 
-## Learn More
+## Useful Commands
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run build
+```

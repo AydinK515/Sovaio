@@ -640,8 +640,6 @@ export async function POST(req: Request) {
       channelName,
       pricingRealityCheck
     )
-    console.log('\n=== negotiate SYSTEM PROMPT ===\n', systemPrompt, '\n=== USER MESSAGE ===\n', latestUserMessage, '\n==============================\n')
-
     const openaiRequestBody = JSON.stringify({
       model: 'gpt-5-mini',
       conversation: conversationId,
@@ -864,8 +862,6 @@ export async function POST(req: Request) {
                 lastSent,
                 lastValidPayload,
               })
-
-          console.log('\n=== negotiate RESPONSE ===\n', JSON.stringify(finalPayload, null, 2), '\n==========================\n')
 
           let savedMessage: DealMessage | null = null
           const messageContent = finalPayload.advice.trim() || 'I generated a response, but it came back empty.'
