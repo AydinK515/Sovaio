@@ -8,7 +8,7 @@ import { ArrowRight, ChevronDown, Upload, BarChart3, MessageSquare } from 'lucid
 import type { Metadata } from 'next'
 
 const description =
-  "Upload your YouTube Studio analytics, get a data-backed sponsorship rate card, and negotiate better brand deals with AI that knows your exact numbers. Join creators closing bigger deals."
+  "Upload your YouTube Studio analytics, get a data-backed sponsorship rate card, and negotiate with AI that helps you price scope, usage rights, and counteroffers."
 
 export const metadata: Metadata = {
   title: {
@@ -96,14 +96,14 @@ export default async function LandingPage({
   }
 
   const marqueeItems = [
-    'Closed $4,200 for a 60s integration',
-    'Countered from $800 → $2,100',
-    'Walked away from a lowball — got a better offer 3 days later',
-    'First deal closed at $3,100',
-    'Negotiated a 90-day exclusivity clause removed',
-    'Closed $5,800 for a dedicated video',
-    'Raised rate floor after uploading new analytics',
-    'Turned a flat $1,500 into $2,900 + commission',
+    'Calculate a sponsor-ready rate',
+    'Turn deliverables into a clear price',
+    'Spot vague usage rights',
+    'Compare shorts, integrations, and dedicated videos',
+    'Draft a confident counteroffer',
+    'Price exclusivity before saying yes',
+    'Anchor your reply in real channel data',
+    'Know when the scope changed',
   ]
 
   return (
@@ -125,11 +125,6 @@ export default async function LandingPage({
 
               {/* Left: headline */}
               <div>
-                <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8">
-                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                  <span className="text-xs font-semibold text-white/70 tracking-widest uppercase">For YouTube Creators</span>
-                </div>
-
                 <h1 className="text-5xl sm:text-6xl md:text-7xl xl:text-8xl font-black tracking-tighter leading-[0.92] text-white">
                   Stop leaving<br />
                   <span className="text-primary">money</span><br />
@@ -152,10 +147,6 @@ export default async function LandingPage({
                     See how it works ↓
                   </a>
                 </div>
-
-                <p className="mt-6 text-sm text-white/50">
-                  So many creators are already closing bigger deals with Sovaio
-                </p>
 
               </div>
 
@@ -237,23 +228,48 @@ export default async function LandingPage({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-20">
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter text-secondary leading-tight">
-                You&apos;re being underpaid.<br />
-                <span className="text-primary">Here&apos;s the proof.</span>
+                You might be leaving<br />
+                <span className="text-primary">money on the table.</span>
               </h2>
+              <p className="mx-auto mt-5 max-w-2xl text-base md:text-lg text-muted leading-relaxed">
+                You are not bad at negotiating. Sponsor asks often hide the details that should change your rate.
+              </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-px bg-border overflow-hidden rounded-3xl border border-border">
               {[
-                { number: '40%', label: 'Below market rate', sub: 'What the average creator charges vs. what they should' },
-                { number: '$2,400', label: 'Left on the table', sub: 'Average annual revenue lost by creators who don\'t negotiate' },
-                { number: '3×', label: 'Higher close rate', sub: 'When creators use data-backed rates instead of guessing' },
-              ].map((stat, i) => (
-                <div key={i} className="bg-white p-10 md:p-14 flex flex-col justify-between group hover:bg-muted-light transition-colors">
+                {
+                  eyebrow: '01',
+                  title: 'Rate Guessing',
+                  description: 'Most creators price from vibes, old deals, or whatever number the brand puts in the first email.',
+                },
+                {
+                  eyebrow: '02',
+                  title: 'Scope',
+                  titleSecondLine: 'Creep',
+                  description: 'Usage rights, exclusivity, whitelisting, revisions, and deadlines can quietly turn one deliverable into a bigger buy.',
+                },
+                {
+                  eyebrow: '03',
+                  title: 'Weak Counters',
+                  description: 'A good counteroffer needs math, context, and language that feels confident without sounding awkward.',
+                },
+              ].map((problem, i) => (
+                <div key={i} className="bg-white p-10 md:p-14 flex flex-col group hover:bg-muted-light transition-colors">
                   <div>
-                    <p className="text-6xl md:text-7xl xl:text-8xl font-black text-secondary tracking-tighter group-hover:text-primary transition-colors">{stat.number}</p>
-                    <p className="mt-3 text-lg md:text-xl font-bold text-secondary">{stat.label}</p>
+                    <p className="text-xs font-black tracking-widest text-primary">{problem.eyebrow}</p>
+                    <p className="mt-5 text-3xl md:text-4xl xl:text-5xl font-black text-secondary tracking-tighter leading-[0.95] group-hover:text-primary transition-colors">
+                      {problem.title}
+                      {problem.titleSecondLine ? (
+                        <>
+                          <span className="inline md:hidden"> </span>
+                          <br className="hidden md:block" />
+                          {problem.titleSecondLine}
+                        </>
+                      ) : null}
+                    </p>
                   </div>
-                  <p className="mt-6 text-sm text-muted leading-relaxed border-t border-border pt-6">{stat.sub}</p>
+                  <p className="mt-6 text-base text-muted leading-relaxed border-t border-border pt-5">{problem.description}</p>
                 </div>
               ))}
             </div>
@@ -267,7 +283,7 @@ export default async function LandingPage({
               <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter leading-tight">
                 Three steps.<br /><span className="text-primary">Bigger deals.</span>
               </h2>
-              <p className="text-white/40 text-sm max-w-xs leading-relaxed">From raw CSV to closed deal — most creators are done in under 10 minutes.</p>
+              <p className="text-white/40 text-sm max-w-xs leading-relaxed">From raw CSV to a clearer sponsor reply, without building a spreadsheet from scratch.</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
@@ -341,7 +357,7 @@ export default async function LandingPage({
                     <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                   </div>
                   <h3 className="text-xl font-black text-secondary mb-2">Privacy First</h3>
-                  <p className="text-sm text-muted leading-relaxed">CSV files are parsed in your browser. We never store the original file — only the structured analytics we need to generate your reports.</p>
+                  <p className="text-base text-muted leading-relaxed">CSV files are parsed in your browser. We never store the original file — only the structured analytics we need to generate your reports.</p>
                 </div>
                 <p className="mt-6 text-xs text-muted font-semibold">No YouTube API connection required</p>
               </div>
@@ -353,7 +369,7 @@ export default async function LandingPage({
                     <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                   </div>
                   <h3 className="text-xl font-black text-secondary mb-2">Real Valuations</h3>
-                  <p className="text-sm text-muted leading-relaxed">Not a generic calculator. Your rate card uses your actual audience geo, niche CPM, and view patterns to price every deal type.</p>
+                  <p className="text-base text-muted leading-relaxed">Not a generic calculator. Your rate card uses your actual audience geo, niche CPM, and view patterns to price every deal type.</p>
                 </div>
               </div>
 
@@ -458,7 +474,7 @@ export default async function LandingPage({
                     <span className="font-bold text-sm text-secondary">{item.q}</span>
                     <ChevronDown className="w-4 h-4 text-muted group-open:rotate-180 transition-transform flex-shrink-0 ml-4" />
                   </summary>
-                  <p className="mt-3 text-sm text-muted leading-relaxed">{item.a}</p>
+                  <p className="mt-3 text-base text-muted leading-relaxed">{item.a}</p>
                 </details>
               ))}
             </div>
@@ -474,7 +490,7 @@ export default async function LandingPage({
             <h2 className="text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tighter leading-tight">
               Know your worth.<br /><span className="text-primary">Prove it.</span> Close the deal.
             </h2>
-            <p className="mt-6 text-lg text-white/50 max-w-md mx-auto">From analytics to closed deal — most creators are up and running in under 10 minutes.</p>
+            <p className="mt-6 text-lg text-white/50 max-w-md mx-auto">Turn your analytics into a rate card, a pitch, and a clearer sponsor reply.</p>
             <Link
               href="/auth/signup"
               className="mt-10 inline-flex items-center gap-2 bg-primary text-white font-bold px-10 py-5 rounded-xl hover:bg-primary-hover transition-all text-lg"
